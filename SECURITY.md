@@ -14,7 +14,9 @@ The helper, `/Library/PrivilegedHelperTools/local.tether.helper`
 - writes its status, stats and log under `/Library/Application Support/Tether` and
   `/Library/Logs/Tether`;
 - removes itself, the watchdog, their files, and the `tether` links and per-user login items that
-  point into Tether.app, once Tether.app has been gone for 10 minutes (dragged to the Trash).
+  point into Tether.app, once Tether.app has been gone for 10 minutes (dragged to the Trash). The
+  app path it watches must end in `.app/Contents/MacOS/Tether`, so a hand-edited control file
+  can't aim this clean-up elsewhere.
 
 It makes no network connections and runs no program other than `pmset` and, when removing
 itself, `launchctl bootout`.

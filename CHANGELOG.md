@@ -32,6 +32,8 @@ First public release.
   second; a status item with a ring that empties during a battery hold.
 - Icon Composer app icon (Liquid Glass, dark, clear and tinted), sidebar settings, English and
   Korean with a choice in Settings.
+- `tether doctor` and a checks list in Settings › System and at the top of the report; "+30 min"
+  for a running battery hold (`tether hold +30m`), still capped at 4 hours from its start.
 - First-run welcome, update check against GitHub releases, full uninstall.
 - A quiet panel: controls that can't act right now are hidden rather than greyed out, and there
   are no lid-open or toggle notifications (the last lid session is in the panel and History).

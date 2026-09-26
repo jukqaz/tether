@@ -86,6 +86,10 @@ These are the loosest values allowed. Settings → Safety can only tighten them 
 it again, so a hand-edited file cannot loosen anything; it logs the limits in force whenever
 they change.
 
+"+30 min" in the panel (`tether hold +30m`, `tether://hold/+30m`) pushes the deadline back; the
+helper treats a later deadline for a running hold as an extension and keeps the time it was first
+seen, so the 4-hour cap can't be extended.
+
 On battery the helper checks every 10 seconds and, unless Settings → Safety → Low Power Mode says
 otherwise (`control.json` → `holdLowPower`), turns Low Power Mode on (`pmset -b lowpowermode 1`). Ending a hold with the lid closed sleeps the Mac through
 the same path as an unplug. A hold is consumed when it ends, on "sleep now", and on any helper
@@ -119,7 +123,8 @@ A charger that can't keep up (a small power bank, a phone charger) also counts a
 closed and no external display, a battery at the floor whose IOPS current stays at or below
 −100 mA for a minute puts the Mac to sleep the same way (`WeakChargerPolicy`, event
 `weakChargerSleep`, `status.json` → `weakChargerSleepAt`). A charge limit holding the battery at
-0 mA doesn't count. Both last-resort sleeps live in `Helper+SafetyNet`.
+0 mA doesn't count. Both last-resort sleeps live in `Helper+SafetyNet`; their timing is
+`SafetyNetTracker`, a value type fed the time, so it is unit-tested on a simulated clock.
 
 ## Safety net for the helper itself
 
@@ -135,7 +140,10 @@ while it was on and the Mac then ran on battery with the lid closed, nothing wou
   every 30 seconds), it runs `pmset -a disablesleep 0` and logs to the helper log.
 - The login item relaunches the app after a crash (`KeepAlive` → `SuccessfulExit: false`), since a
   crash with the lid closed would leave the built-in screen at 0 brightness; Quit is final.
-- An app dragged to the Trash is noticed by the helper (`AppPresence`, 10-minute grace): it restores
+- Only one copy of the app runs; a second launch brings the first forward and quits, as two would
+  each hold the screen awake and fight over dimming.
+- An app dragged to the Trash is noticed by the helper (`AppPresence`, 10-minute grace; only a path
+  ending in `.app/Contents/MacOS/Tether` counts): it restores
   normal sleep and Low Power Mode, removes itself, the watchdog, the `tether` links and login items
   that pointed into the app, then boots itself out.
 
@@ -238,6 +246,12 @@ more. Above 3 %/h (1–2 % is typical) the app notifies with the wake cause. Thi
 Mac Tether put to sleep with the lid shut really stayed asleep in the bag.
 
 ## Diagnostics
+
+`HealthChecks` runs quick checks as the user: helper installed and answering, versions matching,
+watchdog present, the sleep setting matching the rule (in a full wake), battery temperature
+readable, control file writable, login item current, detailed logging left on. `tether doctor`
+prints them (exit 1 on a failure), Settings › System lists only those needing attention, and the
+report opens with them.
 
 `Diagnostics.report` builds one Markdown document for a person or an AI assistant: how Tether is
 meant to behave (so the logs can be checked against it), the state now, the limits in force,

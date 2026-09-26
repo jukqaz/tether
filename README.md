@@ -92,7 +92,9 @@ tether status [--json]          # state, for people or scripts
 tether on | off | toggle
 tether sleep                    # sleep now, even on power
 tether hold 1h30m               # stay awake on battery too (up to 4 h); tether hold off
+tether hold +30m                # extend the running hold (still at most 4 h from its start)
 tether run -- make release      # stay awake until the command finishes
+tether doctor                   # quick checks: helper, watchdog, sleep setting, login item
 tether diagnose --record        # a troubleshooting report (see below)
 ```
 
@@ -129,7 +131,8 @@ puts the Mac to sleep as soon as any of these is true:
 
 ## Troubleshooting
 
-Something not working as expected? Settings › System › Diagnostics: turn on **Detailed logging**,
+Something not working as expected? First run `tether doctor` (or look at Settings › System ›
+Diagnostics, which lists any check that needs attention). Then turn on **Detailed logging**,
 make it happen again, then click **Create Report…**. You get a Markdown file on your Desktop with
 how Tether is meant to behave, the current state, settings, recent sleeps, the helper log, the
 macOS power log and the app log, with your user name and the Mac's name masked. Attach it to an
