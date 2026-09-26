@@ -3,6 +3,8 @@
 # for 3 minutes) while sleep is disabled and the Mac runs on battery, a closed Mac in a bag would
 # never sleep: turn sleep back on. Plain shell on purpose, so it works even if the helper binary
 # cannot run.
+PATH=/usr/bin:/bin:/usr/sbin:/sbin
+export PATH
 # The paths can be overridden only to test this script.
 STATUS="${TETHER_STATUS:-/Library/Application Support/Tether/status.json}"
 LOG="${TETHER_LOG:-/Library/Logs/Tether/helper.log}"

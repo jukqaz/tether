@@ -10,7 +10,7 @@ extension Helper {
         let path = control.appPath
         let exists = path.map { FileManager.default.fileExists(atPath: $0) } ?? true
         guard appPresence.shouldRetire(path: path, exists: exists, now: Date()), let path else { return false }
-        log("Tether.app has been gone for \(Int(AppPresence.grace / 60)) minutes (\(path)): restoring normal sleep and removing the helper")
+        log("Tether.app has been gone for \(Int(AppPresence.grace / 60)) minutes (\(printable(path))): restoring normal sleep and removing the helper")
         if currentSnapshot().sleepDisabled { pmset(["-a", "disablesleep", "0"]) }
         manageLowPower(on: false)
         manageACLowPower(on: false, readings: currentReadings())

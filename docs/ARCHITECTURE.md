@@ -317,8 +317,13 @@ A menu bar utility should cost nothing while nothing happens:
 - **Updates.** Once a day the app asks the GitHub API for the latest release tag; nothing else is
   sent. Off in Settings → System.
 
-Files: `/Library/Application Support/Tether/{control,status,usage,helper-state}.json` (control is
-admin-writable), log at `/Library/Logs/Tether/helper.log` (trimmed past 2 MB).
+Files: `/Library/Application Support/Tether/{control,status,usage,helper-state}.json`, log at
+`/Library/Logs/Tether/helper.log` (trimmed past 2 MB). The folder is root:wheel 0755, so only root
+can add, remove or replace files in it; control.json is root:admin 0664, so administrators (the app,
+the `tether` command) rewrite it in place (`JSONFile.overwrite`: no link, a single name, no create).
+The helper replaces its own files through `mkstemp` and `rename` (`JSONFile.write`), and at every
+start takes the folder back and removes anything unexpected (`Helper.secureSupportFolder`), as the
+install script does.
 
 ## Known limits
 

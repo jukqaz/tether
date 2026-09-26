@@ -96,3 +96,80 @@ final class LanguageTests: XCTestCase {
         XCTAssertEqual(L("Sleep", "잠자기"), "Sleep")
     }
 }
+
+/// The helper writes as root into a folder the app can reach, so writes must never follow a link
+/// or trust a predictable name, and the in-place control write must refuse anything but the file.
+final class JSONFileSafetyTests: XCTestCase {
+    private var folder: String!
+
+    override func setUpWithError() throws {
+        folder = FileManager.default.temporaryDirectory.appendingPathComponent("jsonfile-\(UUID().uuidString)").path
+        try FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(atPath: folder)
+    }
+
+    private func mode(_ path: String) -> mode_t {
+        var info = stat()
+        stat(path, &info)
+        return info.st_mode & 0o7777
+    }
+
+    func testWriteReplacesALinkInsteadOfFollowingIt() throws {
+        let victim = folder + "/victim"
+        try Data("keep".utf8).write(to: URL(fileURLWithPath: victim))
+        let path = folder + "/status.json"
+        try FileManager.default.createSymbolicLink(atPath: path, withDestinationPath: victim)
+        XCTAssertTrue(JSONFile.write(Control(enabled: false), to: path, permissions: 0o644))
+        XCTAssertEqual(try String(contentsOfFile: victim, encoding: .utf8), "keep")
+        XCTAssertNil(try? FileManager.default.destinationOfSymbolicLink(atPath: path))
+        XCTAssertEqual(JSONFile.read(Control.self, from: path)?.enabled, false)
+        XCTAssertEqual(mode(path), 0o644)
+        // No temp file left behind.
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: folder).sorted(), ["status.json", "victim"])
+    }
+
+    func testOverwriteKeepsTheFileAndItsMode() throws {
+        let path = folder + "/control.json"
+        FileManager.default.createFile(atPath: path, contents: Data("{\"enabled\":true}".utf8), attributes: [.posixPermissions: 0o640])
+        var before = stat()
+        stat(path, &before)
+        XCTAssertTrue(JSONFile.overwrite(Control(enabled: false), at: path))
+        var after = stat()
+        stat(path, &after)
+        XCTAssertEqual(after.st_ino, before.st_ino)
+        XCTAssertEqual(mode(path), 0o640)
+        XCTAssertEqual(JSONFile.read(Control.self, from: path)?.enabled, false)
+    }
+
+    func testOverwriteRefusesLinksAndMissingFiles() throws {
+        let victim = folder + "/victim"
+        try Data("keep".utf8).write(to: URL(fileURLWithPath: victim))
+        let symlink = folder + "/control.json"
+        try FileManager.default.createSymbolicLink(atPath: symlink, withDestinationPath: victim)
+        XCTAssertFalse(JSONFile.overwrite(Control(enabled: false), at: symlink))
+        let hardlink = folder + "/other.json"
+        try FileManager.default.linkItem(atPath: victim, toPath: hardlink)
+        XCTAssertFalse(JSONFile.overwrite(Control(enabled: false), at: hardlink))
+        XCTAssertEqual(try String(contentsOfFile: victim, encoding: .utf8), "keep")
+        XCTAssertFalse(JSONFile.overwrite(Control(enabled: false), at: folder + "/missing.json"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder + "/missing.json"))
+    }
+
+    func testControlStoreChangesTheFileInPlace() throws {
+        let path = folder + "/control.json"
+        FileManager.default.createFile(atPath: path, contents: Data("{\"enabled\":true}".utf8))
+        XCTAssertTrue(ControlStore.update(path: path) { $0.enabled = false })
+        XCTAssertEqual(ControlStore.read(path: path).enabled, false)
+        XCTAssertFalse(ControlStore.update(path: folder + "/none.json") { $0.enabled = false })
+    }
+
+    func testOversizedFilesAreNotRead() throws {
+        let path = folder + "/big.json"
+        let padding = String(repeating: " ", count: JSONFile.maxSize)
+        try Data("{\"enabled\":false}\(padding)".utf8).write(to: URL(fileURLWithPath: path))
+        XCTAssertNil(JSONFile.read(Control.self, from: path))
+    }
+}

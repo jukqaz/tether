@@ -22,13 +22,22 @@ install -o root -g wheel -m 644 "$RES/$LABEL.plist" "/Library/LaunchDaemons/$LAB
 install -o root -g wheel -m 755 "$RES/tether-watchdog.sh" "/Library/PrivilegedHelperTools/$WATCHDOG"
 install -o root -g wheel -m 644 "$RES/$WATCHDOG.plist" "/Library/LaunchDaemons/$WATCHDOG.plist"
 
-# Admins may write the control file, so the app can change settings without a password.
-install -d -o root -g admin -m 775 "$SUPPORT"
+# The support folder is root's alone: only root may add, remove or replace files in it, so nothing
+# there can be swapped for a link. Admins may rewrite control.json, so the app changes settings
+# without a password. 2.0.0 made the folder admin-writable, so it is taken back first, then
+# anything that isn't a known plain file with a single name is removed before control.json is
+# touched.
+mkdir -p "$SUPPORT"
+chown root:wheel "$SUPPORT"
+chmod 755 "$SUPPORT"
+find "$SUPPORT" -mindepth 1 -maxdepth 1 \( ! -type f -o -links +1 \) -exec rm -rf {} +
+find "$SUPPORT" -mindepth 1 -maxdepth 1 -type f ! \( -name control.json -o -name status.json \
+  -o -name usage.json -o -name helper-state.json \) -exec rm -f {} +
 if [ ! -f "$SUPPORT/control.json" ]; then
   printf '{\n  "enabled" : true\n}\n' > "$SUPPORT/control.json"
-  chown root:admin "$SUPPORT/control.json"
-  chmod 664 "$SUPPORT/control.json"
 fi
+chown root:admin "$SUPPORT/control.json"
+chmod 664 "$SUPPORT/control.json"
 install -d -o root -g wheel -m 755 /Library/Logs/Tether
 
 launchctl enable "system/$LABEL" 2>/dev/null || true

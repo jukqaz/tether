@@ -105,6 +105,7 @@ final class Helper {
         } else {
             log("warning: battery temperature unreadable; battery holds will end immediately")
         }
+        secureSupportFolder()
         state = JSONFile.read(HelperState.self, from: statePath) ?? HelperState()
         usage = JSONFile.read(Usage.self, from: usagePath) ?? Usage()
         summary = UsageSummary(usage, now: Date())

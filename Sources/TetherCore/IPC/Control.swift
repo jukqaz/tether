@@ -49,13 +49,14 @@ public enum ControlStore {
         JSONFile.read(Control.self, from: path) ?? Control()
     }
 
-    /// Applies a change to the control file and nudges the helper. Returns false when it cannot
-    /// be written, e.g. the helper was never installed so the folder does not exist.
+    /// Applies a change to the control file, in place (see `JSONFile.overwrite`), and nudges the
+    /// helper. Returns false when it cannot be written, e.g. the helper was never installed, so
+    /// the file does not exist, or the user isn't an administrator.
     @discardableResult
     public static func update(path: String = TetherPaths.controlPath, _ change: (inout Control) -> Void) -> Bool {
         var control = read(path: path)
         change(&control)
-        guard JSONFile.write(control, to: path, permissions: 0o664) else { return false }
+        guard JSONFile.overwrite(control, at: path) else { return false }
         DarwinNotification.post(TetherPaths.controlChanged)
         return true
     }
