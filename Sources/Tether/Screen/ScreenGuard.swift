@@ -130,7 +130,7 @@ final class ScreenGuard {
 
     private func dim() {
         if let level = BuiltInBrightness.get(), ScreenPolicy.worthSaving(level) {
-            appLog.notice("lid closed: dimming the built-in screen from \(level, privacy: .public)")
+            appLog.notice("dimming the built-in screen from \(level, privacy: .public) (\(self.lidClosed ? "lid closed" : "screen off", privacy: .public))")
             defaults.set(level, forKey: Key.brightness)
             BuiltInBrightness.set(0)
         }
