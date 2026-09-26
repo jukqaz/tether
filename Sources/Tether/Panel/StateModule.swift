@@ -2,7 +2,8 @@ import SwiftUI
 import TetherCore
 
 /// The main module: what Tether is doing, and the switch for clamshell mode. On by default, so
-/// connecting power turns clamshell mode on by itself; off gives the lid back to macOS.
+/// connecting power turns clamshell mode on by itself; off gives the lid back to macOS until power
+/// is connected again.
 struct StateModule: View {
     @ObservedObject var model: AppModel
     let compact: Bool
@@ -33,8 +34,8 @@ struct StateModule: View {
                 .controlSize(compact ? .mini : .small)
                 .tint(Color.tetherMint)
                 .disabled(!model.helperInstalled)
-                .help(L("On power, closing the lid doesn't sleep the Mac. Off: the lid sleeps it as usual.",
-                        "전원이 연결되면 덮개를 닫아도 잠들지 않아요. 끄면 평소처럼 덮개를 닫을 때 잠들어요."))
+                .help(L("On power, closing the lid doesn't sleep the Mac. Off: the lid sleeps it as usual until power is connected again.",
+                        "전원이 연결되면 덮개를 닫아도 잠들지 않아요. 끄면 전원을 다시 연결할 때까지 평소처럼 덮개를 닫으면 잠들어요."))
         }
         .padding(compact ? Metrics.compactPadding : Metrics.padding)
         .surface(radius: compact ? Metrics.compactRadius : Metrics.radius)

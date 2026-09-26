@@ -36,6 +36,12 @@ public enum Action: Equatable, Sendable {
 /// The whole rule set: AC power turns clamshell mode on, anything else turns it off, except
 /// during a time-boxed battery hold whose safety limits are checked by the helper.
 public enum Policy {
+    /// Switched off means "off until power is connected again": going from battery to AC turns
+    /// clamshell mode back on, so it isn't forgotten off. A restart isn't a connection.
+    public static func resumesOnPower(enabled: Bool, previous: PowerSource?, current: PowerSource) -> Bool {
+        !enabled && previous == .battery && current == .ac
+    }
+
     public static func wantsClamshell(_ s: Snapshot, enabled: Bool, sleepNowPending: Bool,
                                       batteryHold: Bool = false) -> Bool {
         enabled && !sleepNowPending && (s.power == .ac || (s.power == .battery && batteryHold))

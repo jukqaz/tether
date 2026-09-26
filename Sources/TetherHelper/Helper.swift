@@ -21,6 +21,8 @@ final class Helper {
     var lastEvent: EventKind?
     var lastEventAt: Double?
     var lastLidClosed: Bool?
+    /// The power source at the previous check, to notice a new connection.
+    var lastPower: PowerSource?
     var sleepAttempt = 0
     /// What the next forced sleep is logged as: a "sleep now" request, or overheating.
     var sleepNowReason = EventKind.sleepNow
@@ -102,6 +104,7 @@ final class Helper {
         // Seed the lid state so only real opens/closes get logged. The clamshell message also
         // fires when AppleClamshellCausesSleep flips on a power change, with the lid unchanged.
         lastLidClosed = currentSnapshot().lidClosed
+        lastPower = currentSnapshot().power
         loadControl(initial: true)
         watchPowerSource()
         watchSystemPower()
@@ -172,6 +175,12 @@ final class Helper {
             log("lid \(snapshot.lidClosed ? "closed" : "opened") on \(snapshot.power.rawValue)"
                 + (snapshot.sleepDisabled ? ", clamshell holds" : ""))
         }
+        if Policy.resumesOnPower(enabled: control.enabled, previous: lastPower, current: snapshot.power),
+           ControlStore.update(path: controlPath, { $0.enabled = true }) {
+            control.enabled = true
+            log("power connected: clamshell mode switched back on")
+        }
+        if snapshot.power != .unknown { lastPower = snapshot.power }
         let holdActive = updateBatteryHold(snapshot, readings: readings)
         let actions = Policy.actions(for: snapshot, triggers: triggers, enabled: control.enabled,
                                      sleepNowPending: Date() < sleepNowUntil, batteryHold: holdActive)

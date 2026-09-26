@@ -37,7 +37,8 @@ case .on, .off, .toggle:
                               : L("Tether is on. Clamshell mode starts when power is connected.", "Tether를 켰습니다. 전원을 연결하면 클램쉘 모드가 켜집니다."))
     } else {
         print(after.snapshot.lidClosed ? L("Tether is off. The lid is closed, so the Mac is going to sleep.", "Tether를 껐습니다. 덮개가 닫혀 있어 Mac이 잠듭니다.")
-                                       : L("Tether is off. Closing the lid will sleep the Mac.", "Tether를 껐습니다. 이제 덮개를 닫으면 잠듭니다."))
+                                       : L("Tether is off until power is connected again. Closing the lid will sleep the Mac.",
+                                           "전원을 다시 연결할 때까지 Tether를 껐습니다. 이제 덮개를 닫으면 잠듭니다."))
     }
 
 case .sleep:

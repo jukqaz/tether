@@ -43,7 +43,7 @@ extension AppModel {
                          menuBarIcon: .symbol("exclamationmark.triangle"))
         case .off:
             Presentation(title: L("Clamshell mode off", "클램쉘 모드 꺼짐"),
-                         subtitle: L("Closing the lid sleeps the Mac as usual", "덮개를 닫으면 평소처럼 잠들어요"),
+                         subtitle: L("The lid sleeps the Mac as usual · on again with power", "덮개를 닫으면 평소처럼 잠들어요 · 전원을 다시 연결하면 켜져요"),
                          icon: .mark(.disabled), color: .gray, menuBarIcon: .mark(.disabled))
         case .holdingOnBattery:
             Presentation(title: L("Holding on battery", "배터리로 유지 중"),

@@ -360,7 +360,7 @@ final class AppModel: ObservableObject {
             if notifyToggle, errorText == nil {
                 notifier?.post(title: on ? L("Clamshell mode is on", "클램쉘 모드를 켰습니다") : L("Clamshell mode is off", "클램쉘 모드를 껐습니다"),
                                body: on ? L("On power, closing the lid won't sleep the Mac.", "전원이 연결돼 있으면 덮개를 닫아도 잠들지 않아요.")
-                                        : L("Closing the lid will sleep the Mac.", "이제 덮개를 닫으면 잠들어요."))
+                                        : L("Closing the lid will sleep the Mac until power is connected again.", "전원을 다시 연결할 때까지 덮개를 닫으면 잠들어요."))
             }
         case .sleep: sleepNow()
         case .hold(let minutes): startBatteryHold(minutes: minutes, source: "url")

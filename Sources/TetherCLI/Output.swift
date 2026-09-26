@@ -8,7 +8,7 @@ let usageText = L("""
 tether: control Tether's clamshell mode
 
   tether [status] [--json]      current state (--json for scripts and agents)
-  tether on | off | toggle      turn Tether on, off, or flip it
+  tether on | off | toggle      turn clamshell mode on, off (until power is connected again), or flip it
   tether sleep                  sleep now, even on power
   tether hold <time>            stay awake on battery too: 30m, 1h, 1h30m, 90 (minutes), up to 4h
   tether hold off               end the battery hold
@@ -24,7 +24,7 @@ The same commands work as URLs: tether://sleep, tether://hold/90m, tether://togg
 tether: Tether 클램쉘 모드 제어
 
   tether [status] [--json]      지금 상태 (--json: 스크립트·에이전트용)
-  tether on | off | toggle      Tether 켜기 / 끄기 / 전환
+  tether on | off | toggle      클램쉘 모드 켜기 / 끄기(전원을 다시 연결할 때까지) / 전환
   tether sleep                  지금 잠자기 (전원이 연결돼 있어도)
   tether hold <시간>             배터리에서도 유지: 30m, 1h, 1h30m, 90 (분), 최대 4h
   tether hold off               배터리 유지 끄기

@@ -118,3 +118,18 @@ final class PolicyTests: XCTestCase {
         XCTAssertEqual(actions(.ac, lid: false, sd: false, triggers: [.timer], pending: true), [])
     }
 }
+
+/// Switched off lasts until power is connected again.
+final class ResumeOnPowerTests: XCTestCase {
+    func testConnectingPowerTurnsItBackOn() {
+        XCTAssertTrue(Policy.resumesOnPower(enabled: false, previous: .battery, current: .ac))
+    }
+
+    func testOnlyANewConnection() {
+        XCTAssertFalse(Policy.resumesOnPower(enabled: false, previous: .ac, current: .ac), "switched off on power stays off")
+        XCTAssertFalse(Policy.resumesOnPower(enabled: false, previous: nil, current: .ac), "a restart isn't a connection")
+        XCTAssertFalse(Policy.resumesOnPower(enabled: false, previous: .ac, current: .battery))
+        XCTAssertFalse(Policy.resumesOnPower(enabled: false, previous: .unknown, current: .ac))
+        XCTAssertFalse(Policy.resumesOnPower(enabled: true, previous: .battery, current: .ac), "already on")
+    }
+}
