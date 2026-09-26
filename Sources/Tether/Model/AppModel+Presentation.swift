@@ -199,16 +199,11 @@ extension AppModel {
 
     // MARK: Records
 
-    /// The last lid session, shown for an hour after it ended unless dismissed.
+    /// The last lid session, for an hour after it ended.
     var visibleSession: LidSession? {
         guard let session = usage?.recentSessions.last, let end = session.end,
-              end > dismissedSessionEnd, Date().timeIntervalSince1970 - end < 3600,
-              !snapshot.lidClosed else { return nil }
+              Date().timeIntervalSince1970 - end < 3600, !snapshot.lidClosed else { return nil }
         return session
-    }
-
-    func dismissSession() {
-        dismissedSessionEnd = usage?.recentSessions.last?.end ?? Date().timeIntervalSince1970
     }
 
     var today: DayStats { (usage?.stats ?? StatsTracker()).today(now: Date()) }

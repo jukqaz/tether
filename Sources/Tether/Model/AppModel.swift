@@ -35,6 +35,8 @@ final class AppModel: ObservableObject {
     @Published private(set) var enabled = true
     /// Stricter battery-hold limits.
     @Published private(set) var limits = UserLimits()
+    /// Low Power Mode during a battery hold (`Control.holdLowPower`).
+    @Published private(set) var holdLowPower = true
     @Published private(set) var heatGuard = HeatGuardSettings.standard
     /// Who armed the current battery hold (see `Control.holdSource`).
     @Published private(set) var holdSource: String?
@@ -77,9 +79,6 @@ final class AppModel: ObservableObject {
             Localization.current = language.language
         }
     }
-    @Published var dismissedSessionEnd: Double {
-        didSet { defaults.set(dismissedSessionEnd, forKey: Key.dismissedSessionEnd) }
-    }
 
     // MARK: Everything else
 
@@ -120,7 +119,6 @@ final class AppModel: ObservableObject {
         static let checkUpdates = "checkUpdates"
         static let lastUpdateCheck = "lastUpdateCheck"
         static let onboarded = "onboarded"
-        static let dismissedSessionEnd = "dismissedSessionEnd"
         static let launchAtLoginConfigured = "launchAtLoginConfigured"
     }
 
@@ -149,11 +147,17 @@ final class AppModel: ObservableObject {
         panelCompact = defaults.bool(forKey: Key.panelCompact)
         menuBarDetails = defaults.bool(forKey: Key.menuBarDetails)
         language = Localization.savedChoice
-        dismissedSessionEnd = defaults.double(forKey: Key.dismissedSessionEnd)
         launchAtLogin = SystemIntegration.launchAtLogin
         readState()
         if preview {
-            if sample { usage = SampleData.usage() }
+            if sample {
+                // Screenshots show the defaults, not this Mac's own choices.
+                usage = SampleData.usage()
+                limits = UserLimits()
+                heatGuard = .standard
+                holdLowPower = true
+                debugLogging = false
+            }
             if holdSample, let status {
                 self.status = SampleData.holding(status)
                 helperResponding = true
@@ -223,6 +227,7 @@ final class AppModel: ObservableObject {
         if controlFile.reload(), let control = controlFile.value {
             assign(\.enabled, control.enabled)
             assign(\.limits, control.limits ?? UserLimits())
+            assign(\.holdLowPower, control.holdLowPower ?? true)
             assign(\.heatGuard, control.heatGuard ?? .standard)
             assign(\.holdSource, control.batteryHoldUntil == nil ? nil : control.holdSource)
             assign(\.debugLogging, control.debugLog == true)

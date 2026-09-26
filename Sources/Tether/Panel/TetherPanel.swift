@@ -1,16 +1,15 @@
 import SwiftUI
 import TetherCore
 
-/// The menu bar panel, built like macOS Control Center: glass modules, the state circle doubling
-/// as the on/off control. Full shows status, the battery hold, the last lid session and today's
-/// numbers; compact keeps the state module and one row of controls.
+/// The menu bar panel, built like macOS Control Center: glass modules on one spacing grid. Full
+/// shows the state with the clamshell switch, status, the battery hold and today's records;
+/// compact keeps the state module and one row of controls.
 struct TetherPanel: View {
     @ObservedObject var model: AppModel
-    @AppStorage(DesignKey.liquidGlass) private var glass = true
 
     var body: some View {
         Group {
-            if glass && DesignKey.glassOn {
+            if DesignKey.glassOn {
                 GlassEffectContainer(spacing: Metrics.spacing) { content }
             } else {
                 content
@@ -19,7 +18,6 @@ struct TetherPanel: View {
         .padding(model.panelCompact ? Metrics.compactPadding : Metrics.padding)
         .frame(width: model.panelCompact ? 300 : 340)
         .animation(.snappy, value: model.batteryHoldUntil)
-        .animation(.snappy, value: model.visibleSession)
     }
 
     @ViewBuilder
@@ -45,9 +43,6 @@ struct TetherPanel: View {
                     }
                 }
                 .fixedSize(horizontal: false, vertical: true)
-                if let session = model.visibleSession {
-                    SessionCard(session: session, model: model)
-                }
                 if model.usage != nil {
                     TodayModule(model: model)
                 }

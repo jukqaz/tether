@@ -2,8 +2,9 @@ import Charts
 import SwiftUI
 import TetherCore
 
-/// Today's lid-closed time with a bar per day, and the one number worth a glance: how the last
-/// sleep went, or how warm the lid-closed battery ran.
+/// Today's lid-closed time with a bar per day, and the one line worth a glance: the lid session
+/// that just ended, how the last sleep went, or how warm the lid-closed battery ran. (The lid
+/// session is also a notification, and History keeps them all.)
 struct TodayModule: View {
     @ObservedObject var model: AppModel
 
@@ -42,6 +43,12 @@ struct TodayModule: View {
     }
 
     private func detail(_ day: DayStats) -> String? {
+        if let session = model.visibleSession {
+            var parts = [L("Just closed \(Texts.duration(session.duration))", "방금 덮개 닫음 \(Texts.duration(session.duration))")]
+            if let peak = session.maxTemperature { parts.append(L(String(format: "peak %.1f°", peak), String(format: "최고 %.1f°", peak))) }
+            if let a = session.batteryStart, let b = session.batteryEnd, a != b { parts.append("\(a)→\(b)%") }
+            return parts.joined(separator: " · ")
+        }
         if let last = model.lastSleep, let drain = last.drainPerHour {
             return L(String(format: "Last sleep %@ · %.1f%%/h (%@)", Texts.duration(last.duration ?? 0), drain, Texts.drainLevel(drain)),
                      String(format: "지난 잠 %@ · 시간당 %.1f%% (%@)", Texts.duration(last.duration ?? 0), drain, Texts.drainLevel(drain)))

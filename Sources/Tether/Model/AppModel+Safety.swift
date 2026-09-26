@@ -1,8 +1,8 @@
 import Foundation
 import TetherCore
 
-/// The battery-hold limits and the heat guard, and what the measurements recommend for them.
-/// They live in the control file because the helper enforces them.
+/// The battery-hold limits, Low Power Mode and the heat guard, and what the measurements recommend
+/// for them. They live in the control file because the helper enforces them.
 extension AppModel {
     var batteryFloor: Int { SafetyPolicy.floor(limits) }
     var maxHoldMinutes: Int { Int(SafetyPolicy.maxHold(limits) / 60) }
@@ -23,11 +23,27 @@ extension AppModel {
         save { ControlStore.update { $0.heatGuard = new == .standard ? nil : new } }
     }
 
+    func setHoldLowPower(_ on: Bool) {
+        save { ControlStore.update { $0.holdLowPower = on ? nil : false } }
+    }
+
+    /// When a closed Mac running hot on power gets Low Power Mode: from "serious" (2), from "fair"
+    /// (1), or never (0). One choice for the heat guard's switch and level.
+    var heatLowPowerLevel: Int { heatGuard.enabled ? heatGuard.threshold : 0 }
+
+    func setHeatLowPowerLevel(_ level: Int) {
+        setHeatGuard(level == 0 ? HeatGuardSettings(enabled: false, level: heatGuard.level)
+                                : HeatGuardSettings(enabled: true, level: level))
+    }
+
+    var safetyIsDefault: Bool { limits.isDefault && heatGuard == .standard && holdLowPower }
+
     func resetSafety() {
         save {
             ControlStore.update {
                 $0.limits = nil
                 $0.heatGuard = nil
+                $0.holdLowPower = nil
             }
         }
     }

@@ -54,8 +54,8 @@ struct SystemPage: View {
             } header: {
                 Text(L("What Tether Changes", "Tether가 바꾸는 시스템 설정"))
             } footer: {
-                Note(L("“Prevent sleep” is a hidden setting, on only while power is connected, and not shown in System Settings. Low Power Mode is switched on only during the heat guard or a battery hold, then restored. The keep-screen-on request shows in Activity Monitor › Energy. A small watchdog checks every minute that sleep is never left off on battery should the helper stop. Sleep and display timers, the lock password, the screen saver and input sources are never changed.",
-                       "잠자기 금지는 전원이 연결돼 있을 때만 켜는 숨은 값이라 설정 앱에는 없어요. 저전력 모드는 발열 보호나 배터리 유지 중에만 잠깐 켜고 원래 값으로 돌려요. 화면 켜 둠 요청은 활동 모니터 › 에너지에 보여요. 작은 감시 장치가 1분마다 확인해서, 도우미가 멈춰도 배터리에서 잠자기 금지가 남지 않게 해요. 잠자기·화면 끄기 타이머, 잠금 암호, 화면 보호기, 입력 소스는 바꾸지 않아요."))
+                Note(L("“Prevent sleep” is a hidden setting, on only while power is connected, and not shown in System Settings. Low Power Mode is switched on only in the cases chosen in Safety, then restored. The keep-screen-on request shows in Activity Monitor › Energy. A small watchdog checks every minute that sleep is never left off on battery should the helper stop. Sleep and display timers, the lock password, the screen saver and input sources are never changed.",
+                       "잠자기 금지는 전원이 연결돼 있을 때만 켜는 숨은 값이라 설정 앱에는 없어요. 저전력 모드는 배터리와 발열 설정에서 고른 경우에만 잠깐 켜고 원래 값으로 돌려요. 화면 켜 둠 요청은 활동 모니터 › 에너지에 보여요. 작은 감시 장치가 1분마다 확인해서, 도우미가 멈춰도 배터리에서 잠자기 금지가 남지 않게 해요. 잠자기·화면 끄기 타이머, 잠금 암호, 화면 보호기, 입력 소스는 바꾸지 않아요."))
             }
 
             Section {

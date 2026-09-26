@@ -12,13 +12,13 @@ enum Metrics {
 }
 
 enum DesignKey {
-    /// Liquid Glass surfaces and buttons; off falls back to tinted fills and bordered capsules.
-    static let liquidGlass = "liquidGlass"
-
-    /// On by default; `bool(forKey:)` also accepts "NO"/"0" passed as a launch argument.
-    static var glassOn: Bool {
-        UserDefaults.standard.object(forKey: liquidGlass) == nil ? true : UserDefaults.standard.bool(forKey: liquidGlass)
-    }
+    /// Liquid Glass surfaces and buttons. Glass already follows the system's Reduce Transparency
+    /// setting, so there is no switch for it; `-liquidGlass NO` on the command line falls back to
+    /// tinted fills and bordered capsules, because glass doesn't draw in offscreen screenshots.
+    static let glassOn: Bool = {
+        let value = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)["liquidGlass"]
+        return !["NO", "no", "0", "false"].contains(value as? String ?? "")
+    }()
 }
 
 extension View {
@@ -67,11 +67,10 @@ struct StateIcon: View {
 struct Orb: ViewModifier {
     let color: Color
     var active = true
-    @AppStorage(DesignKey.liquidGlass) private var glass = true
 
     func body(content: Content) -> some View {
         let fill = active ? color : Color.secondary.opacity(0.35)
-        if glass && DesignKey.glassOn {
+        if DesignKey.glassOn {
             content.glassEffect(.regular.tint(fill).interactive(), in: .circle)
         } else {
             content

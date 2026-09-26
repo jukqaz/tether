@@ -20,7 +20,7 @@ struct SafetyPage: View {
                         L(String(format: "%.1f%% an hour · %@", $0, Texts.drainLevel($0)), String(format: "시간당 %.1f%% · %@", $0, Texts.drainLevel($0)))
                     } ?? L("no data yet", "아직 기록 없음"))
                 }
-                LabeledContent(L("Heat guard", "발열 보호")) {
+                LabeledContent(L("Low Power Mode for heat", "발열로 저전력 모드")) {
                     Text(summary.heatGuards == 0 ? L("never needed", "켜진 적 없음")
                          : L("\(summary.heatGuards)× · peak heat with the lid closed: \(Texts.thermal(summary.closedMaxThermal))",
                              "\(summary.heatGuards)회 · 덮개 닫힘 최고 발열 \(Texts.thermal(summary.closedMaxThermal))"))
@@ -78,25 +78,32 @@ struct SafetyPage: View {
             }
 
             Section {
-                Toggle(L("Heat guard", "발열 보호"), isOn: Binding(get: { model.heatGuard.enabled }, set: { on in
-                    var settings = model.heatGuard
-                    settings.enabled = on
-                    model.setHeatGuard(settings)
-                }))
-                Picker(L("Turn Low Power Mode on from", "저전력 모드를 켜는 단계"), selection: Binding(get: { model.heatGuard.threshold }, set: { level in
-                    var settings = model.heatGuard
-                    settings.level = level
-                    model.setHeatGuard(settings)
-                })) {
-                    Text(choice(L("“fair” heat", "발열 '보통'부터"), isDefault: false, isRecommended: advice.heatLevel?.value == 1)).tag(1)
-                    Text(choice(L("“serious” heat", "발열 '심각'부터"), isDefault: true, isRecommended: advice.heatLevel?.value == 2)).tag(2)
+                Toggle(L("During a battery hold", "배터리 유지 중"),
+                       isOn: Binding(get: { model.holdLowPower }, set: { model.setHoldLowPower($0) }))
+                Picker(L("On power, lid closed and hot", "전원 연결 중 덮개를 닫은 채 뜨거울 때"),
+                       selection: Binding(get: { model.heatLowPowerLevel }, set: { model.setHeatLowPowerLevel($0) })) {
+                    Text(choice(L("From “serious” heat", "발열 '심각'부터"), isDefault: true,
+                                isRecommended: advice.heatLevel?.value == 2)).tag(2)
+                    Text(choice(L("From “fair” heat", "발열 '보통'부터"), isDefault: false,
+                                isRecommended: advice.heatLevel?.value == 1)).tag(1)
+                    Text(L("Never", "켜지 않음")).tag(0)
                 }
-                .disabled(!model.heatGuard.enabled)
             } header: {
-                Text(L("Heat Guard · On Power, Lid Closed", "발열 보호 · 전원 연결, 덮개 닫힘"))
+                Text(L("Low Power Mode", "저전력 모드"))
             } footer: {
-                Note(L("When it runs hot, Low Power Mode cools it; after \(Int(ACThermalPolicy.coolDown / 60)) cool minutes the setting is restored. It never sleeps the Mac, so remote work keeps going.",
-                       "뜨거워지면 저전력 모드로 식히고, \(Int(ACThermalPolicy.coolDown / 60))분 동안 식으면 원래대로 돌려요. 원격 작업이 끊기지 않도록 잠재우지는 않아요."))
+                Note(L("Tether turns Low Power Mode on only in these cases, for less heat and drain, and puts your setting back afterwards: on power after \(Int(ACThermalPolicy.coolDown / 60)) cool minutes. If you change Low Power Mode yourself meanwhile, it's left as you set it.",
+                       "Tether는 이 두 경우에만 저전력 모드를 켜서 열과 배터리 소모를 줄이고, 끝나면 원래 설정으로 돌려요(전원 연결 중에는 \(Int(ACThermalPolicy.coolDown / 60))분 동안 식은 뒤). 그사이 직접 저전력 모드를 바꾸면 그대로 둬요."))
+            }
+
+            Section {
+                LabeledContent(L("Put to sleep when overheating", "과열되면 잠재우기")) {
+                    Text(L("always on", "항상 켜짐"))
+                }
+            } header: {
+                Text(L("Safety Net · On Power, Lid Closed", "안전장치 · 전원 연결, 덮개 닫힘"))
+            } footer: {
+                Note(L("With no display attached, a closed Mac on power may be in a bag on a power bank. If heat stays “critical” for 2 minutes or the battery reaches \(Int(ACThermalPolicy.hotBattery))°C for a minute, it's put to sleep. With an external display attached it's left running.",
+                       "모니터 없이 전원이 연결된 채 덮개가 닫혀 있으면 보조배터리를 꽂고 가방에 넣은 상태일 수 있어요. 발열 '위험'이 2분 이어지거나 배터리가 \(Int(ACThermalPolicy.hotBattery))°C로 1분 지나면 잠재워요. 외장 모니터가 있으면 그대로 둬요."))
             }
 
             Section {
@@ -108,7 +115,7 @@ struct SafetyPage: View {
                     }
                     Spacer()
                     Button(L("Restore Defaults", "기본값으로 되돌리기")) { model.resetSafety() }
-                        .disabled(model.limits.isDefault && model.heatGuard == .standard)
+                        .disabled(model.safetyIsDefault)
                 }
             }
         }
@@ -119,7 +126,7 @@ struct SafetyPage: View {
         if let v = a.closedLid?.value { parts.append(L("lid closed \(Int(v))°C", "덮개 닫힘 \(Int(v))°C")) }
         if let v = a.openLid?.value { parts.append(L("lid open \(Int(v))°C", "덮개 열림 \(Int(v))°C")) }
         if let v = a.maxHold?.value { parts.append(L("up to \(Int(v)) h", "최대 \(Int(v))시간")) }
-        if let v = a.heatLevel?.value { parts.append(L("heat guard from “\(Texts.thermal(v))”", "발열 '\(Texts.thermal(v))'부터")) }
+        if let v = a.heatLevel?.value { parts.append(L("Low Power Mode from “\(Texts.thermal(v))”", "저전력 모드 '\(Texts.thermal(v))'부터")) }
         return L("Recommended: ", "추천: ") + parts.joined(separator: " · ")
     }
 

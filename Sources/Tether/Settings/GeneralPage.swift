@@ -3,7 +3,6 @@ import TetherCore
 
 struct GeneralPage: View {
     @ObservedObject var model: AppModel
-    @AppStorage(DesignKey.liquidGlass) private var glass = true
 
     var body: some View {
         Page {
@@ -31,12 +30,11 @@ struct GeneralPage: View {
                     Text(L("Compact", "컴팩트")).tag(true)
                 }
                 .pickerStyle(.segmented)
-                Toggle(L("Liquid Glass", "리퀴드 글래스"), isOn: $glass)
             } header: {
                 Text(L("Appearance", "모양"))
             } footer: {
-                Note(L("Compact shows the state and one row of round buttons; the button at the bottom of the panel switches too. Without Liquid Glass, cards and buttons are opaque.",
-                       "컴팩트는 상태와 동그란 버튼 한 줄만 보여 줘요. 패널 아래 버튼으로도 바꿀 수 있어요. 리퀴드 글래스를 끄면 불투명한 카드와 버튼을 써요."))
+                Note(L("Compact shows the state and one row of controls; the button at the bottom of the panel switches too. Liquid Glass follows System Settings › Accessibility › Display › Reduce transparency.",
+                       "컴팩트는 상태와 조작 한 줄만 보여 줘요. 패널 아래 버튼으로도 바꿀 수 있어요. 리퀴드 글래스는 시스템 설정 › 손쉬운 사용 › 디스플레이 › 투명도 줄이기를 따라요."))
             }
 
             Section {
