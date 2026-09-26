@@ -267,11 +267,19 @@ func run(_ rest: [String]) -> Never {
     term.resume()
     process.waitUntilExit()
 
+    let took = Texts.duration(Date().timeIntervalSince(started))
+    let message: String
     if let ownHold, ControlStore.read().batteryHoldUntil == ownHold {
         ControlStore.cancelHold()
-        FileHandle.standardError.write(Data(L("tether: done after \(Texts.duration(Date().timeIntervalSince(started))); the Mac may sleep again\n",
-                                              "tether: \(Texts.duration(Date().timeIntervalSince(started))) 만에 끝났습니다. 이제 다시 잠들 수 있습니다\n").utf8))
+        message = L("tether: done after \(took); the Mac may sleep again\n", "tether: \(took) 만에 끝났습니다. 이제 다시 잠들 수 있습니다\n")
+    } else if ownHold != nil {
+        // Someone ended or replaced the hold meanwhile (the panel, another command): theirs now.
+        message = L("tether: done after \(took); the battery hold was changed meanwhile, so it was left as it is\n",
+                    "tether: \(took) 만에 끝났습니다. 그사이 배터리 유지가 바뀌어 그대로 두었습니다\n")
+    } else {
+        message = L("tether: done after \(took)\n", "tether: \(took) 만에 끝났습니다\n")
     }
+    FileHandle.standardError.write(Data(message.utf8))
     let status = process.terminationStatus
     exit(process.terminationReason == .uncaughtSignal ? 128 + status : status)
 }
