@@ -112,7 +112,7 @@ extension EventKind {
     public var displayText: String {
         switch self {
         case .started: L("helper started", "도우미 시작")
-        case .clamshellOn: L("power connected → clamshell on", "전원 연결 → 클램쉘 켬")
+        case .clamshellOn: L("on power → clamshell on", "전원 연결 중 → 클램쉘 켬")
         case .clamshellOffPower: L("power disconnected → clamshell off", "전원 해제 → 클램쉘 끔")
         case .clamshellOffDisabled: L("Tether turned off → clamshell off", "Tether 끔 → 클램쉘 끔")
         case .clamshellOffSleepNow: L("sleep now → clamshell off", "지금 잠자기 → 클램쉘 끔")

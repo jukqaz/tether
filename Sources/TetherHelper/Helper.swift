@@ -264,7 +264,11 @@ final class Helper {
     func perform(_ action: Action, snapshot: Snapshot, triggers: Set<Trigger>) {
         switch action {
         case .setSleepDisabled(true):
-            note(.clamshellOn)
+            if snapshot.power == .battery {
+                log("battery hold: clamshell on")  // the hold's own event stays the last one
+            } else {
+                note(.clamshellOn)
+            }
             pmset(["-a", "disablesleep", "1"])
         case .setSleepDisabled(false):
             if snapshot.power == .battery {

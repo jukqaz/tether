@@ -109,7 +109,7 @@ public enum EventKind: String, Codable, Sendable {
     public var logText: String {
         switch self {
         case .started: "helper started"
-        case .clamshellOn: "power connected: clamshell on"
+        case .clamshellOn: "on power: clamshell on"
         case .clamshellOffPower: "power disconnected: clamshell off"
         case .clamshellOffDisabled: "Tether turned off: clamshell off"
         case .clamshellOffSleepNow: "sleep now: clamshell off"

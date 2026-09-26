@@ -17,7 +17,7 @@ final class DiagnosticsTests: XCTestCase {
     func testLinesSinceKeepsDatedLinesAndTheirContinuations() {
         let log = """
         2026-09-26 10:00:00 started v2.0.0
-        2026-09-26 11:59:59 power connected: clamshell on
+        2026-09-26 11:59:59 on power: clamshell on
         2026-09-26 12:00:00 lid closed on AC
           continued detail
         2026-09-26 12:30:00 battery hold armed

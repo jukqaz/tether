@@ -158,7 +158,7 @@ public enum Diagnostics {
     static let expectations = """
     ## How Tether should behave (compare the logs against this)
 
-    - On power: the helper sets `SleepDisabled` (log: "power connected: clamshell on"). The Mac stays awake with the lid closed and the app keeps the display from sleeping, so nothing locks; with no external display it dims the built-in screen instead.
+    - On power: the helper sets `SleepDisabled` (log: "on power: clamshell on"). The Mac stays awake with the lid closed and the app keeps the display from sleeping, so nothing locks; with no external display it dims the built-in screen instead.
     - Unplugged: the helper clears `SleepDisabled` ("power disconnected: clamshell off"). If the lid is already closed it asks for sleep ("lid already closed: sleeping"; powerd then waits about 5 s, `darkwakelinger`).
     - Battery hold: clamshell stays on on battery until the time is up or a safety limit ends it ("battery hold ended: …"), then a closed Mac sleeps. Holds never survive a helper restart. With auto-adjust on (control.json "autoLimits": true) the temperature limits and the longest hold follow this Mac's measurements, never looser than the defaults; the helper logs the limits in force whenever they change ("limits (auto-adjusted): …").
     - Heat guard: on power with the lid closed, thermal pressure at the threshold turns AC Low Power Mode on; it is restored after 2 cool minutes or when the lid opens.
