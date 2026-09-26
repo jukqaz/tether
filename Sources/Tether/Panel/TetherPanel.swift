@@ -38,7 +38,8 @@ struct TetherPanel: View {
                 StateModule(model: model, compact: false)
                 HStack(alignment: .top, spacing: Metrics.spacing) {
                     StatusModule(model: model)
-                    if model.helperInstalled, model.helperResponding {
+                    // A hold only means something while clamshell mode is switched on.
+                    if model.helperInstalled, model.helperResponding, model.enabled || model.batteryHoldUntil != nil {
                         HoldModule(model: model, clock: model.clock)
                     }
                 }

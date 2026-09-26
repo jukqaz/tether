@@ -29,7 +29,7 @@ struct CompactControls: View {
     private var holdControl: some View {
         if model.batteryHoldUntil != nil {
             CompactHold(model: model, clock: model.clock)
-        } else if model.helperInstalled, model.helperResponding {
+        } else if model.helperInstalled, model.helperResponding, model.enabled, model.canStartHold {
             Menu {
                 ForEach(model.holdChoices, id: \.self) { minutes in
                     Button(L("Battery hold ", "배터리 유지 ") + Texts.duration(TimeInterval(minutes * 60))) {
@@ -48,9 +48,7 @@ struct CompactControls: View {
             .buttonStyle(.plain)
             .menuIndicator(.hidden)
             .fixedSize()
-            .disabled(!model.enabled || !model.canStartHold)
-            .opacity(model.enabled && model.canStartHold ? 1 : 0.45)
-            .help(model.canStartHold ? L("Battery hold", "배터리에서도 유지") : model.holdBlockedReason)
+            .help(L("Battery hold", "배터리에서도 유지"))
             .accessibilityLabel(L("Battery hold", "배터리 유지"))
         }
     }

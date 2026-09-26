@@ -27,15 +27,17 @@ struct StateModule: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 4)
-            Toggle(L("Clamshell mode", "클램쉘 모드"),
-                   isOn: Binding(get: { model.enabled }, set: { model.setEnabled($0) }))
-                .toggleStyle(.switch)
-                .labelsHidden()
-                .controlSize(compact ? .mini : .small)
-                .tint(Color.tetherMint)
-                .disabled(!model.helperInstalled)
-                .help(L("On power, closing the lid doesn't sleep the Mac. Off: the lid sleeps it as usual until power is connected again.",
-                        "전원이 연결되면 덮개를 닫아도 잠들지 않아요. 끄면 전원을 다시 연결할 때까지 평소처럼 덮개를 닫으면 잠들어요."))
+            // Without the helper there's nothing to switch; the banner above offers the install.
+            if model.helperInstalled {
+                Toggle(L("Clamshell mode", "클램쉘 모드"),
+                       isOn: Binding(get: { model.enabled }, set: { model.setEnabled($0) }))
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+                    .controlSize(compact ? .mini : .small)
+                    .tint(Color.tetherMint)
+                    .help(L("On power, closing the lid doesn't sleep the Mac. Off: the lid sleeps it as usual until power is connected again.",
+                            "전원이 연결되면 덮개를 닫아도 잠들지 않아요. 끄면 전원을 다시 연결할 때까지 평소처럼 덮개를 닫으면 잠들어요."))
+            }
         }
         .padding(compact ? Metrics.compactPadding : Metrics.padding)
         .surface(radius: compact ? Metrics.compactRadius : Metrics.radius)

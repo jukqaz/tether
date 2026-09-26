@@ -12,20 +12,14 @@ struct LidPage: View {
                     Text(L("Lock the screen", "화면 잠그기")).tag(true)
                 }
                 .disabled(!ScreenLock.available && !model.lidCloseLocks)
-                LabeledContent(L("Built-in screen and keyboard light", "내장 화면과 키보드 조명")) {
-                    Text(L("dimmed to 0 · restored when the lid opens", "0으로 내림 · 덮개를 열면 복원"))
-                }
-                LabeledContent(L("With an external display", "외장 모니터가 있을 때")) {
-                    Text(L("left to macOS · never locked", "macOS에 맡김 · 잠그지 않음"))
-                }
             } header: {
                 Text(L("Lid Closed", "덮개를 닫았을 때"))
             } footer: {
                 Note(model.lidCloseLocks
-                     ? L("It locks the moment the lid closes. Opening the lid or connecting remotely asks for your password or Touch ID, and display sleep and locking follow your macOS settings.",
-                         "덮개를 닫는 순간 잠겨요. 덮개를 열거나 원격으로 접속하면 암호나 Touch ID가 필요하고, 화면 끄기와 잠금은 macOS 설정을 그대로 따라요.")
-                     : L("Nothing locks, so remote sessions and reopening the lid carry on right away. The screen under the lid is dimmed so it doesn't heat up.",
-                         "잠그지 않으니 원격 접속이나 덮개를 열 때 바로 이어서 쓸 수 있어요. 덮개 아래에서 화면이 켜진 채 열이 나지 않도록 어둡게 해요."))
+                     ? L("It locks as the lid closes, and display sleep and locking follow your macOS settings.",
+                         "덮개를 닫으면 바로 잠기고, 화면 끄기와 잠금은 macOS 설정을 따라요.")
+                     : L("Remote sessions and reopening the lid carry on right away. The screen and keyboard light under the lid go dark and come back when it opens; with an external display, macOS handles the screens.",
+                         "원격 접속도, 덮개를 다시 열 때도 바로 이어서 쓸 수 있어요. 덮개 아래 화면과 키보드 조명은 꺼 두었다가 열면 돌아오고, 외장 모니터가 있으면 화면은 macOS가 맡아요."))
             }
 
             if !model.lidCloseLocks {
@@ -38,8 +32,8 @@ struct LidPage: View {
                 } header: {
                     Text(L("Screen Off Without Locking", "잠금 없이 화면 끄기"))
                 } footer: {
-                    Note(L("In clamshell mode macOS's display sleep is held off so nothing locks. Instead, when idle, Tether turns the screen black; any input brings it straight back. It waits while another app keeps the screen on, like a video or a call. To turn it off right away, close the lid.",
-                           "클램쉘 모드에서는 화면이 잠기지 않도록 macOS의 화면 끄기를 막아요. 대신 입력이 없으면 Tether가 화면을 검게 만들고, 마우스나 키보드를 쓰면 바로 돌아와요. 동영상이나 화상 회의처럼 다른 앱이 화면을 켜 두는 동안에는 끄지 않아요. 바로 끄려면 덮개를 닫으면 돼요."))
+                    Note(L("The screen goes black and comes straight back, unlocked, with any input. It waits during a video or a call.",
+                           "화면을 검게 꺼 두었다가, 마우스나 키보드를 쓰면 잠금 없이 바로 돌아와요. 동영상이나 화상 회의 중에는 기다려요."))
                 }
             }
         }

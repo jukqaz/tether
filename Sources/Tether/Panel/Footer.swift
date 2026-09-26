@@ -55,7 +55,6 @@ struct FooterButtons: View {
                     Button(L("Download Tether \(update)…", "Tether \(update) 받기…")) { model.openReleases() }
                 }
                 Divider()
-                Button(L("Show Log", "기록 보기")) { model.openLog() }
                 Button(L("Create Diagnostic Report", "진단 보고서 만들기")) { model.createDiagnosticReport() }
                     .disabled(model.diagnosticsBusy)
                 Divider()

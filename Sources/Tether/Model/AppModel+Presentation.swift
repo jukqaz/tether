@@ -43,11 +43,11 @@ extension AppModel {
                          menuBarIcon: .symbol("exclamationmark.triangle"))
         case .off:
             Presentation(title: L("Clamshell mode off", "클램쉘 모드 꺼짐"),
-                         subtitle: L("The lid sleeps the Mac as usual · on again with power", "덮개를 닫으면 평소처럼 잠들어요 · 전원을 다시 연결하면 켜져요"),
+                         subtitle: L("Back on when power is connected again", "전원을 다시 연결하면 켜져요"),
                          icon: .mark(.disabled), color: .gray, menuBarIcon: .mark(.disabled))
         case .holdingOnBattery:
             Presentation(title: L("Holding on battery", "배터리로 유지 중"),
-                         subtitle: L("Sleeps on its own if it gets hot or time runs out", "뜨거워지거나 시간이 끝나면 알아서 잠들어요"),
+                         subtitle: L("Awake on battery, within the safety limits", "안전 기준 안에서 배터리로 깨어 있어요"),
                          icon: .symbol("bag.fill"), color: .orange, menuBarIcon: .mark(.held))
         case .heatGuard(let critical):
             Presentation(title: critical ? L("Critical heat", "발열 위험") : L("Heat guard on", "발열 보호 중"),
@@ -61,7 +61,7 @@ extension AppModel {
                          icon: .mark(.on), color: .tetherMint, menuBarIcon: .mark(.on))
         case .clamshellOff:
             Presentation(title: L("On battery", "배터리 사용 중"),
-                         subtitle: L("Closing the lid sleeps · back on with power", "덮개를 닫으면 잠들어요 · 전원을 연결하면 다시 켜져요"),
+                         subtitle: L("Clamshell mode turns on with power", "전원을 연결하면 클램쉘 모드가 켜져요"),
                          icon: .mark(.off), color: .blue, menuBarIcon: .mark(.off))
         }
     }

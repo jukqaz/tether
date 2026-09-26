@@ -57,11 +57,7 @@ final class AppModel: ObservableObject {
     }
     @Published var notifyHoldEnd: Bool { didSet { defaults.set(notifyHoldEnd, forKey: Key.notifyHoldEnd) } }
     @Published var notifyHeat: Bool { didSet { defaults.set(notifyHeat, forKey: Key.notifyHeat) } }
-    @Published var notifyToggle: Bool { didSet { defaults.set(notifyToggle, forKey: Key.notifyToggle) } }
     @Published var notifySleepDrain: Bool { didSet { defaults.set(notifySleepDrain, forKey: Key.notifySleepDrain) } }
-    @Published var sessionNotifications: Bool {
-        didSet { defaults.set(sessionNotifications, forKey: Key.sessionNotifications) }
-    }
     @Published var checkUpdates: Bool {
         didSet {
             defaults.set(checkUpdates, forKey: Key.checkUpdates)
@@ -108,13 +104,11 @@ final class AppModel: ObservableObject {
 
     private enum Key {
         static let idleBlankMinutes = "idleBlankMinutes"
-        static let sessionNotifications = "sessionNotifications"
         static let menuBarDetails = "menuBarDetails"
         static let panelCompact = "panelCompact"
         static let lidCloseLocks = "lidCloseLocks"
         static let notifyHoldEnd = "notifyHoldEnd"
         static let notifyHeat = "notifyHeat"
-        static let notifyToggle = "notifyToggle"
         static let notifySleepDrain = "notifySleepDrain"
         static let checkUpdates = "checkUpdates"
         static let lastUpdateCheck = "lastUpdateCheck"
@@ -133,16 +127,14 @@ final class AppModel: ObservableObject {
     /// adds made-up usage and `holdSample` a running battery hold, to check the design.
     init(preview: Bool = false, sample: Bool = false, holdSample: Bool = false) {
         if !preview { Self.migrateDefaults() }
-        defaults.register(defaults: [Key.idleBlankMinutes: 10, Key.sessionNotifications: true, Key.menuBarDetails: true,
+        defaults.register(defaults: [Key.idleBlankMinutes: 10, Key.menuBarDetails: true,
                                      Key.lidCloseLocks: false, Key.notifyHoldEnd: true, Key.notifyHeat: true,
-                                     Key.notifyToggle: true, Key.notifySleepDrain: true, Key.checkUpdates: true])
+                                     Key.notifySleepDrain: true, Key.checkUpdates: true])
         idleBlankMinutes = defaults.integer(forKey: Key.idleBlankMinutes)
         lidCloseLocks = defaults.bool(forKey: Key.lidCloseLocks)
         notifyHoldEnd = defaults.bool(forKey: Key.notifyHoldEnd)
         notifyHeat = defaults.bool(forKey: Key.notifyHeat)
-        notifyToggle = defaults.bool(forKey: Key.notifyToggle)
         notifySleepDrain = defaults.bool(forKey: Key.notifySleepDrain)
-        sessionNotifications = defaults.bool(forKey: Key.sessionNotifications)
         checkUpdates = defaults.bool(forKey: Key.checkUpdates)
         panelCompact = defaults.bool(forKey: Key.panelCompact)
         menuBarDetails = defaults.bool(forKey: Key.menuBarDetails)
@@ -212,8 +204,7 @@ final class AppModel: ObservableObject {
         screenGuard.update(clamshellActive: clamshellActive, lidClosed: snapshot.lidClosed,
                            idleBlankMinutes: idleBlankMinutes, lockOnLidClose: lidCloseLocks)
         notifier?.check(status: status, usage: usage, lidClosed: snapshot.lidClosed,
-                        choices: .init(holdEnd: notifyHoldEnd, heat: notifyHeat, sleepDrain: notifySleepDrain,
-                                       sessions: sessionNotifications))
+                        choices: .init(holdEnd: notifyHoldEnd, heat: notifyHeat, sleepDrain: notifySleepDrain))
         notifier?.checkHelper(installed: helperInstalled, responding: helperResponding)
         checkForUpdates(force: false)
     }
@@ -355,13 +346,8 @@ final class AppModel: ObservableObject {
         switch command {
         case .status: break
         case .on, .off, .toggle:
-            let on = command == .toggle ? !enabled : command == .on
-            setEnabled(on)
-            if notifyToggle, errorText == nil {
-                notifier?.post(title: on ? L("Clamshell mode is on", "클램쉘 모드를 켰습니다") : L("Clamshell mode is off", "클램쉘 모드를 껐습니다"),
-                               body: on ? L("On power, closing the lid won't sleep the Mac.", "전원이 연결돼 있으면 덮개를 닫아도 잠들지 않아요.")
-                                        : L("Closing the lid will sleep the Mac until power is connected again.", "전원을 다시 연결할 때까지 덮개를 닫으면 잠들어요."))
-            }
+            // The menu bar icon shows the result; Shortcuts can announce it if wanted.
+            setEnabled(command == .toggle ? !enabled : command == .on)
         case .sleep: sleepNow()
         case .hold(let minutes): startBatteryHold(minutes: minutes, source: "url")
         case .cancelHold: cancelBatteryHold()

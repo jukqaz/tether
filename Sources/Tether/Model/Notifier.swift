@@ -12,7 +12,6 @@ final class Notifier {
         var holdEnd: Bool
         var heat: Bool
         var sleepDrain: Bool
-        var sessions: Bool
     }
 
     private let defaults = UserDefaults.standard
@@ -21,7 +20,6 @@ final class Notifier {
 
     private enum Key {
         static let holdEnd = "lastNotifiedHoldEnd"
-        static let session = "lastNotifiedSessionEnd"
         static let heat = "lastNotifiedThermalAlert"
         static let overheat = "lastNotifiedOverheatSleep"
         static let weakCharger = "lastNotifiedWeakChargerSleep"
@@ -30,7 +28,7 @@ final class Notifier {
 
     /// Starts from what is already recorded, so only what happens from now on is reported.
     init(status: Status?, usage: Usage?) {
-        for (key, value) in [(Key.holdEnd, status?.lastHoldEndAt), (Key.session, usage?.recentSessions.last?.end),
+        for (key, value) in [(Key.holdEnd, status?.lastHoldEndAt),
                              (Key.heat, status?.thermalAlertAt), (Key.overheat, status?.overheatSleepAt),
                              (Key.weakCharger, status?.weakChargerSleepAt),
                              (Key.sleep, usage?.sleeps.recent.last?.wokeAt)]
@@ -44,7 +42,6 @@ final class Notifier {
         holdEnded(status, allowed: choices.holdEnd)
         overheated(status, allowed: choices.heat)
         chargerTooWeak(status)
-        if !lidClosed { sessionEnded(usage?.recentSessions.last, allowed: choices.sessions) }
         sleepDrained(usage?.sleeps.recent.last, allowed: choices.sleepDrain)
     }
 
@@ -82,12 +79,6 @@ final class Notifier {
         post(title: L("Tether put your Mac to sleep", "Tether가 Mac을 잠재웠습니다"),
              body: L("\(time) · The charger couldn't keep up and the battery reached its floor with the lid closed. Use a stronger charger to keep it awake.",
                      "\(time) · 충전기 출력이 부족해 덮개를 닫은 채 배터리가 하한선까지 줄었어요. 계속 깨워 두려면 더 센 충전기를 쓰세요."))
-    }
-
-    /// When the lid opens after a long closed stretch, summarise it.
-    private func sessionEnded(_ session: LidSession?, allowed: Bool) {
-        guard let session, let end = session.end, isNew(end, Key.session), allowed else { return }
-        post(title: L("While the lid was closed", "덮개를 닫아 둔 동안"), body: Texts.session(session))
     }
 
     /// Sleep that cost more than it should (1–2 %/h is typical): say how much and what woke it.
