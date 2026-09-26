@@ -6,7 +6,15 @@ import TetherCore
 enum Launcher {
     static func main() {
         let rendered = MainActor.assumeIsolated { PreviewRenderer.handle(CommandLine.arguments) }
-        if !rendered { TetherApp.main() }
+        guard !rendered else { return }
+        // One copy at a time: two would each hold the screen awake and fight over dimming.
+        if let id = Bundle.main.bundleIdentifier,
+           let running = NSRunningApplication.runningApplications(withBundleIdentifier: id)
+               .first(where: { $0 != NSRunningApplication.current }) {
+            running.activate()
+            return
+        }
+        TetherApp.main()
     }
 }
 

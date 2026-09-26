@@ -14,6 +14,16 @@ struct HoldModule: View {
                     Image(systemName: "bag.fill")
                     Text(model.holdingOnBattery ? L("On battery", "배터리로 유지") : L("Armed", "유지 예약됨"))
                     Spacer(minLength: 0)
+                    if model.canExtendHold(minutes: 30) {
+                        Button(L("+30 min", "+30분")) { model.extendBatteryHold(minutes: 30) }
+                            .buttonStyle(.plain)
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(.orange.opacity(0.15), in: .capsule)
+                            .help(L("Stay awake 30 minutes longer, up to 4 hours from the start",
+                                    "30분 더 유지해요. 시작부터 최대 4시간까지"))
+                    }
                     Button { model.cancelBatteryHold() } label: {
                         Image(systemName: "xmark")
                             .font(.caption2.weight(.bold))

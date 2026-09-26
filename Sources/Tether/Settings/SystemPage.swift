@@ -5,6 +5,7 @@ struct SystemPage: View {
     @ObservedObject var model: AppModel
     @State private var lowPower: (battery: Int?, ac: Int?) = (nil, nil)
     @State private var blockers: [SleepBlocker] = []
+    @State private var checks: [HealthCheck] = []
     @State private var confirmingRemoval = false
 
     var body: some View {
@@ -80,6 +81,20 @@ struct SystemPage: View {
             }
 
             Section {
+                let problems = checks.filter { $0.result != .ok }
+                if problems.isEmpty, !checks.isEmpty {
+                    Label(L("All \(checks.count) checks pass", "점검 \(checks.count)개 모두 정상"), systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                } else {
+                    ForEach(problems, id: \.name) { check in
+                        LabeledContent {
+                            Text(check.detail).foregroundStyle(.secondary)
+                        } label: {
+                            Label(check.name, systemImage: check.result == .failed ? "xmark.octagon.fill" : "exclamationmark.triangle.fill")
+                                .foregroundStyle(check.result == .failed ? Color.red : Color.orange)
+                        }
+                    }
+                }
                 Toggle(L("Detailed logging", "자세한 기록 남기기"),
                        isOn: Binding(get: { model.debugLogging }, set: { model.setDebugLogging($0) }))
                     .disabled(!model.helperInstalled)
@@ -147,6 +162,7 @@ struct SystemPage: View {
             while !Task.isCancelled {
                 lowPower = SystemProbe.lowPowerModes()
                 blockers = model.sleepBlockers()
+                checks = HealthChecks.run()
                 try? await Task.sleep(for: .seconds(5))
             }
         }

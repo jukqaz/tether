@@ -8,6 +8,9 @@ if arguments.first == "run" {
 if arguments.first == "diagnose" {
     diagnose(Array(arguments.dropFirst()))
 }
+if arguments.first == "doctor" {
+    doctor()
+}
 
 let words = arguments.filter { !$0.hasPrefix("-") }
 
@@ -66,6 +69,16 @@ case .hold(let minutes):
     let floor = SafetyPolicy.floor(after.control.limits)
     print(L("Staying awake on battery until \(time(until)). It sleeps sooner if it gets hot or the battery reaches \(floor)%.",
             "배터리에서도 \(time(until))까지 유지합니다. 뜨거워지거나 배터리가 \(floor)%가 되면 먼저 잠듭니다."))
+
+case .extendHold(let minutes):
+    requireHelper(state)
+    guard state.status?.batteryHoldUntil != nil else {
+        fail(L("No battery hold is running. Start one with 'tether hold 1h'.", "배터리 유지가 켜져 있지 않습니다. 'tether hold 1h'로 먼저 켜 주세요."))
+    }
+    let after = change { ControlStore.extendHold(minutes: minutes) }
+    guard let until = after.status?.batteryHoldUntil else { fail(cannotWrite) }
+    print(L("Battery hold extended until \(time(until)) (at most 4 h from when it started).",
+            "배터리 유지를 \(time(until))까지 늘렸습니다 (시작부터 최대 4시간)."))
 
 case .cancelHold:
     requireHelper(state)

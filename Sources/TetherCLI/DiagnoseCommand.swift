@@ -9,6 +9,20 @@ func appVersion() -> String? {
     return plist?["CFBundleShortVersionString"] as? String
 }
 
+/// `tether doctor`: the quick checks, one line each; exits 1 when one failed.
+func doctor() -> Never {
+    let checks = HealthChecks.run()
+    for check in checks {
+        let mark = switch check.result {
+        case .ok: "✓"
+        case .warning: "!"
+        case .failed: "✗"
+        }
+        print("\(mark) \(check.name): \(check.detail)")
+    }
+    exit(checks.contains { $0.result == .failed } ? 1 : 0)
+}
+
 func diagnose(_ rest: [String]) -> Never {
     var output: String?
     var record = false

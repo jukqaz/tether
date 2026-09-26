@@ -313,6 +313,17 @@ final class AppModel: ObservableObject {
         save { ControlStore.cancelHold() }
     }
 
+    /// Whether the running hold can take `minutes` more under the cap counted from its start.
+    func canExtendHold(minutes: Int) -> Bool {
+        guard let until = batteryHoldUntil, let since = status?.batteryHoldSince else { return false }
+        return until.timeIntervalSince1970 + TimeInterval(minutes * 60) <= since + SafetyPolicy.maxHold(limits)
+    }
+
+    func extendBatteryHold(minutes: Int) {
+        guard canExtendHold(minutes: minutes) else { return }
+        save { ControlStore.extendHold(minutes: minutes) }
+    }
+
     /// Fraction of the hold still left, for the progress ring and bar.
     func holdRemainingFraction(at date: Date) -> Double {
         guard let until = batteryHoldUntil, let since = status?.batteryHoldSince else { return 1 }
@@ -350,6 +361,7 @@ final class AppModel: ObservableObject {
             setEnabled(command == .toggle ? !enabled : command == .on)
         case .sleep: sleepNow()
         case .hold(let minutes): startBatteryHold(minutes: minutes, source: "url")
+        case .extendHold(let minutes): extendBatteryHold(minutes: minutes)
         case .cancelHold: cancelBatteryHold()
         }
     }
