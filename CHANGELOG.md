@@ -12,6 +12,8 @@ First public release.
   thermal pressure, battery floor, time), adjustable only toward stricter values.
 - Heat guard: Low Power Mode for a closed Mac running hot on power, and sleep if it keeps
   overheating with no display attached (a bag on a power bank counts as power).
+- Low Power Mode only where you allow it (during battery holds; when hot on power, from "serious",
+  from "fair" or never), and your own change to it is never undone.
 - A watchdog LaunchDaemon that turns sleep back on if the helper ever stops while sleep is off on
   battery.
 - Data-based settings: time-weighted battery temperatures, battery use during holds, and

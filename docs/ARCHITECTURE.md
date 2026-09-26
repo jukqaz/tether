@@ -78,8 +78,8 @@ These are the loosest values allowed. Settings → Safety can only tighten them 
 it again, so a hand-edited file cannot loosen anything; it logs the limits in force whenever
 they change.
 
-On battery the hold turns Low Power Mode on (`pmset -b lowpowermode 1`, previous value restored)
-and the helper checks every 10 seconds. Ending a hold with the lid closed sleeps the Mac through
+On battery the helper checks every 10 seconds and, unless Settings → Safety → Low Power Mode says
+otherwise (`control.json` → `holdLowPower`), turns Low Power Mode on (`pmset -b lowpowermode 1`). Ending a hold with the lid closed sleeps the Mac through
 the same path as an unplug. A hold is consumed when it ends, on "sleep now", and on any helper
 restart or reboot, so it never comes back on its own. Battery temperature is
 `BatteryData.Temperature` (0.01 °C) on the `AppleSmartBatteryPack` registry entry (macOS 27; older
@@ -93,8 +93,12 @@ Clamshell on AC still blocks the hinge vent, and sleeping would end the remote s
 clamshell is for, so the helper cools first: thermal pressure *serious* with the lid closed on AC
 turns AC Low Power Mode on (`pmset -c lowpowermode 1`, previous value restored), released after 2
 minutes at *fair* or below, or at once when the lid opens or power is pulled. *Critical* for 3
-minutes raises a notification (visible over remote desktop). Settings → Safety can turn the guard
-off or start it at *fair* (`control.json` → `heatGuard`).
+minutes raises a notification (visible over remote desktop). Settings → Safety → Low Power Mode
+picks from *serious*, from *fair*, or never (`control.json` → `heatGuard`).
+
+Both cases go through `LowPowerPolicy`: Tether remembers the value it replaced and puts it back
+afterwards only while the setting still shows the "on" it chose, so a change the user made
+meanwhile is kept. A battery hold is recorded (event, stats) whether or not Low Power Mode helps.
 
 A power bank counts as AC, so "on power with the lid closed" may also be a bag. With no external
 display attached, *critical* for 2 minutes or a battery at 45 °C for a minute (above every hold
@@ -108,6 +112,7 @@ the helper checks every 10 seconds.
 `SleepDisabled` is a system setting that outlives the process that set it. If the helper stopped
 while it was on and the Mac then ran on battery with the lid closed, nothing would put it to sleep:
 
+- An overheat sleep also ends an armed battery hold, quietly, as the overheating is reported.
 - The helper clears it on SIGTERM (normal stop, uninstall) and re-evaluates on every start; launchd
   restarts it after a crash (`KeepAlive`).
 - `local.tether.watchdog` is a second LaunchDaemon that launchd runs every 60 seconds: a plain
@@ -147,9 +152,9 @@ from the bottom reads as a speech bubble.
 
 The panel is laid out like Control Center: glass modules on one spacing grid (`PanelStyle.Metrics`).
 Full: the state with the clamshell switch, status (power, lid, battery temperature), the battery
-hold (durations in a menu, then the countdown to the second with a bar), the last lid session, and
-today (lid-closed time, a bar per day, how the last sleep went). Compact: the state module, and a
-row with the hold, the temperature and the footer buttons.
+hold (durations in a menu, then the countdown to the second with a bar), and today (lid-closed
+time, a bar per day, and one line: the lid session that just ended, or how the last sleep went).
+Compact: the state module, and a row with the hold, the temperature and the footer buttons.
 
 ## App icon
 
@@ -183,9 +188,9 @@ A System Settings style sidebar (the gear in the panel, or ⌘, while it is open
 
 | Page | Contents |
 |---|---|
-| General | launch at login, language, panel size, Liquid Glass, menu bar details |
-| Lid & Screen | lid close: stay unlocked (dim) or lock, idle screen-off delay |
-| Safety | this Mac's measurements with recommended limits, stricter battery-hold limits, heat guard |
+| General | launch at login, language, panel size, menu bar details (Liquid Glass follows Reduce transparency) |
+| Lid & Screen | lid close: stay unlocked (dim) or lock; the idle screen-off delay, shown only when staying unlocked |
+| Safety | this Mac's measurements with recommended limits, stricter battery-hold limits, Low Power Mode (during holds; when hot on power), the overheat safety net |
 | History | daily peak battery temperature against the limits, recent sleeps (drain and causes), lid sessions, 7-day totals |
 | Notifications | notifications per kind |
 | Automation | install the `tether` command, command and URL reference |

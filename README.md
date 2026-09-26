@@ -36,8 +36,9 @@ closed.
   Prefer a lock? Choose "Lock the screen" for when the lid closes.
 - **Battery hold**: stay awake on battery for a while, bag included. The helper ends it when the
   battery gets hot, runs low, or time is up. Limits can be made stricter, never looser.
-- **Heat guard**: a closed Mac running hot on power is cooled with Low Power Mode. If it keeps
-  overheating with no display attached, as in a bag on a power bank, it is put to sleep.
+- **Heat guard**: a closed Mac running hot on power is cooled with Low Power Mode (your choice of
+  when, or never). If it keeps overheating with no display attached, as in a bag on a power bank,
+  it is put to sleep.
 - **Data-based settings**: Tether measures this Mac's battery temperatures and battery use and
   recommends limits from them.
 - **Sleep log**: how long it slept, charge used per hour, what put it to sleep and what woke it,
@@ -111,7 +112,8 @@ puts the Mac to sleep as soon as any of these is true:
 | The time you set, at most 4 hours | |
 | Battery temperature unreadable | at once (the safe side) |
 
-- Low Power Mode is on during a hold, and the helper checks every 10 seconds.
+- The helper checks every 10 seconds during a hold and turns Low Power Mode on for less heat and
+  drain; Settings › Safety › Low Power Mode can turn that off.
 - A hold never survives a restart of the helper or the Mac.
 - The limits can be made stricter in Settings, never looser, even by editing the control file.
 - On power, overheating with the lid closed and no display attached (as in a bag on a power bank)
@@ -147,7 +149,7 @@ Details and reasoning: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | Setting | When | Visible in System Settings |
 |---|---|---|
 | Prevent sleep (`pmset disablesleep`) | on while power is connected | no (a hidden setting) |
-| Low Power Mode | only during the heat guard or a battery hold, then restored | yes, while on |
+| Low Power Mode | only in the cases you allow in Settings › Safety (a battery hold, heat on power), then restored unless you changed it meanwhile | yes, while on |
 | Screen brightness, keyboard light | dimmed while the lid is closed, restored when it opens | yes, while dimmed |
 | Background items | the helper, its watchdog and "open at login" | General › Login Items |
 
