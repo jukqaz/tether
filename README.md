@@ -14,6 +14,24 @@ shut and it's in your bag.
   <img src="docs/images/settings-history.png" width="500" alt="Tether's settings: history">
 </p>
 
+<details>
+<summary>More screenshots</summary>
+
+The status item in each state (clamshell on, a battery hold counting down, running hot, on
+battery, switched off, helper not responding):
+
+<img src="docs/images/menubar.png" width="394" alt="The status item in each state, on a light and a dark menu bar">
+
+<p>
+  <img src="docs/images/panel-compact.png" width="300" alt="The compact panel during a battery hold">
+  <img src="docs/images/panel-dark.png" width="300" alt="The panel in dark mode">
+</p>
+<p>
+  <img src="docs/images/settings-safety.png" width="500" alt="Settings: measurements, recommendations and battery-hold limits">
+  <img src="docs/images/welcome.png" width="240" alt="The welcome window">
+</p>
+</details>
+
 ## Why
 
 macOS sleeps a MacBook when the lid closes, unless an external display is attached. Keep-awake
@@ -75,6 +93,9 @@ On a desktop Mac (no lid, no battery) Tether leaves sleep settings alone.
    ```
 
 3. Click **Install Helper…** in the welcome window and enter your administrator password once.
+
+To check the download first, keep `Tether-x.y.z.zip.sha256` from the release next to the zip and
+run `shasum -a 256 -c Tether-x.y.z.zip.sha256` in that folder.
 
 Prefer to see what you run? [Build it yourself](#build-from-source): it takes a minute.
 

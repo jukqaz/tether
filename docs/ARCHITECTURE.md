@@ -86,7 +86,7 @@ These are the loosest values allowed. Settings → Safety can only tighten them 
 it again, so a hand-edited file cannot loosen anything; it logs the limits in force whenever
 they change.
 
-"+30 min" in the panel (`tether hold +30m`, `tether://hold/+30m`) pushes the deadline back; the
+"+30m" in the panel (`tether hold +30m`, `tether://hold/+30m`) pushes the deadline back; the
 helper treats a later deadline for a running hold as an extension and keeps the time it was first
 seen, so the 4-hour cap can't be extended.
 

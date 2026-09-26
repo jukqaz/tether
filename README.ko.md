@@ -13,6 +13,24 @@
   <img src="docs/images/settings-history.png" width="500" alt="Tether 설정: 기록">
 </p>
 
+<details>
+<summary>스크린샷 더 보기</summary>
+
+상태별 메뉴바 아이콘(클램쉘 켜짐, 배터리 유지 카운트다운, 발열, 배터리 사용 중, 꺼짐, 도우미 응답
+없음):
+
+<img src="docs/images/menubar.png" width="394" alt="밝은/어두운 메뉴바의 상태별 아이콘">
+
+<p>
+  <img src="docs/images/panel-compact.png" width="300" alt="배터리 유지 중인 컴팩트 패널">
+  <img src="docs/images/panel-dark.png" width="300" alt="다크 모드 패널">
+</p>
+<p>
+  <img src="docs/images/settings-safety.png" width="500" alt="설정: 측정값, 추천값, 배터리 유지 기준">
+  <img src="docs/images/welcome.png" width="240" alt="시작 창">
+</p>
+</details>
+
 ## 왜 만들었나
 
 macOS는 외장 모니터가 없으면 덮개를 닫을 때 MacBook을 재웁니다. 잠 안 자기 앱이나
@@ -70,6 +88,9 @@ macOS는 외장 모니터가 없으면 덮개를 닫을 때 MacBook을 재웁니
    ```
 
 3. 시작 창에서 **도우미 설치…**를 누르고 관리자 암호를 한 번 입력합니다.
+
+받은 파일을 먼저 확인하려면 릴리스의 `Tether-x.y.z.zip.sha256`을 zip과 같은 폴더에 받아 두고, 그
+폴더에서 `shasum -a 256 -c Tether-x.y.z.zip.sha256`을 실행하세요.
 
 직접 확인하고 싶다면 [소스에서 빌드](#소스에서-빌드)하세요. 1분이면 됩니다.
 

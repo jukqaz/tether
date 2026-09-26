@@ -7,21 +7,28 @@ import TetherCore
 struct SettingsView: View {
     @ObservedObject var model: AppModel
     @State private var page: SettingsPage?
+    /// Offscreen screenshots can't draw the system's sidebar selection (it comes out as a black
+    /// bar hiding the title), so they mark the current page themselves.
+    private let screenshot: Bool
 
-    init(model: AppModel, initialPage: SettingsPage = .general) {
+    init(model: AppModel, initialPage: SettingsPage = .general, screenshot: Bool = false) {
         self.model = model
+        self.screenshot = screenshot
         _page = State(initialValue: initialPage)
     }
 
     var body: some View {
         NavigationSplitView {
-            List(SettingsPage.allCases, selection: $page) { page in
+            List(SettingsPage.allCases, selection: screenshot ? .constant(nil) : $page) { item in
                 Label {
-                    Text(page.title)
+                    Text(item.title)
                 } icon: {
-                    SidebarIcon(symbol: page.symbol, color: page.color)
+                    SidebarIcon(symbol: item.symbol, color: item.color)
                 }
-                .tag(page)
+                .tag(item)
+                .listRowBackground(screenshot && item == page
+                                   ? RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.09)).padding(.horizontal, 10)
+                                   : nil)
             }
             .navigationSplitViewColumnWidth(min: 200, ideal: 214, max: 260)
             .toolbar(removing: .sidebarToggle)

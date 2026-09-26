@@ -26,7 +26,7 @@ enum PreviewRenderer {
         } else if let out = path(after: "--render-settings", extra: 1),
                   let page = SettingsPage(rawValue: args[args.firstIndex(of: "--render-settings")! + 2]) {
             let model = AppModel(preview: true, sample: sample, autoSample: args.contains("--auto"))
-            render(SettingsView(model: model, initialPage: page), to: out, dark: dark)
+            render(SettingsView(model: model, initialPage: page, screenshot: true), to: out, dark: dark)
         } else if let out = path(after: "--render-welcome") {
             render(WelcomePreview(model: AppModel(preview: true)), to: out, dark: dark)
         } else if let out = path(after: "--render-preview") {
@@ -98,12 +98,16 @@ enum PreviewRenderer {
         host.frame = NSRect(origin: .zero, size: size)
         host.layoutSubtreeIfNeeded()
         RunLoop.current.run(until: Date().addingTimeInterval(0.5))  // let SwiftUI settle
-        guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else {
+        // Always 2x, so README screenshots stay sharp whichever screen is attached.
+        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width * 2), pixelsHigh: Int(size.height * 2),
+                                         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else {
             print("render failed")
             return
         }
+        rep.size = size
         host.cacheDisplay(in: host.bounds, to: rep)
         try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
-        print("wrote \(path) (\(Int(size.width))x\(Int(size.height)))")
+        print("wrote \(path) (\(rep.pixelsWide)x\(rep.pixelsHigh))")
     }
 }
