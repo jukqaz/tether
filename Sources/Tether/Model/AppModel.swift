@@ -155,6 +155,7 @@ final class AppModel: ObservableObject {
                 heatGuard = .standard
                 holdLowPower = true
                 debugLogging = false
+                if let status { self.status = SampleData.status(status) }
             }
             if holdSample, let status {
                 self.status = SampleData.holding(status)

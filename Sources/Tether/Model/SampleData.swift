@@ -54,11 +54,26 @@ enum SampleData {
         return Usage(stats: stats, recentSessions: sessions, sleepLog: sleeps)
     }
 
-    /// The status with a battery hold armed 19 seconds ago, running for half an hour.
-    static func holding(_ status: Status, now: Date = Date()) -> Status {
+    /// The live status with this Mac's own events replaced by a plain "clamshell on" 23 minutes
+    /// ago, so screenshots show no leftover alerts or hold endings.
+    static func status(_ status: Status, now: Date = Date()) -> Status {
         var fake = status
         let t = now.timeIntervalSince1970
         fake.updatedAt = t
+        fake.lastEvent = .clamshellOn
+        fake.lastEventAt = t - 23 * 60
+        fake.lastHoldEnd = nil
+        fake.lastHoldEndAt = nil
+        fake.thermalAlertAt = nil
+        fake.overheatSleepAt = nil
+        fake.weakChargerSleepAt = nil
+        return fake
+    }
+
+    /// The same with a battery hold armed 19 seconds ago, running for half an hour.
+    static func holding(_ status: Status, now: Date = Date()) -> Status {
+        var fake = self.status(status, now: now)
+        let t = now.timeIntervalSince1970
         fake.batteryHoldUntil = t + 30 * 60 - 19
         fake.batteryHoldSince = t - 19
         return fake

@@ -13,17 +13,8 @@ struct HoldModule: View {
                 HStack(spacing: 5) {
                     Image(systemName: "bag.fill")
                     Text(model.holdingOnBattery ? L("On battery", "배터리로 유지") : L("Armed", "유지 예약됨"))
+                        .lineLimit(1)
                     Spacer(minLength: 0)
-                    if model.canExtendHold(minutes: 30) {
-                        Button(L("+30 min", "+30분")) { model.extendBatteryHold(minutes: 30) }
-                            .buttonStyle(.plain)
-                            .font(.caption2.weight(.semibold))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.orange.opacity(0.15), in: .capsule)
-                            .help(L("Stay awake 30 minutes longer, up to 4 hours from the start",
-                                    "30분 더 유지해요. 시작부터 최대 4시간까지"))
-                    }
                     Button { model.cancelBatteryHold() } label: {
                         Image(systemName: "xmark")
                             .font(.caption2.weight(.bold))
@@ -44,11 +35,27 @@ struct HoldModule: View {
                     .animation(.smooth(duration: 0.25), value: left)
                     .accessibilityLabel(L("\(left) left", "\(left) 남음"))
                 HoldBar(fraction: model.holdRemainingFraction(at: clock.now))
-                Text(untilLine(until))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .help(limitLine)
+                HStack(spacing: 4) {
+                    Text(untilLine(until))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .help(limitLine)
+                    Spacer(minLength: 0)
+                    if model.canExtendHold(minutes: 30) {
+                        Button(L("+30m", "+30분")) { model.extendBatteryHold(minutes: 30) }
+                            .buttonStyle(.plain)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.orange)
+                            .lineLimit(1)
+                            .fixedSize()
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(.orange.opacity(0.15), in: .capsule)
+                            .help(L("Stay awake 30 minutes longer, up to 4 hours from the start",
+                                    "30분 더 유지해요. 시작부터 최대 4시간까지"))
+                    }
+                }
             } else {
                 Label(L("Battery hold", "배터리 유지"), systemImage: "bag")
                     .font(.caption.weight(.semibold))
