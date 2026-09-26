@@ -5,7 +5,7 @@
 First public release.
 
 - Clamshell mode follows power: on while connected, off on battery, and a Mac already closed is put
-  to sleep the moment it's unplugged.
+  to sleep the moment it's unplugged. Its switch turns it off until power is connected again.
 - No lock: the screen under the lid is dimmed instead of sleeping the display. Optionally lock
   when the lid closes instead.
 - Battery hold with safety limits enforced by the helper (battery temperature by lid state,

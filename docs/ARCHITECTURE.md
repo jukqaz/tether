@@ -25,7 +25,10 @@ CoreBrightness), restoring them only once the lid is open again. Restoring at un
 lid still shut raced macOS's battery dimming (`lessbright`) and left the panel at half brightness.
 
 Clamshell mode has one switch, at the top of the panel (`control.json` → `enabled`). It is on by
-default, so connecting power turns clamshell mode on by itself; off leaves the lid to macOS. While
+default, so connecting power turns clamshell mode on by itself; off leaves the lid to macOS until
+power is connected again: on a battery → AC change the helper writes `enabled: true` back
+(`Policy.resumesOnPower`), so the switch can't be forgotten off. Switching off while on power lasts
+until the next unplug and replug; a restart isn't a connection. While
 it is on, macOS's own Sleep menu item does nothing (sleep is disabled system-wide), which is why
 `tether sleep` and `tether://sleep` exist for scripts.
 

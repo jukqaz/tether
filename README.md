@@ -80,8 +80,9 @@ Prefer to see what you run? [Build it yourself](#build-from-source): it takes a 
 ## Use
 
 - **Menu bar panel**: the switch at the top turns clamshell mode on and off. It's on by default,
-  so connecting power turns it on by itself; off gives the lid back to macOS. Start a battery hold
-  below it. The footer switches between the full and compact panels.
+  so connecting power turns it on by itself; off gives the lid back to macOS until power is
+  connected again, so it can't be forgotten off. Start a battery hold below it. The footer switches
+  between the full and compact panels.
 - **Settings** (the gear): language, lid behaviour, safety limits with recommendations, history,
   notifications, automation, and everything Tether changes on your Mac.
 - **Terminal**: turn on "Install the tether command" in Settings › Automation.
