@@ -107,7 +107,7 @@ macOS는 외장 모니터가 없으면 덮개를 닫을 때 MacBook을 재웁니
 tether status [--json]          # 상태 (사람용 또는 스크립트용)
 tether on | off | toggle
 tether sleep                    # 전원이 연결돼 있어도 지금 잠자기
-tether hold 1h30m               # 배터리에서도 유지 (최대 4시간), tether hold off
+tether hold 1h30m               # 배터리 유지 (최대 4시간), tether hold off
 tether hold +30m                # 켜져 있는 배터리 유지 늘리기 (시작부터 최대 4시간)
 tether run -- make release      # 명령이 끝날 때까지 유지
 tether doctor                   # 빠른 점검: 도우미, 감시 장치, 잠자기 설정, 로그인 항목

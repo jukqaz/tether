@@ -28,7 +28,7 @@ tether: Tether 클램쉘 모드 제어
   tether [status] [--json]      지금 상태 (--json: 스크립트·에이전트용)
   tether on | off | toggle      클램쉘 모드 켜기 / 끄기(전원을 다시 연결할 때까지) / 전환
   tether sleep                  지금 잠자기 (전원이 연결돼 있어도)
-  tether hold <시간>             배터리에서도 유지: 30m, 1h, 1h30m, 90 (분), 최대 4h
+  tether hold <시간>             배터리 유지: 30m, 1h, 1h30m, 90 (분), 최대 4h
   tether hold +30m              켜져 있는 배터리 유지 늘리기 (시작부터 최대 4시간)
   tether hold off               배터리 유지 끄기
   tether run [--max <시간>] [--] <명령…>

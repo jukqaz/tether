@@ -21,7 +21,7 @@ struct AutomationPage: View {
                     ("tether status", L("current state · --json", "지금 상태 · --json")),
                     ("tether on | off | toggle", L("turn on · off · flip", "켜기 · 끄기 · 전환")),
                     ("tether sleep", L("sleep now", "지금 잠자기")),
-                    ("tether hold 1h30m", L("stay awake on battery · hold off", "배터리에서도 유지 · hold off")),
+                    ("tether hold 1h30m", L("stay awake on battery · hold off", "배터리 유지 · hold off")),
                     ("tether run -- <cmd>", L("stay awake until the command finishes", "명령이 끝날 때까지 유지")),
                     ("tether diagnose --record", L("a troubleshooting report", "문제 해결용 보고서")),
                 ])

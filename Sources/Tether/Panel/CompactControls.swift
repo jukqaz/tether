@@ -48,7 +48,7 @@ struct CompactControls: View {
             .buttonStyle(.plain)
             .menuIndicator(.hidden)
             .fixedSize()
-            .help(L("Battery hold", "배터리에서도 유지"))
+            .help(L("Battery hold", "배터리 유지"))
             .accessibilityLabel(L("Battery hold", "배터리 유지"))
         }
     }

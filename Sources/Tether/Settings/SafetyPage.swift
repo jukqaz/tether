@@ -58,7 +58,7 @@ struct SafetyPage: View {
                     limitPickers(advice)
                 }
             } header: {
-                Text(L("Battery Hold", "배터리에서도 유지"))
+                Text(L("Battery Hold", "배터리 유지"))
             } footer: {
                 Note((model.autoLimits
                       ? L("Recommendations are applied by themselves and re-checked as measurements come in. Until there's enough data (about 30 minutes with the lid closed), the current values stay. ",
@@ -75,7 +75,7 @@ struct SafetyPage: View {
                        selection: Binding(get: { model.heatLowPowerLevel }, set: { model.setHeatLowPowerLevel($0) })) {
                     Text(choice(L("From “serious” heat", "발열 '심각'부터"), isDefault: true,
                                 isRecommended: advice.heatLevel?.value == 2)).tag(2)
-                    Text(choice(L("From “fair” heat", "발열 '보통'부터"), isDefault: false,
+                    Text(choice(L("From “fair” heat", "발열 '주의'부터"), isDefault: false,
                                 isRecommended: advice.heatLevel?.value == 1)).tag(1)
                     Text(L("Never", "켜지 않음")).tag(0)
                 }

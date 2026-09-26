@@ -5,7 +5,7 @@ public enum Texts {
     public static func thermal(_ level: Int) -> String {
         switch level {
         case 0: L("normal", "정상")
-        case 1: L("fair", "보통")
+        case 1: L("fair", "주의")
         case 2: L("serious", "심각")
         default: L("critical", "위험")
         }
