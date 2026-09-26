@@ -85,10 +85,49 @@ struct Report: Encodable {
     var heatGuard: Bool
     var lastEvent: EventKind?
     var lastEventAt: Date?
-    var today: DayStats?
+    var today: Today?
+    var limits: Limits
     var lastSession: LidSession?
     var lastSleep: SleepRecord?
     var sleepBlockers: [Blocker]
+
+    /// Today's totals, without the temperature histograms kept in usage.json.
+    struct Today: Encodable {
+        var day: String
+        var lidClosedMinutes: Int
+        var forcedSleeps: Int
+        var batteryHolds: Int
+        var heatGuards: Int
+        var lidClosedPeakTemperature: Double?
+        var lidOpenPeakTemperature: Double?
+
+        init(_ d: DayStats) {
+            day = d.day
+            lidClosedMinutes = Int(d.lidClosedSeconds / 60)
+            forcedSleeps = d.forcedSleeps
+            batteryHolds = d.batteryHolds
+            heatGuards = d.heatGuards
+            lidClosedPeakTemperature = d.closedTemps?.max
+            lidOpenPeakTemperature = d.openTemps?.max
+        }
+    }
+
+    /// The battery-hold limits in force, auto-adjust included.
+    struct Limits: Encodable {
+        var batteryFloor: Int
+        var lidClosedMaxTemperature: Double
+        var lidOpenMaxTemperature: Double
+        var maxHoldHours: Double
+        var autoAdjust: Bool
+
+        init(_ user: UserLimits?, auto: Bool) {
+            batteryFloor = SafetyPolicy.floor(user)
+            lidClosedMaxTemperature = SafetyPolicy.limits(lidClosed: true, user: user).hardTemperature
+            lidOpenMaxTemperature = SafetyPolicy.limits(lidClosed: false, user: user).hardTemperature
+            maxHoldHours = SafetyPolicy.maxHold(user) / 3600
+            autoAdjust = auto
+        }
+    }
 }
 
 func printJSON(_ s: State) {
@@ -100,7 +139,8 @@ func printJSON(_ s: State) {
         batteryHoldUntil: s.status?.batteryHoldUntil.map { Date(timeIntervalSince1970: $0) },
         heatGuard: s.status?.heatGuard ?? false, lastEvent: s.status?.lastEvent,
         lastEventAt: s.status?.lastEventAt.map { Date(timeIntervalSince1970: $0) },
-        today: s.usage?.stats.today(now: Date()), lastSession: s.usage?.recentSessions.last,
+        today: s.usage.map { Report.Today($0.stats.today(now: Date())) }, limits: Report.Limits(s.limits, auto: s.control.autoLimits == true),
+        lastSession: s.usage?.recentSessions.last,
         lastSleep: s.usage?.sleeps.recent.last,
         sleepBlockers: blockers().map { Report.Blocker(process: $0.process, kind: $0.kind.rawValue, reason: $0.reason) })
     let encoder = JSONEncoder()
