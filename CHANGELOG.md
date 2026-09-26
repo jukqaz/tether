@@ -33,4 +33,6 @@ First public release.
 - Icon Composer app icon (Liquid Glass, dark, clear and tinted), sidebar settings, English and
   Korean with a choice in Settings.
 - First-run welcome, update check against GitHub releases, full uninstall.
+- A quiet panel: controls that can't act right now are hidden rather than greyed out, and there
+  are no lid-open or toggle notifications (the last lid session is in the panel and History).
 - Desktop Macs are left alone.

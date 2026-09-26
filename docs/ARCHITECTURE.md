@@ -172,6 +172,12 @@ hold (durations in a menu, then the countdown to the second with a bar), and tod
 time, a bar per day, and one line: the lid session that just ended, or how the last sleep went).
 Compact: the state module, and a row with the hold, the temperature and the footer buttons.
 
+The panel shows what applies right now instead of greying out what doesn't: the hold module is
+hidden while clamshell mode is off, and at or below the battery floor it says when it'll be ready
+rather than offering a Start that would end at once; the switch is hidden until the helper is
+installed (the banner offers the install). State lines say what happens next ("turns on with
+power") rather than what can't.
+
 ## App icon
 
 `Resources/AppIcon.icon` is an Icon Composer document: a blue fill, the lid (SVG, with the crescent
@@ -208,7 +214,7 @@ A System Settings style sidebar (the gear in the panel, or ⌘, while it is open
 | Lid & Screen | lid close: stay unlocked (dim) or lock; the idle screen-off delay, shown only when staying unlocked |
 | Safety | this Mac's measurements with recommended limits, stricter battery-hold limits, Low Power Mode (during holds; when hot on power), the overheat safety net |
 | History | daily peak battery temperature against the limits, recent sleeps (drain and causes), lid sessions, 7-day totals |
-| Notifications | notifications per kind |
+| Notifications | sleep drain, battery hold ended, overheating; a stopped helper and a weak-charger sleep are always reported |
 | Automation | install the `tether` command, command and URL reference |
 | System | helper status/reinstall/remove/log, live values of what Tether changes, apps keeping the Mac awake, diagnostics, updates, uninstall |
 
