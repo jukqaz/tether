@@ -4,7 +4,8 @@ import os
 import SwiftUI
 import TetherCore
 
-/// The app's unified log, collected by `tether diagnose` and the diagnostic report.
+/// The app's unified log, collected by `tether diagnose` and the diagnostic report. Events are
+/// logged at notice level: info messages stay in memory and never reach `log show`.
 let appLog = Logger(subsystem: TetherPaths.logSubsystem, category: "app")
 
 /// The menu bar app's state. The power rule itself lives in the helper; the app shows what it is
@@ -164,6 +165,7 @@ final class AppModel: ObservableObject {
 
     /// Wiring for the running app: timers, notifications, the login item and the first checks.
     private func start() {
+        appLog.notice("started v\(Self.appVersion, privacy: .public) at \(Bundle.main.bundlePath, privacy: .public)")
         refresh()
         reportAppPath()
         // Keeping the screen unlocked and dimming live in this app, so it comes back after every login.
@@ -297,7 +299,7 @@ final class AppModel: ObservableObject {
     // MARK: Commands
 
     func setEnabled(_ on: Bool) {
-        appLog.info("clamshell mode switched \(on ? "on" : "off", privacy: .public)")
+        appLog.notice("clamshell mode switched \(on ? "on" : "off", privacy: .public)")
         save { ControlStore.setEnabled(on) }
     }
 
@@ -337,7 +339,7 @@ final class AppModel: ObservableObject {
 
     /// `tether://…` URLs from Shortcuts, scripts or a browser.
     func handle(url: URL) {
-        appLog.info("url \(url.absoluteString, privacy: .public)")
+        appLog.notice("url \(url.absoluteString, privacy: .public)")
         guard let command = TetherCommand.parse(url: url) else { return }
         switch command {
         case .status: break
@@ -423,7 +425,7 @@ final class AppModel: ObservableObject {
         let installed = attempt { try SystemIntegration.runScript("install-helper.sh") }
         refresh()
         guard installed else { return }
-        appLog.info("helper installed from \(Bundle.main.bundlePath, privacy: .public)")
+        appLog.notice("helper installed from \(Bundle.main.bundlePath, privacy: .public)")
         reportAppPath()
     }
 

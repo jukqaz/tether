@@ -4,7 +4,7 @@ import TetherCore
 /// Detailed helper logging and the diagnostic report (see `Diagnostics`).
 extension AppModel {
     func setDebugLogging(_ on: Bool) {
-        appLog.info("detailed logging \(on ? "on" : "off", privacy: .public)")
+        appLog.notice("detailed logging \(on ? "on" : "off", privacy: .public)")
         save { ControlStore.update { $0.debugLog = on ? true : nil } }
     }
 

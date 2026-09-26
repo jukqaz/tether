@@ -45,7 +45,7 @@ final class ScreenGuard {
         let external = Displays.hasExternal
         // Working on an external display with the lid shut is not walking away.
         if lockOnLidClose, clamshellActive, lidJustClosed, !external {
-            appLog.info("lid closed: locking the screen")
+            appLog.notice("lid closed: locking the screen")
             ScreenLock.now()
         }
         let visible = ScreenPolicy.screenVisible(lidClosed: lidClosed, externalDisplay: external)
@@ -56,7 +56,7 @@ final class ScreenGuard {
                                            externalDisplay: external, idleSeconds: UserInput.idleSeconds,
                                            thresholdMinutes: idleBlankMinutes),
                   !DisplayAssertions.heldByOthers {
-            appLog.info("idle for \(idleBlankMinutes, privacy: .public) min: screen off")
+            appLog.notice("idle for \(idleBlankMinutes, privacy: .public) min: screen off")
             startBlank()
         }
         applyScreenPolicy(external: external)
@@ -73,7 +73,7 @@ final class ScreenGuard {
     }
 
     private func startBlank() {
-        appLog.info("screen off")
+        appLog.notice("screen off")
         blankedAt = Date()
         Blackout.apply()
         applyScreenPolicy()
@@ -94,7 +94,7 @@ final class ScreenGuard {
     }
 
     private func endBlank() {
-        appLog.info("screen back on")
+        appLog.notice("screen back on")
         blankedAt = nil
         inputWatch?.invalidate()
         inputWatch = nil
@@ -120,17 +120,17 @@ final class ScreenGuard {
                                                      "Tether: clamshell mode keeps the screen unlocked" as CFString,
                                                      &id)
             if result == kIOReturnSuccess { assertion = id }
-            appLog.info("keep-screen-on request: \(result == kIOReturnSuccess ? "held" : "failed \(result)", privacy: .public)")
+            appLog.notice("keep-screen-on request: \(result == kIOReturnSuccess ? "held" : "failed \(result)", privacy: .public)")
         } else if !on, assertion != 0 {
             IOPMAssertionRelease(assertion)
             assertion = 0
-            appLog.info("keep-screen-on request: released")
+            appLog.notice("keep-screen-on request: released")
         }
     }
 
     private func dim() {
         if let level = BuiltInBrightness.get(), ScreenPolicy.worthSaving(level) {
-            appLog.info("lid closed: dimming the built-in screen from \(level, privacy: .public)")
+            appLog.notice("lid closed: dimming the built-in screen from \(level, privacy: .public)")
             defaults.set(level, forKey: Key.brightness)
             BuiltInBrightness.set(0)
         }
@@ -144,7 +144,7 @@ final class ScreenGuard {
 
     private func restore() {
         if defaults.object(forKey: Key.brightness) != nil {
-            appLog.info("restoring the built-in screen to \(self.defaults.float(forKey: Key.brightness), privacy: .public)")
+            appLog.notice("restoring the built-in screen to \(self.defaults.float(forKey: Key.brightness), privacy: .public)")
             BuiltInBrightness.set(defaults.float(forKey: Key.brightness))
             defaults.removeObject(forKey: Key.brightness)
         }
