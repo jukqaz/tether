@@ -15,7 +15,7 @@ enum WelcomeWindow {
         }
         let host = NSHostingView(rootView: WelcomeView(model: model) { close(model: model) }
             .background(SettingsWindowBridge()))
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 560),
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 680),
                               styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: false)
         window.titlebarAppearsTransparent = true
         window.title = L("Welcome to Tether", "Tether 시작하기")
@@ -34,7 +34,7 @@ enum WelcomeWindow {
     }
 }
 
-private struct WelcomeView: View {
+struct WelcomeView: View {
     @ObservedObject var model: AppModel
     let done: () -> Void
 
@@ -61,13 +61,37 @@ private struct WelcomeView: View {
                           L("A Mac already closed goes to sleep right away, even in a bag.", "이미 덮개가 닫혀 있으면 가방 안에서도 바로 잠들어요."))
                     point("shield.lefthalf.filled", .orange,
                           L("Safe when it has to stay awake", "깨어 있어야 할 때도 안전하게"),
-                          L("Battery holds end when hot or low; a hot closed Mac is cooled with Low Power Mode.",
-                            "배터리 유지는 뜨겁거나 배터리가 적으면 끝나고, 덮개를 닫은 채 뜨거우면 저전력 모드로 식혀요."))
+                          L("Battery holds end when hot or low. A closed Mac running hot on power is cooled, and put to sleep if it keeps overheating.",
+                            "배터리 유지는 뜨겁거나 배터리가 적으면 끝나요. 전원 연결 중 덮개를 닫은 채 뜨거우면 식히고, 계속 과열되면 잠재워요."))
                 }
                 .padding(.horizontal, 36)
 
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(L("When the lid closes", "덮개를 닫으면"))
+                        .font(.callout.weight(.semibold))
+                    Picker("", selection: $model.lidCloseLocks) {
+                        Text(L("Stay unlocked — remote sessions and agents keep going", "잠그지 않음 — 원격 접속과 에이전트가 그대로 이어져요")).tag(false)
+                        Text(L("Lock the screen — safer when you walk away", "화면 잠그기 — 자리를 비울 때 더 안전해요")).tag(true)
+                    }
+                    .pickerStyle(.radioGroup)
+                    .labelsHidden()
+                    Text(L("Unlocked, the screen still turns off after \(model.idleBlankMinutes) idle minutes, without locking. Change either in Settings.",
+                           "잠그지 않아도 입력이 \(model.idleBlankMinutes)분 없으면 화면은 꺼져요(잠기지는 않아요). 둘 다 설정에서 바꿀 수 있어요."))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, 36)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
                 VStack(spacing: 8) {
-                    if model.helperInstalled {
+                    if model.isTranslocated {
+                        Label(L("Move Tether.app to Applications and open it again before installing.",
+                                "설치하기 전에 Tether.app을 응용 프로그램 폴더로 옮기고 다시 열어 주세요."),
+                              systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                            .padding(.horizontal, 36)
+                    } else if model.helperInstalled {
                         Label(L("Helper installed", "도우미 설치됨"), systemImage: "checkmark.circle.fill")
                             .foregroundStyle(Color.tetherMint)
                     } else {
@@ -104,7 +128,7 @@ private struct WelcomeView: View {
             }
             .padding(20)
         }
-        .frame(width: 480, height: 560)
+        .frame(width: 480, height: 680)
     }
 
     private func point(_ symbol: String, _ color: Color, _ title: String, _ detail: String) -> some View {
