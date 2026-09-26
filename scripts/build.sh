@@ -26,6 +26,8 @@ xcrun actool Resources/AppIcon.icon --compile "$APP/Contents/Resources" --platfo
 # Strings live in code (English and Korean); these tell macOS which languages the app speaks.
 for lang in en ko; do mkdir -p "$APP/Contents/Resources/$lang.lproj"; done
 
+# Extended attributes (com.apple.provenance and the like) would ride along into the release zip.
+xattr -cr "$APP"
 codesign --force --sign - --identifier local.tether.helper "$APP/Contents/Resources/tether-helper"
 codesign --force --sign - --identifier local.tether.cli "$APP/Contents/Helpers/tether"
 codesign --force --sign - "$APP"
