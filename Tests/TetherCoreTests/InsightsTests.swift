@@ -235,7 +235,7 @@ final class CommandTests: XCTestCase {
         XCTAssertEqual(TetherCommand.parse(["OFF"]), .off)
         XCTAssertEqual(TetherCommand.parse(["toggle"]), .toggle)
         XCTAssertEqual(TetherCommand.parse(["sleep"]), .sleep)
-        XCTAssertEqual(TetherCommand.parse(["blank"]), .blank)
+        XCTAssertNil(TetherCommand.parse(["blank"]), "screen off was removed")
         XCTAssertEqual(TetherCommand.parse(["hold", "2h"]), .hold(minutes: 120))
         XCTAssertEqual(TetherCommand.parse(["hold", "1h", "30m"]), .hold(minutes: 90))
         XCTAssertEqual(TetherCommand.parse(["hold", "off"]), .cancelHold)
@@ -247,7 +247,7 @@ final class CommandTests: XCTestCase {
     func testURLs() {
         func parse(_ s: String) -> TetherCommand? { TetherCommand.parse(url: URL(string: s)!) }
         XCTAssertEqual(parse("tether://sleep"), .sleep)
-        XCTAssertEqual(parse("tether://blank"), .blank)
+        XCTAssertNil(parse("tether://blank"))
         XCTAssertEqual(parse("tether://on"), .on)
         XCTAssertEqual(parse("tether://hold/90m"), .hold(minutes: 90))
         XCTAssertEqual(parse("tether://hold?minutes=45"), .hold(minutes: 45))
@@ -265,8 +265,10 @@ final class CommandTests: XCTestCase {
         XCTAssertEqual(Texts.total(0), "0분")
         XCTAssertEqual(Texts.total(59), "0분")
         XCTAssertEqual(Texts.total(185 * 60), "3시간 5분")
-        XCTAssertEqual(Texts.countdown(83 * 60), "1:23")
-        XCTAssertEqual(Texts.countdown(10), "0:01")
+        XCTAssertEqual(Texts.countdown(83 * 60), "1:23:00")
+        XCTAssertEqual(Texts.countdown(29 * 60 + 41), "29:41")
+        XCTAssertEqual(Texts.countdown(9.2), "0:10")
+        XCTAssertEqual(Texts.countdown(3599.5), "1:00:00")
         XCTAssertEqual(Texts.countdown(-5), "0:00")
     }
 

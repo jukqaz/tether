@@ -80,28 +80,6 @@ final class HeatGuardSettingsTests: XCTestCase {
     }
 }
 
-final class KeyComboTests: XCTestCase {
-    func testDisplayUsesApplesModifierOrder() {
-        let all = KeyCombo.command | KeyCombo.shift | KeyCombo.option | KeyCombo.control
-        XCTAssertEqual(KeyCombo(keyCode: 0x01, modifiers: all).display, "⌃⌥⇧⌘S")
-        XCTAssertEqual(KeyCombo(keyCode: 0x60, modifiers: KeyCombo.command).display, "⌘F5")
-        XCTAssertEqual(KeyCombo(keyCode: 0x31, modifiers: KeyCombo.option).display, "⌥Space")
-    }
-
-    func testNeedsCommandOptionOrControl() {
-        XCTAssertFalse(KeyCombo(keyCode: 0x01, modifiers: 0).isValid)
-        XCTAssertFalse(KeyCombo(keyCode: 0x01, modifiers: KeyCombo.shift).isValid)
-        XCTAssertTrue(KeyCombo(keyCode: 0x01, modifiers: KeyCombo.control | KeyCombo.shift).isValid)
-    }
-
-    func testLabelsComeFromTheUSLayout() {
-        XCTAssertEqual(KeyCombo.keyName(0x01), "S")
-        XCTAssertEqual(KeyCombo.keyName(0x2C), "/")
-        XCTAssertNil(KeyCombo.keyName(0xFF))
-        XCTAssertEqual(KeyCombo(keyCode: 0xFF, modifiers: KeyCombo.command, key: "Ä").key, "Ä")
-    }
-}
-
 final class ControlCompatibilityTests: XCTestCase {
     /// Files written before limits and the heat guard existed still load, with defaults.
     func testOldControlFileLoads() throws {
@@ -126,5 +104,41 @@ final class VersionTests: XCTestCase {
         XCTAssertTrue(Version.isNewer("2.1", than: "2.0.5"))
         XCTAssertFalse(Version.isNewer("2.0", than: "2.0.0"))
         XCTAssertFalse(Version.isNewer("1.9.9", than: "2.0.0"))
+    }
+}
+
+final class AppPresenceTests: XCTestCase {
+    private let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+    private let path = "/Applications/Tether.app/Contents/MacOS/Tether"
+
+    func testRetiresOnlyAfterTheGracePeriod() {
+        var presence = AppPresence()
+        XCTAssertFalse(presence.shouldRetire(path: path, exists: false, now: t0))
+        XCTAssertFalse(presence.shouldRetire(path: path, exists: false, now: t0.addingTimeInterval(599)))
+        XCTAssertTrue(presence.shouldRetire(path: path, exists: false, now: t0.addingTimeInterval(600)))
+    }
+
+    func testComingBackResetsTheClock() {
+        var presence = AppPresence()
+        _ = presence.shouldRetire(path: path, exists: false, now: t0)
+        XCTAssertFalse(presence.shouldRetire(path: path, exists: true, now: t0.addingTimeInterval(300)))
+        XCTAssertFalse(presence.shouldRetire(path: path, exists: false, now: t0.addingTimeInterval(700)))
+    }
+
+    func testUnknownOrTranslocatedPathsNeverCount() {
+        var presence = AppPresence()
+        XCTAssertFalse(presence.shouldRetire(path: nil, exists: false, now: t0.addingTimeInterval(9999)))
+        let translocated = "/private/var/folders/x/AppTranslocation/ABC/d/Tether.app/Contents/MacOS/Tether"
+        XCTAssertFalse(presence.shouldRetire(path: translocated, exists: false, now: t0))
+        XCTAssertFalse(presence.shouldRetire(path: translocated, exists: false, now: t0.addingTimeInterval(9999)))
+    }
+
+    func testHoldSourceWording() {
+        Localization.current = .english
+        defer { Localization.current = .preferred }
+        XCTAssertNil(Texts.holdSource(nil))
+        XCTAssertNil(Texts.holdSource("app"))
+        XCTAssertEqual(Texts.holdSource("run:make"), "tether run: make")
+        XCTAssertEqual(Texts.holdSource("cli"), "from the terminal")
     }
 }
