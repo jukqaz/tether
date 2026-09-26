@@ -16,6 +16,9 @@ First public release.
   from "fair" or never), and your own change to it is never undone.
 - A watchdog LaunchDaemon that turns sleep back on if the helper ever stops while sleep is off on
   battery.
+- A Mac put to sleep on power stays asleep through Power Nap's dark wakes; a charger that can't
+  keep up can no longer run the battery flat with the lid closed; a battery hold can't start at or
+  below the floor; the app relaunches after a crash.
 - Data-based settings: time-weighted battery temperatures, battery use during holds, and
   recommended limits from them.
 - Sleep log: duration, charge per hour, sleep and wake causes, dark wakes; alerts on high drain.

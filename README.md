@@ -118,7 +118,11 @@ puts the Mac to sleep as soon as any of these is true:
 - The limits can be made stricter in Settings, never looser, even by editing the control file.
 - On power, overheating with the lid closed and no display attached (as in a bag on a power bank)
   puts the Mac to sleep: critical thermal pressure for 2 minutes, or the battery at 45 °C for a
+  minute. So does a charger that can't keep up: the battery at its floor and still draining for a
   minute.
+- A Mac put to sleep on power stays asleep: clamshell mode only turns on when the Mac is fully
+  awake, not during Power Nap's short dark wakes.
+- A battery hold can't start at or below the battery floor, where it would end at once.
 - If the helper ever stops while sleep is off on battery, a separate watchdog (a plain shell
   script launchd runs every minute) turns sleep back on.
 

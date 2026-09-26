@@ -8,6 +8,11 @@ reasoning behind it; the [README](../README.md) is the user-facing overview.
 | Power connected | clamshell on | clamshell on: screen dark, session **not locked** |
 | Power disconnected | clamshell off | clamshell off, then sleep immediately |
 
+Clamshell mode keeps an awake Mac awake; it never wakes a sleeping one. `SleepDisabled` is only
+set during a full wake, so a dark wake on power (Power Nap, a maintenance wake, a charger
+connected while asleep, the first wake after "sleep now") goes back to sleep, and the next full
+wake turns clamshell mode on.
+
 macOS only evaluates the lid when it opens or closes, so clearing `SleepDisabled` with the lid
 already shut leaves the Mac awake. The helper requests sleep itself (`IOPMSleepSystem`, retried
 while powerd propagates the cleared flag; powerd then lingers ~5 s before sleeping). Dark wakes
@@ -107,6 +112,12 @@ limit) puts the Mac to sleep through the "sleep now" path (`ACThermalPolicy.shou
 external display it's a desk, and only the guard and the alert apply. While this is building up
 the helper checks every 10 seconds.
 
+A charger that can't keep up (a small power bank, a phone charger) also counts as AC. With the lid
+closed and no external display, a battery at the floor whose IOPS current stays at or below
+−100 mA for a minute puts the Mac to sleep the same way (`WeakChargerPolicy`, event
+`weakChargerSleep`, `status.json` → `weakChargerSleepAt`). A charge limit holding the battery at
+0 mA doesn't count. Both last-resort sleeps live in `Helper+SafetyNet`.
+
 ## Safety net for the helper itself
 
 `SleepDisabled` is a system setting that outlives the process that set it. If the helper stopped
@@ -119,6 +130,8 @@ while it was on and the Mac then ran on battery with the lid closed, nothing wou
   shell script (`tether-watchdog.sh`), so it works even when the helper binary can't. On battery,
   with `SleepDisabled` on and `status.json` older than 3 minutes (the helper rewrites it at least
   every 30 seconds), it runs `pmset -a disablesleep 0` and logs to the helper log.
+- The login item relaunches the app after a crash (`KeepAlive` → `SuccessfulExit: false`), since a
+  crash with the lid closed would leave the built-in screen at 0 brightness; Quit is final.
 - An app dragged to the Trash is noticed by the helper (`AppPresence`, 10-minute grace): it restores
   normal sleep and Low Power Mode, removes itself, the watchdog, the `tether` links and login items
   that pointed into the app, then boots itself out.
@@ -268,7 +281,15 @@ A menu bar utility should cost nothing while nothing happens:
   sent. Off in Settings → System.
 
 Files: `/Library/Application Support/Tether/{control,status,usage,helper-state}.json` (control is
-admin-writable), log at `/Library/Logs/Tether/helper.log`.
+admin-writable), log at `/Library/Logs/Tether/helper.log` (trimmed past 2 MB).
+
+## Known limits
+
+- Before anyone logs in (after a restart), the helper already keeps a closed Mac on power awake,
+  but the app that dims the screen under the lid and holds off display sleep isn't running yet.
+- The app runs per user; with fast user switching only the user running Tether gets dimming and
+  no-lock, while the power rule applies to the whole Mac.
+- A battery hold's 4-hour cap and deadlines follow the wall clock.
 
 ## Build and install
 
