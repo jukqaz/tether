@@ -19,6 +19,47 @@ display, dims the built-in panel and keyboard backlight to 0 (private DisplaySer
 CoreBrightness), restoring them only once the lid is open again. Restoring at unplug with the
 lid still shut raced macOS's battery dimming (`lessbright`) and left the panel at half brightness.
 
+Clamshell mode has one switch, at the top of the panel (`control.json` → `enabled`). It is on by
+default, so connecting power turns clamshell mode on by itself; off leaves the lid to macOS. While
+it is on, macOS's own Sleep menu item does nothing (sleep is disabled system-wide), which is why
+`tether sleep` and `tether://sleep` exist for scripts.
+
+## Code layout
+
+```
+Sources/
+  TetherCore/            shared by all three executables, no UI
+    IPC/                 paths, control.json (+ ControlStore), status.json, helper state,
+                         JSONFile/JSONWatch, Darwin notifications
+    Policy/              the rules: clamshell (Policy), battery hold (SafetyPolicy), heat on AC
+                         (ACThermalPolicy), screen (ScreenPolicy), recommendations (Advisor),
+                         what to show (TetherState)
+    Usage/               temperature histograms, daily stats, lid sessions, the sleep log
+    System/              read-only probes (IOPS, IOPMrootDomain, assertions), Shell, input idle time
+    Commands/            `tether` words and `tether://` URLs, hold durations
+    Text/                English/Korean strings (`L`), wording shared by app and CLI
+    Diagnostics/         the troubleshooting report
+    Support/             version comparison, app-presence tracking
+  TetherHelper/          root LaunchDaemon: Helper.swift decides; Helper+Events, +BatteryHold,
+                         +HeatGuard, +Usage, +Readings, +Output, +Retire do one job each
+  TetherCLI/             `tether`: main.swift dispatches; one file per command group
+  Tether/                the menu bar app
+    App/                 @main, scenes, URL handling; PreviewRenderer for screenshots
+    Model/               AppModel (state + commands) with +Presentation, +Safety, +Diagnostics;
+                         Notifier, UpdateChecker, SystemIntegration, HoldClock, SampleData
+    MenuBar/             the mark (TetherGlyph), the status item image, its SwiftUI label
+    Panel/               TetherPanel and one file per module; PanelStyle holds metrics and styles
+    Settings/            SettingsView (sidebar) and one file per page
+    Screen/              ScreenGuard (no-lock, dimming, idle blanking) and display controls
+    Onboarding/          the welcome window
+Resources/               Info.plist, AppIcon.icon (Icon Composer), LaunchDaemon plists, scripts
+```
+
+Policies are pure functions of their inputs, which is what the tests exercise. `AppModel` only
+holds state and forwards commands; how the state reads is `AppModel+Presentation`, built on
+`TetherState.resolve`, which is tested in Core. Side effects outside the app bundle (login item,
+`tether` link, root scripts) go through `SystemIntegration`, which throws user-facing messages.
+
 ## Battery hold
 
 The battery hold arms a one-shot hold (30 min – 4 h, capped at 4 h from when the helper
@@ -37,77 +78,104 @@ These are the loosest values allowed. Settings → Safety can only tighten them 
 it again, so a hand-edited file cannot loosen anything; it logs the limits in force whenever
 they change.
 
-On battery the hold turns Low Power Mode on (`pmset -b lowpowermode 1`, previous value restored).
-Ending a hold with the lid closed sleeps the Mac through the same path as an unplug. A hold is
-consumed when it ends, on "sleep now", and on any helper restart or reboot, so it never comes back
-on its own. Battery temperature is `BatteryData.Temperature` (0.01 °C) on the `AppleSmartBatteryPack`
-registry entry (macOS 27; older layouts kept it on `AppleSmartBattery`, tried as a fallback);
-thermal pressure is `ProcessInfo.thermalState`, also watched via `com.apple.system.thermalpressurelevel`.
-The app notifies the reason after wake, and alerts if the helper stops answering for 2 minutes.
+On battery the hold turns Low Power Mode on (`pmset -b lowpowermode 1`, previous value restored)
+and the helper checks every 10 seconds. Ending a hold with the lid closed sleeps the Mac through
+the same path as an unplug. A hold is consumed when it ends, on "sleep now", and on any helper
+restart or reboot, so it never comes back on its own. Battery temperature is
+`BatteryData.Temperature` (0.01 °C) on the `AppleSmartBatteryPack` registry entry (macOS 27; older
+layouts kept it on `AppleSmartBattery`, tried as a fallback); thermal pressure is
+`ProcessInfo.thermalState`, also watched via `com.apple.system.thermalpressurelevel`. The app
+notifies the reason after wake, and alerts if the helper stops answering for 2 minutes.
 
-## Heat guard (lid closed on AC)
+## Heat on AC with the lid closed
 
-Clamshell on AC still blocks the hinge vent, but sleeping would kill the remote session or job
-that clamshell is for. So the helper only cools: thermal pressure *serious* with the lid closed
-on AC turns AC Low Power Mode on (`pmset -c lowpowermode 1`, previous value restored), released
-after 2 minutes at *fair* or below, or at once when the lid opens or power is pulled. *Critical*
-for 3 minutes raises a notification (visible over remote desktop). No auto-sleep. Settings → Safety
-can turn the guard off or start it at *fair* (`control.json` → `heatGuard`).
+Clamshell on AC still blocks the hinge vent, and sleeping would end the remote session or job that
+clamshell is for, so the helper cools first: thermal pressure *serious* with the lid closed on AC
+turns AC Low Power Mode on (`pmset -c lowpowermode 1`, previous value restored), released after 2
+minutes at *fair* or below, or at once when the lid opens or power is pulled. *Critical* for 3
+minutes raises a notification (visible over remote desktop). Settings → Safety can turn the guard
+off or start it at *fair* (`control.json` → `heatGuard`).
+
+A power bank counts as AC, so "on power with the lid closed" may also be a bag. With no external
+display attached, *critical* for 2 minutes or a battery at 45 °C for a minute (above every hold
+limit) puts the Mac to sleep through the "sleep now" path (`ACThermalPolicy.shouldSleep`, event
+`overheatSleep`, `status.json` → `overheatSleepAt`, reported by the app after wake). With an
+external display it's a desk, and only the guard and the alert apply. While this is building up
+the helper checks every 10 seconds.
+
+## Safety net for the helper itself
+
+`SleepDisabled` is a system setting that outlives the process that set it. If the helper stopped
+while it was on and the Mac then ran on battery with the lid closed, nothing would put it to sleep:
+
+- The helper clears it on SIGTERM (normal stop, uninstall) and re-evaluates on every start; launchd
+  restarts it after a crash (`KeepAlive`).
+- `local.tether.watchdog` is a second LaunchDaemon that launchd runs every 60 seconds: a plain
+  shell script (`tether-watchdog.sh`), so it works even when the helper binary can't. On battery,
+  with `SleepDisabled` on and `status.json` older than 3 minutes (the helper rewrites it at least
+  every 30 seconds), it runs `pmset -a disablesleep 0` and logs to the helper log.
+- An app dragged to the Trash is noticed by the helper (`AppPresence`, 10-minute grace): it restores
+  normal sleep and Low Power Mode, removes itself, the watchdog, the `tether` links and login items
+  that pointed into the app, then boots itself out.
 
 ## Screen off without locking
 
 The no-lock assertion would also keep an idle screen lit forever. With a screen in view in
-clamshell mode (lid open, or an external display), after N minutes without input (Settings → Lid & Screen, default 10 min, off/5/10/20/30)
-the app blanks every display (gamma to black, built-in panel and keyboard dimmed) instead of
-sleeping them; any input restores it, still unlocked. Skipped while another app holds a display
-assertion (video, presentation, call). "Screen Off" (panel, ⌃⌥⌘B, `tether blank`) does the same on
-demand, ignoring input for 1.5 s so the click or hotkey itself does not undo it. Gamma changes die
-with the app process, so a crash never leaves a black screen.
+clamshell mode (lid open, or an external display), after N minutes without input (Settings → Lid &
+Screen, default 10 min, off/5/10/20/30) the app blanks every display (gamma to black, built-in panel
+and keyboard dimmed) instead of sleeping them; any input restores it, still unlocked. Skipped while
+another app holds a display assertion (video, presentation, call). Gamma changes die with the app
+process, so a crash never leaves a black screen. To turn the screen off right away, close the lid.
 
-Settings → Lid & Screen → When the lid closes → Lock the screen is the opposite choice for people who want the Mac
-locked when they walk away: Tether then drops its no-lock assertion (macOS display sleep and lock
-settings apply as usual), locks at once when the lid closes (`SACLockScreenImmediate`, the ⌃⌘Q
-path), and skips blanking. Closing the lid while an external display is in use never locks.
+Settings → Lid & Screen → When the lid closes → Lock the screen is the opposite choice for people
+who want the Mac locked when they walk away: Tether then drops its no-lock assertion (macOS display
+sleep and lock settings apply as usual), locks at once when the lid closes (`SACLockScreenImmediate`,
+the ⌃⌘Q path), and skips blanking. Closing the lid while an external display is in use never locks.
 
-## Sessions, stats, menu bar
+## Menu bar and panel
 
-- When the lid opens after ≥ 5 minutes closed in clamshell mode, the app shows (and notifies)
-  a summary: duration, peak battery temperature and thermal level, battery change, Low Power Mode.
-- The panel shows time awake with the lid closed today / 7 days, a bar per day, and counts of
-  forced sleeps, battery holds and heat-guard activations (`usage.json`, kept 7 days).
-- The menu bar shows the hold countdown (`bag 1:23`) on battery, or the battery temperature
-  (`39°`) while the heat guard is on.
+The status item is drawn with AppKit into one template image (`MenuBarIcon`): the mark, and during
+a battery hold a ring that empties as the hold runs out plus the time left (`29:41`, `1:29:41` from
+an hour up), redrawn every second by `HoldClock`, which only runs while a hold does. While a closed
+Mac runs hot on power the battery temperature (`41°`) appears instead. Settings → General turns
+these details off.
 
-## Hotkeys, URLs, terminal
+The mark is a closed laptop lid with a crescent: solid with its cable while clamshell is on,
+solid without the cable during a battery hold, outlined on battery, struck through when switched
+off; SF Symbols only for problems. The cable leaves the lid's side, not its bottom: at 16 pt a cable
+from the bottom reads as a speech bubble.
 
-| | Hotkey | URL | Terminal |
-|---|---|---|---|
-| Status | | | `tether status [--json]` |
-| On / off / toggle | ⌃⌥⌘T (toggle) | `tether://on` `off` `toggle` | `tether on` `off` `toggle` |
-| Sleep now | ⌃⌥⌘S | `tether://sleep` | `tether sleep` |
-| Screen off, no lock | ⌃⌥⌘B | `tether://blank` | `tether blank` |
-| Battery hold | | `tether://hold/90m`, `?minutes=90`, `hold/off` | `tether hold 1h30m`, `hold off` |
+The panel is laid out like Control Center: glass modules on one spacing grid (`PanelStyle.Metrics`).
+Full: the state with the clamshell switch, status (power, lid, battery temperature), the battery
+hold (durations in a menu, then the countdown to the second with a bar), the last lid session, and
+today (lid-closed time, a bar per day, how the last sleep went). Compact: the state module, and a
+row with the hold, the temperature and the footer buttons.
 
-Hotkeys use Carbon `RegisterEventHotKey` (no Accessibility permission) and can be re-recorded in
-Settings → Automation (any combination with ⌘, ⌥ or ⌃; labels come from the US layout). "Sleep now" (button,
-hotkey, URL, `tether sleep`) waits up to 3 s for input to settle first: any input during powerd's
-~5 s pre-sleep window cancels the sleep, so a finger lifting after the click or the hotkey keys
-being released would otherwise wake the Mac straight back up. The `tether` binary
-lives at `Tether.app/Contents/Helpers/tether`; Settings → Automation links it into `~/.local/bin` (or `/usr/local/bin`).
-It writes the same control file as the app and waits up to 3 s for the helper to apply it. Use
-Shortcuts' "Open URL" or "Run Shell Script" for automations.
+## App icon
 
-## Panel
+`Resources/AppIcon.icon` is an Icon Composer document: a blue fill, the lid (SVG, with the crescent
+cut out) and the cable (a filled outline: the glass renderer closes open paths and lights the
+seam). `scripts/build.sh` compiles it with `actool` into `Assets.car` (Liquid Glass, and the dark,
+clear and tinted looks macOS 26 generates) plus a flat `AppIcon.icns`; Info.plist names both
+`AppIcon`.
 
-Laid out like macOS Control Center: glass modules, with the state circle doubling as the on/off
-control. Full: state, status (power, lid, battery temperature), battery hold (durations in a menu,
-then a countdown ring), screen off and sleep now, the last lid session, and today (lid-closed time,
-a bar per day, and how the last sleep went). Compact: the state module and one row of round
-buttons. Switch with the footer button or Settings → General.
+## URLs and terminal
 
-The icon and menu bar mark are a crescent moon holding the power stroke: sleep, governed by power
-(`scripts/make-icon.swift`, `TetherGlyph`). Solid when clamshell is on, outlined on battery, struck
-through when Tether is off; SF Symbols where they say it better (hold, heat, problems).
+| | URL | Terminal |
+|---|---|---|
+| Status | | `tether status [--json]` |
+| On / off / toggle | `tether://on` `off` `toggle` | `tether on` `off` `toggle` |
+| Sleep now | `tether://sleep` | `tether sleep` |
+| Battery hold | `tether://hold/90m`, `?minutes=90`, `hold/off` | `tether hold 1h30m`, `hold off` |
+| Stay awake for a command | | `tether run [--max 2h] -- <cmd>` |
+| Troubleshooting report | | `tether diagnose [--record] [--out f] [--hours n]` |
+
+"Sleep now" waits up to 3 s for input to settle first: any input during powerd's ~5 s pre-sleep
+window cancels the sleep, so the key press that ran it would otherwise wake the Mac straight back
+up. The `tether` binary lives at `Tether.app/Contents/Helpers/tether`; Settings → Automation links it
+into `~/.local/bin` (or `/usr/local/bin`). It writes the same control file as the app and waits up
+to 3 s for the helper to apply it. Its language follows the app's (Settings → General), read from
+the app's preferences.
 
 ## Settings window
 
@@ -115,13 +183,13 @@ A System Settings style sidebar (the gear in the panel, or ⌘, while it is open
 
 | Page | Contents |
 |---|---|
-| General | launch at login, panel size, Liquid Glass, menu bar details |
-| Lid & Screen | lid close: stay unlocked (dim) or lock, idle screen-off delay, screen off now |
+| General | launch at login, language, panel size, Liquid Glass, menu bar details |
+| Lid & Screen | lid close: stay unlocked (dim) or lock, idle screen-off delay |
 | Safety | this Mac's measurements with recommended limits, stricter battery-hold limits, heat guard |
 | History | daily peak battery temperature against the limits, recent sleeps (drain and causes), lid sessions, 7-day totals |
 | Notifications | notifications per kind |
-| Automation | record hotkeys, install the `tether` command, command and URL reference |
-| System | helper status/reinstall/remove/log, live values of what Tether changes, links to System Settings |
+| Automation | install the `tether` command, command and URL reference |
+| System | helper status/reinstall/remove/log, live values of what Tether changes, apps keeping the Mac awake, diagnostics, updates, uninstall |
 
 ## Data-based settings
 
@@ -142,11 +210,41 @@ sleeps (under a minute) dropped, and charge per hour computed for sleeps on batt
 more. Above 3 %/h (1–2 % is typical) the app notifies with the wake cause. This is the check that a
 Mac Tether put to sleep with the lid shut really stayed asleep in the bag.
 
-## 2.0 additions
+## Diagnostics
 
-- **Languages.** Strings sit side by side in code, `L("English", "한국어")`, chosen from the
-  first preferred language. The app bundle, the helper and the `tether` command share this with no
-  resource bundles (SwiftPM resource bundles don't fit inside an app bundle cleanly).
+`Diagnostics.report` builds one Markdown document for a person or an AI assistant: how Tether is
+meant to behave (so the logs can be checked against it), the state now, the limits in force,
+`control.json`, other apps' power assertions, recent sleeps, lid sessions, 7 days of stats, the
+helper log, the relevant `pmset -g log` lines (sleep, wake and Tether's own assertions; periodic
+"Summary" repeats dropped) and the app's unified log (subsystem `io.github.jukqaz.tether`).
+The home folder, user name, full name and host name are masked. "Detailed logging"
+(`control.json` → `debugLog`) makes the helper log every check with its inputs and decision, and
+every sleep/wake message. The app saves the report to the Desktop or copies it; `tether diagnose
+--record` turns detailed logging on while you reproduce a problem, then reports from that moment.
+
+## Performance
+
+A menu bar utility should cost nothing while nothing happens:
+
+- The helper is event-driven (power source, lid, sleep/wake, thermal pressure, settings; bursts
+  coalesced for 0.1 s) with a 30 s safety timer, 10 s only during a battery hold or overheating.
+  It writes `status.json` every pass (the heartbeat the app and the watchdog check) but
+  `usage.json` only when a sleep or lid session is recorded, or every 5 minutes.
+- IOPMrootDomain is looked up once per process, not per property read.
+- The app refreshes on the helper's status notification, on display changes, and on a 5 s timer
+  (with 1 s tolerance) for idle blanking. `JSONWatch` decodes a file again only when its inode,
+  size or modification time changed, and `AppModel` publishes only values that changed, so SwiftUI
+  redraws nothing on an idle tick.
+- The one-second tick lives in `HoldClock`, which only the countdown views and the status item
+  observe, and only runs during a battery hold. The status item image is drawn directly with
+  AppKit; still images are cached.
+
+## 2.0 notes
+
+- **Languages.** Strings sit side by side in code, `L("English", "한국어")`. The choice in Settings →
+  General (or macOS's language) applies to the app and to the `tether` command, which reads it from
+  the app's preferences. No resource bundles (SwiftPM resource bundles don't fit inside an app
+  bundle cleanly).
 - **Desktops.** Without a built-in battery and a lid, every moment looks like "on AC", which would
   mean never sleeping. The helper checks `SystemProbe.isSupportedMac` at start and, on a desktop,
   only reports; the app explains and does nothing.
@@ -157,27 +255,14 @@ Mac Tether put to sleep with the lid shut really stayed asleep in the bag.
 - **Apps keeping the Mac awake.** `IOPMCopyAssertionsByProcess`, keeping system and display
   assertions of other processes; powerd's own display-on assertion is dropped. Process names come
   from the assertion's "Process Name" (proc_name cannot read root processes).
+- **Bundle identifier.** `io.github.jukqaz.tether` since 2.0; settings from `local.tether` are
+  copied over once. The helper and watchdog labels stay `local.tether.*`.
+- **Translocation.** An app opened straight from Downloads runs from a random temporary path; the
+  app refuses to install the helper from there and asks to be moved to Applications first.
 - **Updates.** Once a day the app asks the GitHub API for the latest release tag; nothing else is
   sent. Off in Settings → System.
-- **Uninstall.** The helper script also removes a `/usr/local/bin/tether` link into Tether.app; the
-  app removes its login item, `~/.local/bin/tether`, its preferences, then moves itself to the Trash.
 
-## Layout
-
-- `TetherCore` — pure policies (`Policy`, `SafetyPolicy`, `ACThermalPolicy`, `ScreenPolicy`),
-  session/stats trackers, command parsing, Korean texts, probes (IOPS + IOPMrootDomain registry),
-  shared files.
-- `TetherHelper` — root LaunchDaemon `local.tether.helper`. Reacts to power-source, lid, sleep/wake
-  and settings notifications (coalesced 0.1 s) plus a 30 s fallback timer. Owns `SleepDisabled`
-  via `pmset -a disablesleep`, so the rule holds before login and without the app running.
-- `Tether` — SwiftUI `MenuBarExtra` panel (status, on/off, battery hold, screen off, sleep now)
-  and `Settings` window; launch at login (on by default, per-user LaunchAgent `local.tether.app`),
-  helper install/update, notifications, hotkeys, `tether://` URLs, and `ScreenGuard` (no-lock,
-  dimming, blanking). Keep it running:
-  without it the display sleeps after its timer and the Mac locks.
-- `TetherCLI` — the `tether` command.
-
-Files: `/Library/Application Support/Tether/{control,status,usage}.json` (control is
+Files: `/Library/Application Support/Tether/{control,status,usage,helper-state}.json` (control is
 admin-writable), log at `/Library/Logs/Tether/helper.log`.
 
 ## Build and install
@@ -193,16 +278,16 @@ Uninstall: Settings → System → Uninstall Tether… (restores `disablesleep 0
 ## Test
 
 ```sh
-swift test                                         # policy scenarios
-.build/debug/Tether --render-preview /tmp/p.png [dark] [--sample]   # draw the panel (live data)
-.build/debug/Tether --render-menubar /tmp/m.png "1:23" bag.fill        # draw a status item
-.build/debug/Tether --render-settings /tmp/s.png system [dark]         # draw a settings tab
-swift scripts/make-icon.swift && iconutil -c icns Resources/Tether.iconset -o Resources/Tether.icns
+swift test                                                   # policies and records
+.build/debug/Tether --render-preview /tmp/p.png [dark] [--sample] [--hold] -liquidGlass NO
+.build/debug/Tether --render-settings /tmp/s.png system [dark] -liquidGlass NO
+.build/debug/Tether --render-menubar /tmp/m.png              # every status item state
 .build/debug/TetherHelper --dry-run --control /tmp/c.json --status /tmp/s.json
 ```
 
-The dry-run helper logs decisions without calling `pmset` or `IOPMSleepSystem`. Add
-`--fake fake.json` (keys: `power`, `lid`, `sleepDisabled`, `temperature`, `thermal`, `battery`,
-re-read on every check) to walk a battery-hold or heat-guard scenario without unplugging; post
+Liquid Glass does not draw in an offscreen window, hence `-liquidGlass NO` for screenshots. The
+dry-run helper logs decisions without calling `pmset` or `IOPMSleepSystem`. Add `--fake fake.json`
+(keys: `power`, `lid`, `sleepDisabled`, `temperature`, `thermal`, `battery`, re-read on every check)
+to walk a battery-hold or overheating scenario without unplugging; post
 `notifyutil -p local.tether.control` to trigger a check. SwiftPM needs to run outside the
 Claude Code sandbox (`swift build` writes build service data it cannot write).

@@ -10,14 +10,22 @@ First public release.
   when the lid closes instead.
 - Battery hold with safety limits enforced by the helper (battery temperature by lid state,
   thermal pressure, battery floor, time), adjustable only toward stricter values.
-- Heat guard: Low Power Mode for a closed Mac running hot on power.
+- Heat guard: Low Power Mode for a closed Mac running hot on power, and sleep if it keeps
+  overheating with no display attached (a bag on a power bank counts as power).
+- A watchdog LaunchDaemon that turns sleep back on if the helper ever stops while sleep is off on
+  battery.
 - Data-based settings: time-weighted battery temperatures, battery use during holds, and
   recommended limits from them.
 - Sleep log: duration, charge per hour, sleep and wake causes, dark wakes; alerts on high drain.
-- Screen off without locking, idle or on demand.
-- `tether` command with `status --json`, `hold`, `sleep`, `blank`, and `run -- <command>`.
-- `tether://` URLs, global shortcuts you can re-record.
+- Screen off without locking after a few idle minutes.
+- `tether` command with `status --json`, `hold`, `sleep`, `run -- <command>` and `diagnose`.
+- `tether://` URLs for the Shortcuts app.
 - Apps keeping the Mac awake, live in Settings and `tether status`.
-- Control Center style panel (full and compact), sidebar settings, new icon, English and Korean.
+- Troubleshooting: detailed logging and a Markdown report with masked names, from Settings or
+  `tether diagnose --record`.
+- Control Center style panel (full and compact) with a clamshell switch and a countdown to the
+  second; a status item with a ring that empties during a battery hold.
+- Icon Composer app icon (Liquid Glass, dark, clear and tinted), sidebar settings, English and
+  Korean with a choice in Settings.
 - First-run welcome, update check against GitHub releases, full uninstall.
 - Desktop Macs are left alone.
