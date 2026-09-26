@@ -27,11 +27,12 @@ public enum Texts {
         seconds < 60 ? L("0 min", "0분") : duration(seconds)
     }
 
-    /// Countdown for the menu bar: "1:23" (hours:minutes), rounded up so it never shows 0:00
-    /// while time is left.
+    /// A ticking countdown: "29:41", or "1:29:41" from an hour up. Rounded up, so it never shows
+    /// 0:00 while time is left.
     public static func countdown(_ seconds: TimeInterval) -> String {
-        let minutes = max(0, Int((seconds / 60).rounded(.up)))
-        return String(format: "%d:%02d", minutes / 60, minutes % 60)
+        let s = max(0, Int(seconds.rounded(.up)))
+        let hours = s / 3600, minutes = s % 3600 / 60, rest = s % 60
+        return hours > 0 ? String(format: "%d:%02d:%02d", hours, minutes, rest) : String(format: "%d:%02d", minutes, rest)
     }
 
     /// Why the Mac went to sleep, from IOPMrootDomain "Last Sleep Reason".
@@ -84,6 +85,20 @@ public enum Texts {
         return parts.joined(separator: " · ")
     }
 
+    /// Who armed a battery hold, for the panel; nil for the app itself.
+    public static func holdSource(_ raw: String?) -> String? {
+        guard let raw, raw != "app" else { return nil }
+        if raw.hasPrefix("run:") {
+            let command = String(raw.dropFirst(4))
+            return L("tether run: \(command)", "tether run: \(command)")
+        }
+        switch raw {
+        case "cli": return L("from the terminal", "터미널에서")
+        case "url": return L("from a shortcut or URL", "단축어·URL에서")
+        default: return nil
+        }
+    }
+
     /// What a blocker holds off.
     public static func blockerKind(_ kind: SleepBlocker.Kind) -> String {
         switch kind {
@@ -115,6 +130,7 @@ extension EventKind {
         case .heatGuardOn: L("heat guard · Low Power Mode on", "발열 보호 · 저전력 모드 켬")
         case .heatGuardOff: L("heat guard off · Low Power Mode restored", "발열 보호 끝 · 저전력 모드 복원")
         case .heatCritical: L("critical heat for 3 minutes", "발열 위험 3분 지속")
+        case .overheatSleep: L("overheating on power → put to sleep", "전원 연결 중 과열 → 잠재움")
         }
     }
 }

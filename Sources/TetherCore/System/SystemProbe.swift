@@ -139,11 +139,12 @@ public enum SystemProbe {
                        batteryPercent: batteryPercent())
     }
 
+    /// IOPMrootDomain lives as long as the system does, so it is looked up once, not per read.
+    private static let rootDomain = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOPMrootDomain"))
+
     private static func rootDomainValue(_ key: String) -> Any? {
-        let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOPMrootDomain"))
-        guard service != 0 else { return nil }
-        defer { IOObjectRelease(service) }
-        return IORegistryEntryCreateCFProperty(service, key as CFString, kCFAllocatorDefault, 0)?
+        guard rootDomain != 0 else { return nil }
+        return IORegistryEntryCreateCFProperty(rootDomain, key as CFString, kCFAllocatorDefault, 0)?
             .takeRetainedValue()
     }
 
@@ -164,22 +165,6 @@ public enum SystemProbe {
             let fields = line.split(whereSeparator: \.isWhitespace)
             return fields.first == "SleepDisabled" && fields.last == "1"
         }
-    }
-}
-
-public enum Shell {
-    @discardableResult
-    public static func run(_ path: String, _ arguments: [String]) -> (status: Int32, output: String) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: path)
-        process.arguments = arguments
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
-        do { try process.run() } catch { return (-1, "\(error)") }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        return (process.terminationStatus, String(decoding: data, as: UTF8.self))
     }
 }
 
