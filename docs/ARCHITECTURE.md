@@ -220,7 +220,7 @@ A System Settings style sidebar (the gear in the panel, or ⌘, while it is open
 |---|---|
 | General | launch at login, language, panel size, menu bar details (Liquid Glass follows Reduce transparency) |
 | Lid & Screen | lid close: stay unlocked (dim) or lock; the idle screen-off delay, shown only when staying unlocked |
-| Safety | this Mac's measurements with recommended limits, stricter battery-hold limits, Low Power Mode (during holds; when hot on power), the overheat safety net |
+| Safety | this Mac's measurements with recommended limits, auto-adjust, stricter battery-hold limits, Low Power Mode (during holds; when hot on power), the overheat safety net |
 | History | daily peak battery temperature against the limits, recent sleeps (drain and causes), lid sessions, 7-day totals |
 | Notifications | sleep drain, battery hold ended, overheating; a stopped helper and a weak-charger sleep are always reported |
 | Automation | install the `tether` command, command and URL reference |
@@ -235,6 +235,15 @@ stricter-than-default choices: a temperature limit 4 °C above the usual (95th p
 ordinary use never trips it and a bag soon does; the longest hold the measured drain allows from
 the usual starting charge; the heat guard from "fair" when the lid-closed Mac often runs hot.
 Nothing is recommended before 30 minutes of lid-closed data.
+
+Auto-adjust (`Control.autoLimits`, "Adjust to this Mac") puts the recommendations for the two
+temperature limits and the longest hold in force by themselves; the floor and Low Power Mode stay
+as chosen. The helper enforces it: `Advisor.limitsInForce` combines the chosen limits with the
+recommendations from the week in `usage.json`, which the helper summarises each time it writes
+the file, so the limits in force change at most every 5 minutes and match what the app computes
+from the same file. A limit with no recommendation yet keeps its chosen value; `SafetyPolicy`
+clamps the result like any other user limit, so it can't be looser than the defaults. The helper
+logs the limits in force whenever they change ("limits (auto-adjusted): …").
 
 ## Sleep log
 

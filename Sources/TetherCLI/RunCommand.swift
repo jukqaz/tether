@@ -34,13 +34,13 @@ func run(_ rest: [String]) -> Never {
     // Our own hold, sized to the command's worst case; one already armed is left alone.
     var ownHold: Double?
     let percent = state.status?.batteryPercent ?? SystemProbe.batteryPercent()
-    let canHold = SafetyPolicy.canStartHold(batteryPercent: percent, user: state.control.limits)
+    let canHold = SafetyPolicy.canStartHold(batteryPercent: percent, user: state.limits)
     if state.control.enabled, !canHold {
         note(L("tether: the battery is at or under its floor, so there's no battery hold; on power it stays awake as usual",
                "tether: 배터리가 하한선 이하라 배터리 유지 없이 실행합니다. 전원이 연결돼 있으면 평소처럼 깨어 있습니다"))
     }
     if state.control.enabled, canHold, state.status?.batteryHoldUntil == nil {
-        let longest = Int(SafetyPolicy.maxHold(state.control.limits) / 60)
+        let longest = Int(SafetyPolicy.maxHold(state.limits) / 60)
         let minutes = min(maxMinutes ?? longest, longest)
         let name = (words[0] as NSString).lastPathComponent
         let after = change { ControlStore.startHold(minutes: minutes, source: "run:\(name)") }

@@ -14,6 +14,9 @@ struct State {
     }
 
     var clamshell: Bool { responding && control.enabled && snapshot.sleepDisabled }
+
+    /// The battery-hold limits the helper enforces, auto-adjust included.
+    var limits: UserLimits? { control.limitsInForce(UsageSummary(usage, now: Date())) }
 }
 
 func requireHelper(_ state: State) {

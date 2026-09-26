@@ -20,6 +20,9 @@ public struct Control: Codable, Equatable, Sendable {
     public var debugLog: Bool?
     /// Low Power Mode during a battery hold; nil means on (see `LowPowerPolicy`).
     public var holdLowPower: Bool?
+    /// Auto-adjust: the battery-hold temperature limits and the longest hold follow this Mac's
+    /// measurements (see `limitsInForce`); nil means off.
+    public var autoLimits: Bool?
 
     public init(enabled: Bool = true, sleepNowRequest: Double? = nil, batteryHoldUntil: Double? = nil,
                 limits: UserLimits? = nil, heatGuard: HeatGuardSettings? = nil, holdSource: String? = nil,
@@ -31,6 +34,13 @@ public struct Control: Codable, Equatable, Sendable {
         self.heatGuard = heatGuard
         self.holdSource = holdSource
         self.appPath = appPath
+    }
+}
+
+extension Control {
+    /// The battery-hold limits in force, auto-adjust included (`Advisor.limitsInForce`).
+    public func limitsInForce(_ summary: UsageSummary) -> UserLimits? {
+        Advisor.limitsInForce(limits, auto: autoLimits == true, summary: summary)
     }
 }
 

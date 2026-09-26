@@ -25,6 +25,8 @@ final class AppModel: ObservableObject {
     @Published private(set) var snapshot = SystemProbe.snapshot()
     @Published private(set) var status: Status?
     @Published private(set) var usage: Usage?
+    /// The last seven days of `usage`, kept with it (see `setUsage`).
+    private(set) var summary = UsageSummary(week: [], sessions: [])
     @Published private(set) var helperInstalled = false
     /// The helper rewrote its status within the last 90 seconds (it does so at least every 30).
     @Published private(set) var helperResponding = false
@@ -33,8 +35,10 @@ final class AppModel: ObservableObject {
 
     /// Clamshell mode: connecting power turns it on by itself. Off leaves the lid to macOS.
     @Published private(set) var enabled = true
-    /// Stricter battery-hold limits.
+    /// Stricter battery-hold limits, as chosen; `limitsInForce` adds auto-adjust.
     @Published private(set) var limits = UserLimits()
+    /// The temperature limits and the longest hold follow this Mac's measurements (`Control.autoLimits`).
+    @Published private(set) var autoLimits = false
     /// Low Power Mode during a battery hold (`Control.holdLowPower`).
     @Published private(set) var holdLowPower = true
     @Published private(set) var heatGuard = HeatGuardSettings.standard
@@ -124,8 +128,9 @@ final class AppModel: ObservableObject {
     }
 
     /// `preview` reads live state once, with no timers, notifications or side effects; `sample`
-    /// adds made-up usage and `holdSample` a running battery hold, to check the design.
-    init(preview: Bool = false, sample: Bool = false, holdSample: Bool = false) {
+    /// adds made-up usage, `holdSample` a running battery hold and `autoSample` auto-adjust, to
+    /// check the design.
+    init(preview: Bool = false, sample: Bool = false, holdSample: Bool = false, autoSample: Bool = false) {
         if !preview { Self.migrateDefaults() }
         defaults.register(defaults: [Key.idleBlankMinutes: 10, Key.menuBarDetails: true,
                                      Key.lidCloseLocks: false, Key.notifyHoldEnd: true, Key.notifyHeat: true,
@@ -144,8 +149,9 @@ final class AppModel: ObservableObject {
         if preview {
             if sample {
                 // Screenshots show the defaults, not this Mac's own choices.
-                usage = SampleData.usage()
+                setUsage(SampleData.usage())
                 limits = UserLimits()
+                autoLimits = autoSample
                 heatGuard = .standard
                 holdLowPower = true
                 debugLogging = false
@@ -214,18 +220,24 @@ final class AppModel: ObservableObject {
     private func readState() {
         assign(\.snapshot, SystemProbe.snapshot())
         if statusFile.reload() { status = statusFile.value }
-        if usageFile.reload() { usage = usageFile.value }
+        if usageFile.reload() { setUsage(usageFile.value) }
         assign(\.helperInstalled, FileManager.default.fileExists(atPath: TetherPaths.helperPlistPath))
         assign(\.helperResponding, status.map { Date().timeIntervalSince1970 - $0.updatedAt < 90 } ?? false)
         if controlFile.reload(), let control = controlFile.value {
             assign(\.enabled, control.enabled)
             assign(\.limits, control.limits ?? UserLimits())
+            assign(\.autoLimits, control.autoLimits == true)
             assign(\.holdLowPower, control.holdLowPower ?? true)
             assign(\.heatGuard, control.heatGuard ?? .standard)
             assign(\.holdSource, control.batteryHoldUntil == nil ? nil : control.holdSource)
             assign(\.debugLogging, control.debugLog == true)
         }
         clock.run(until: batteryHoldUntil)
+    }
+
+    private func setUsage(_ new: Usage?) {
+        usage = new
+        summary = UsageSummary(new, now: Date())
     }
 
     private func assign<T: Equatable>(_ keyPath: ReferenceWritableKeyPath<AppModel, T>, _ value: T) {
@@ -316,7 +328,7 @@ final class AppModel: ObservableObject {
     /// Whether the running hold can take `minutes` more under the cap counted from its start.
     func canExtendHold(minutes: Int) -> Bool {
         guard let until = batteryHoldUntil, let since = status?.batteryHoldSince else { return false }
-        return until.timeIntervalSince1970 + TimeInterval(minutes * 60) <= since + SafetyPolicy.maxHold(limits)
+        return until.timeIntervalSince1970 + TimeInterval(minutes * 60) <= since + SafetyPolicy.maxHold(limitsInForce)
     }
 
     func extendBatteryHold(minutes: Int) {

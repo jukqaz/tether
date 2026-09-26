@@ -31,7 +31,7 @@ struct SafetyPage: View {
                             .buttonStyle(.borderedProminent)
                             .tint(.orange)
                     } label: {
-                        Label(adviceSummary(advice), systemImage: "wand.and.stars")
+                        Label(adviceSummary(advice, limits: !model.autoLimits), systemImage: "wand.and.stars")
                     }
                 }
             } header: {
@@ -41,40 +41,31 @@ struct SafetyPage: View {
             }
 
             Section {
+                Toggle(isOn: Binding(get: { model.autoLimits }, set: { model.setAutoLimits($0) })) {
+                    Text(L("Adjust to this Mac", "이 Mac에 맞춰 자동 조정"))
+                    Text(L("Temperatures and the longest hold follow the measurements, never looser than the defaults",
+                           "온도와 최대 시간을 측정값에 맞춰요. 기본값보다 느슨해지지 않아요"))
+                }
                 Picker(L("End at this much battery", "배터리가 이만큼 남으면 끝내기"),
                        selection: limit(\.batteryFloor, SafetyPolicy.floor(model.limits), default: SafetyPolicy.batteryFloor)) {
                     ForEach(SafetyPolicy.floorChoices, id: \.self) { value in
                         Text(choice("\(value)%", isDefault: value == SafetyPolicy.batteryFloor, isRecommended: false)).tag(value)
                     }
                 }
-                Picker(L("Lid closed · end at once at", "덮개 닫힘 · 이 온도면 바로 끝내기"),
-                       selection: limit(\.closedLidMaxTemperature, model.safetyLimits(lidClosed: true).hardTemperature,
-                                        default: SafetyPolicy.closedLid.hardTemperature)) {
-                    ForEach(SafetyPolicy.closedLidChoices, id: \.self) { value in
-                        Text(choice("\(Int(value))°C", isDefault: value == SafetyPolicy.closedLid.hardTemperature,
-                                    isRecommended: value == advice.closedLid?.value)).tag(value)
-                    }
-                }
-                Picker(L("Lid open · end at once at", "덮개 열림 · 이 온도면 바로 끝내기"),
-                       selection: limit(\.openLidMaxTemperature, model.safetyLimits(lidClosed: false).hardTemperature,
-                                        default: SafetyPolicy.openLid.hardTemperature)) {
-                    ForEach(SafetyPolicy.openLidChoices, id: \.self) { value in
-                        Text(choice("\(Int(value))°C", isDefault: value == SafetyPolicy.openLid.hardTemperature,
-                                    isRecommended: value == advice.openLid?.value)).tag(value)
-                    }
-                }
-                Picker(L("Longest hold", "한 번에 최대"), selection: limit(\.maxHoldHours, SafetyPolicy.maxHold(model.limits) / 3600,
-                                                                   default: SafetyPolicy.maxHold / 3600)) {
-                    ForEach(SafetyPolicy.maxHoldChoices, id: \.self) { hours in
-                        Text(choice(L("\(Int(hours)) h", "\(Int(hours))시간"), isDefault: hours == SafetyPolicy.maxHold / 3600,
-                                    isRecommended: hours == advice.maxHold?.value)).tag(hours)
-                    }
+                if model.autoLimits {
+                    autoRows(advice)
+                } else {
+                    limitPickers(advice)
                 }
             } header: {
                 Text(L("Battery Hold", "배터리에서도 유지"))
             } footer: {
-                Note(L("Limits can't be looser than the defaults. With the lid closed it also ends after a minute at 3°C below the limit, or at “serious” heat. If the battery temperature can't be read, it ends at once.",
-                       "기본값보다 느슨하게는 바꿀 수 없어요. 덮개가 닫혀 있으면 이 온도보다 3°C 낮은 상태가 1분 이어지거나 발열이 '심각'이 돼도 끝내요. 배터리 온도를 읽지 못하면 바로 끝내요."))
+                Note((model.autoLimits
+                      ? L("Recommendations are applied by themselves and re-checked as measurements come in. Until there's enough data (about 30 minutes with the lid closed), the current values stay. ",
+                          "추천값을 알아서 적용하고 기록이 쌓일 때마다 다시 맞춰요. 기록이 모이기 전(덮개를 닫고 약 30분)에는 지금 값을 써요. ")
+                      : L("Limits can't be looser than the defaults. ", "기본값보다 느슨하게는 바꿀 수 없어요. "))
+                     + L("With the lid closed it also ends after a minute at 3°C below the limit, or at “serious” heat. If the battery temperature can't be read, it ends at once.",
+                         "덮개가 닫혀 있으면 이 온도보다 3°C 낮은 상태가 1분 이어지거나 발열이 '심각'이 돼도 끝내요. 배터리 온도를 읽지 못하면 바로 끝내요."))
             }
 
             Section {
@@ -121,16 +112,66 @@ struct SafetyPage: View {
         }
     }
 
-    private func adviceSummary(_ a: AppModel.Recommendations) -> String {
+    /// The limits auto-adjust sets, read-only: the value in force, and whether it follows the data yet.
+    @ViewBuilder
+    private func autoRows(_ advice: Recommendations) -> some View {
+        autoRow(L("Lid closed · end at once at", "덮개 닫힘 · 이 온도면 바로 끝내기"),
+                "\(Int(model.safetyLimits(lidClosed: true).hardTemperature))°C", following: advice.closedLid != nil)
+        autoRow(L("Lid open · end at once at", "덮개 열림 · 이 온도면 바로 끝내기"),
+                "\(Int(model.safetyLimits(lidClosed: false).hardTemperature))°C", following: advice.openLid != nil)
+        autoRow(L("Longest hold", "한 번에 최대"), L("\(model.maxHoldMinutes / 60) h", "\(model.maxHoldMinutes / 60)시간"),
+                following: advice.maxHold != nil)
+    }
+
+    private func autoRow(_ title: String, _ value: String, following: Bool) -> some View {
+        LabeledContent(title) {
+            HStack(spacing: 6) {
+                Text(following ? L("Auto", "자동") : L("Collecting data", "기록 모으는 중"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(value)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func limitPickers(_ advice: Recommendations) -> some View {
+        Picker(L("Lid closed · end at once at", "덮개 닫힘 · 이 온도면 바로 끝내기"),
+               selection: limit(\.closedLidMaxTemperature, model.safetyLimits(lidClosed: true).hardTemperature,
+                                default: SafetyPolicy.closedLid.hardTemperature)) {
+            ForEach(SafetyPolicy.closedLidChoices, id: \.self) { value in
+                Text(choice("\(Int(value))°C", isDefault: value == SafetyPolicy.closedLid.hardTemperature,
+                            isRecommended: value == advice.closedLid?.value)).tag(value)
+            }
+        }
+        Picker(L("Lid open · end at once at", "덮개 열림 · 이 온도면 바로 끝내기"),
+               selection: limit(\.openLidMaxTemperature, model.safetyLimits(lidClosed: false).hardTemperature,
+                                default: SafetyPolicy.openLid.hardTemperature)) {
+            ForEach(SafetyPolicy.openLidChoices, id: \.self) { value in
+                Text(choice("\(Int(value))°C", isDefault: value == SafetyPolicy.openLid.hardTemperature,
+                            isRecommended: value == advice.openLid?.value)).tag(value)
+            }
+        }
+        Picker(L("Longest hold", "한 번에 최대"), selection: limit(\.maxHoldHours, SafetyPolicy.maxHold(model.limits) / 3600,
+                                                           default: SafetyPolicy.maxHold / 3600)) {
+            ForEach(SafetyPolicy.maxHoldChoices, id: \.self) { hours in
+                Text(choice(L("\(Int(hours)) h", "\(Int(hours))시간"), isDefault: hours == SafetyPolicy.maxHold / 3600,
+                            isRecommended: hours == advice.maxHold?.value)).tag(hours)
+            }
+        }
+    }
+
+    /// `limits`: include the battery-hold limits, which auto-adjust otherwise applies by itself.
+    private func adviceSummary(_ a: Recommendations, limits: Bool) -> String {
         var parts: [String] = []
-        if let v = a.closedLid?.value { parts.append(L("lid closed \(Int(v))°C", "덮개 닫힘 \(Int(v))°C")) }
-        if let v = a.openLid?.value { parts.append(L("lid open \(Int(v))°C", "덮개 열림 \(Int(v))°C")) }
-        if let v = a.maxHold?.value { parts.append(L("up to \(Int(v)) h", "최대 \(Int(v))시간")) }
+        if limits, let v = a.closedLid?.value { parts.append(L("lid closed \(Int(v))°C", "덮개 닫힘 \(Int(v))°C")) }
+        if limits, let v = a.openLid?.value { parts.append(L("lid open \(Int(v))°C", "덮개 열림 \(Int(v))°C")) }
+        if limits, let v = a.maxHold?.value { parts.append(L("up to \(Int(v)) h", "최대 \(Int(v))시간")) }
         if let v = a.heatLevel?.value { parts.append(L("Low Power Mode from “\(Texts.thermal(v))”", "저전력 모드 '\(Texts.thermal(v))'부터")) }
         return L("Recommended: ", "추천: ") + parts.joined(separator: " · ")
     }
 
-    private func adviceNote(_ a: AppModel.Recommendations) -> String {
+    private func adviceNote(_ a: Recommendations) -> String {
         let reasons = [a.closedLid?.reason, a.openLid?.reason, a.maxHold?.reason, a.heatLevel?.reason].compactMap { $0 }
         guard !reasons.isEmpty else {
             return L("The helper records battery temperature and heat every 30 seconds. After about 30 minutes with the lid closed, recommendations for this Mac appear here.",

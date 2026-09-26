@@ -40,7 +40,8 @@ closed.
   when, or never). If it keeps overheating with no display attached, as in a bag on a power bank,
   it is put to sleep.
 - **Data-based settings**: Tether measures this Mac's battery temperatures and battery use and
-  recommends limits from them.
+  recommends limits from them, or with "Adjust to this Mac" on, applies them by itself (never
+  looser than the defaults).
 - **Sleep log**: how long it slept, charge used per hour, what put it to sleep and what woke it,
   with an alert when sleep drains more than it should.
 - **Screen off without locking** after a few idle minutes.
@@ -119,6 +120,8 @@ puts the Mac to sleep as soon as any of these is true:
   drain; Settings › Safety › Low Power Mode can turn that off.
 - A hold never survives a restart of the helper or the Mac.
 - The limits can be made stricter in Settings, never looser, even by editing the control file.
+  "Adjust to this Mac" sets them from this Mac's own measurements (4 °C above the usual peak,
+  the longest hold from the measured drain) and keeps them up to date, within the same rule.
 - On power, overheating with the lid closed and no display attached (as in a bag on a power bank)
   puts the Mac to sleep: critical thermal pressure for 2 minutes, or the battery at 45 °C for a
   minute. So does a charger that can't keep up: the battery at its floor and still draining for a

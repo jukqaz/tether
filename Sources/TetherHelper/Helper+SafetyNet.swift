@@ -8,7 +8,7 @@ extension Helper {
     func updateSafetyNet(_ s: Snapshot, clamshellOn: Bool, readings r: SafetyReadings) {
         let now = Date()
         let reason = safetyNet.update(s, clamshellOn: clamshellOn, readings: r,
-                                      floor: SafetyPolicy.floor(control.limits), now: now)
+                                      floor: SafetyPolicy.floor(limits), now: now)
         if safetyNet.criticalSince == nil { criticalAlerted = false }
         if ACThermalPolicy.shouldAlert(criticalSince: safetyNet.criticalSince, alreadyAlerted: criticalAlerted, now: now) {
             criticalAlerted = true

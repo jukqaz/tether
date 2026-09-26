@@ -51,6 +51,14 @@ final class Helper {
     let usagePath: String
     var usage = Usage()
     var usageSavedAt = Date.distantPast
+    /// The week in `usage.json`, refreshed whenever the file is written, so auto-adjust follows
+    /// exactly the data the app shows.
+    var summary = UsageSummary(week: [], sessions: [])
+
+    /// The battery-hold limits in force (`Control.limitsInForce`), refreshed on every check.
+    var limits: UserLimits?
+    /// The settings line last logged, to log again only when something in it changes.
+    var loggedSettings: String?
 
     // Sleep log
     var lastSleepRequestAt = Date.distantPast
@@ -99,11 +107,13 @@ final class Helper {
         }
         state = JSONFile.read(HelperState.self, from: statePath) ?? HelperState()
         usage = JSONFile.read(Usage.self, from: usagePath) ?? Usage()
+        summary = UsageSummary(usage, now: Date())
         // Seed the lid state so only real opens/closes get logged. The clamshell message also
         // fires when AppleClamshellCausesSleep flips on a power change, with the lid unchanged.
         lastLidClosed = currentSnapshot().lidClosed
         lastPower = currentSnapshot().power
         loadControl(initial: true)
+        refreshSettings()
         watchPowerSource()
         watchSystemPower()
         watchClamshell()
@@ -157,6 +167,7 @@ final class Helper {
         var triggers = pendingTriggers
         pendingTriggers = []
         if loadControl(initial: false) { triggers.insert(.sleepNow) }
+        refreshSettings()
 
         if retireIfAppIsGone() { return }
         let snapshot = currentSnapshot()
@@ -204,10 +215,6 @@ final class Helper {
     @discardableResult
     func loadControl(initial: Bool) -> Bool {
         guard let loaded = JSONFile.read(Control.self, from: controlPath) else { return false }
-        if initial || loaded.limits != control.limits || loaded.heatGuard != control.heatGuard
-            || loaded.holdLowPower != control.holdLowPower {
-            logSettings(loaded)
-        }
         if loaded.debugLog != control.debugLog || (initial && loaded.debugLog == true) {
             log("detailed logging \(loaded.debugLog == true ? "on" : "off")")
         }
@@ -235,16 +242,23 @@ final class Helper {
         return true
     }
 
-    /// The limits in force, after clamping to the defaults (they can only be stricter).
-    func logSettings(_ c: Control) {
-        let closed = SafetyPolicy.limits(lidClosed: true, user: c.limits)
-        let open = SafetyPolicy.limits(lidClosed: false, user: c.limits)
-        let guardSettings = c.heatGuard ?? .standard
-        log(String(format: "limits: floor %d%%, lid closed %.0f°C (early %.0f°C), lid open %.0f°C, max %.1f h; Low Power Mode during holds %@, when hot on power %@",
-                   SafetyPolicy.floor(c.limits), closed.hardTemperature, closed.earlyTemperature ?? 0,
-                   open.hardTemperature, SafetyPolicy.maxHold(c.limits) / 3600,
-                   c.holdLowPower == false ? "off" : "on",
-                   guardSettings.enabled ? "from thermal \(guardSettings.threshold)" : "off"))
+    /// Picks up the limits in force and logs them, after clamping to the defaults (they can only
+    /// be stricter), whenever they change: a new choice in Settings, or auto-adjust following
+    /// new measurements.
+    func refreshSettings() {
+        limits = control.limitsInForce(summary)
+        let closed = SafetyPolicy.limits(lidClosed: true, user: limits)
+        let open = SafetyPolicy.limits(lidClosed: false, user: limits)
+        let guardSettings = control.heatGuard ?? .standard
+        let line = String(format: "limits%@: floor %d%%, lid closed %.0f°C (early %.0f°C), lid open %.0f°C, max %.1f h; Low Power Mode during holds %@, when hot on power %@",
+                          control.autoLimits == true ? " (auto-adjusted)" : "",
+                          SafetyPolicy.floor(limits), closed.hardTemperature, closed.earlyTemperature ?? 0,
+                          open.hardTemperature, SafetyPolicy.maxHold(limits) / 3600,
+                          control.holdLowPower == false ? "off" : "on",
+                          guardSettings.enabled ? "from thermal \(guardSettings.threshold)" : "off")
+        guard line != loggedSettings else { return }
+        loggedSettings = line
+        log(line)
     }
 
     func perform(_ action: Action, snapshot: Snapshot, triggers: Set<Trigger>) {

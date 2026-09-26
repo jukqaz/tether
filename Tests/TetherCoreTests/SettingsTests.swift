@@ -87,12 +87,14 @@ final class ControlCompatibilityTests: XCTestCase {
         let control = try JSONDecoder().decode(Control.self, from: Data(json.utf8))
         XCTAssertNil(control.limits)
         XCTAssertNil(control.heatGuard)
+        XCTAssertNil(control.autoLimits)
         XCTAssertEqual(control.batteryHoldUntil, 1790395061.7)
     }
 
     func testRoundTrip() throws {
-        let control = Control(enabled: false, limits: UserLimits(batteryFloor: 30, maxHoldHours: 2),
+        var control = Control(enabled: false, limits: UserLimits(batteryFloor: 30, maxHoldHours: 2),
                               heatGuard: HeatGuardSettings(enabled: true, level: 1))
+        control.autoLimits = true
         XCTAssertEqual(try JSONDecoder().decode(Control.self, from: JSONEncoder().encode(control)), control)
     }
 }

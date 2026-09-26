@@ -18,7 +18,7 @@ extension Helper {
         let s = currentSnapshot()
         let hold = holdWasActive
             ? state.holdDeadline(requested: control.batteryHoldUntil, now: Date(),
-                                 maxHold: SafetyPolicy.maxHold(control.limits))?.timeIntervalSince1970
+                                 maxHold: SafetyPolicy.maxHold(limits))?.timeIntervalSince1970
             : nil
         var status = Status(updatedAt: Date().timeIntervalSince1970, version: TetherPaths.version,
                             enabled: control.enabled, power: s.power, lidClosed: s.lidClosed,

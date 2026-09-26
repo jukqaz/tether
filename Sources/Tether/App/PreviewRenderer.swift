@@ -6,12 +6,12 @@ import TetherCore
 /// through the menu bar. Liquid Glass does not render offscreen, so pass `-liquidGlass NO`.
 ///
 ///     Tether --render-preview out.png [dark] [--sample] [--hold]
-///     Tether --render-settings out.png general|lid|safety|history|notifications|automation|system [dark] [--sample]
+///     Tether --render-settings out.png general|lid|safety|history|notifications|automation|system [dark] [--sample] [--auto]
 ///     Tether --render-welcome out.png [dark]
 ///     Tether --render-menubar out.png
 ///
 /// `--sample` adds made-up usage (a recent lid session, a week of bars); `--hold` a running
-/// battery hold.
+/// battery hold; `--auto` turns auto-adjust on (with `--sample`).
 @MainActor
 enum PreviewRenderer {
     /// Renders what the arguments ask for; false when they ask for nothing, to run the app.
@@ -25,7 +25,8 @@ enum PreviewRenderer {
             renderMenuBar(to: out)
         } else if let out = path(after: "--render-settings", extra: 1),
                   let page = SettingsPage(rawValue: args[args.firstIndex(of: "--render-settings")! + 2]) {
-            render(SettingsView(model: AppModel(preview: true, sample: sample), initialPage: page), to: out, dark: dark)
+            let model = AppModel(preview: true, sample: sample, autoSample: args.contains("--auto"))
+            render(SettingsView(model: model, initialPage: page), to: out, dark: dark)
         } else if let out = path(after: "--render-welcome") {
             render(WelcomePreview(model: AppModel(preview: true)), to: out, dark: dark)
         } else if let out = path(after: "--render-preview") {

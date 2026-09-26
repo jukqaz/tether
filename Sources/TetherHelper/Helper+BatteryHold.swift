@@ -6,7 +6,7 @@ extension Helper {
     /// Applies the hold's safety limits and Low Power Mode; returns whether the hold is active.
     func updateBatteryHold(_ s: Snapshot, readings: SafetyReadings) -> Bool {
         let now = Date()
-        let user = control.limits
+        let user = limits
         var deadline = control.enabled
             ? state.holdDeadline(requested: control.batteryHoldUntil, now: now, maxHold: SafetyPolicy.maxHold(user))
             : nil

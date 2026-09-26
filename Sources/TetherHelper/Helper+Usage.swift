@@ -39,6 +39,7 @@ extension Helper {
         if recorded || now.timeIntervalSince(usageSavedAt) >= 300 {
             JSONFile.write(usage, to: usagePath, permissions: 0o644)
             usageSavedAt = now
+            summary = UsageSummary(usage, now: now)
         }
     }
 

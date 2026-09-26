@@ -62,13 +62,16 @@ public enum Diagnostics {
 
         out.append("## Limits in force")
         out.append("")
-        let closed = SafetyPolicy.limits(lidClosed: true, user: control?.limits)
-        let open = SafetyPolicy.limits(lidClosed: false, user: control?.limits)
+        let limits = control?.limitsInForce(UsageSummary(usage, now: now))
+        let closed = SafetyPolicy.limits(lidClosed: true, user: limits)
+        let open = SafetyPolicy.limits(lidClosed: false, user: limits)
         let heat = control?.heatGuard ?? .standard
         out.append("- Battery hold, lid closed: end at \(Int(closed.hardTemperature)) °C at once, or after 60 s at "
                    + "\(Int(closed.earlyTemperature ?? 0)) °C or thermal ≥ 2; thermal 3 at once.")
         out.append("- Battery hold, lid open: end at \(Int(open.hardTemperature)) °C or thermal 3.")
-        out.append("- Battery floor \(SafetyPolicy.floor(control?.limits))%, longest hold \(SafetyPolicy.maxHold(control?.limits) / 3600) h.")
+        out.append("- Battery floor \(SafetyPolicy.floor(limits))%, longest hold \(SafetyPolicy.maxHold(limits) / 3600) h.")
+        out.append("- Auto-adjust to this Mac's measurements (temperature limits and longest hold, never looser than the defaults): "
+                   + "\(control?.autoLimits == true ? "on" : "off").")
         out.append("- Low Power Mode during battery holds: \(control?.holdLowPower == false ? "off" : "on").")
         out.append("- Heat guard: \(heat.enabled ? "on, Low Power Mode from thermal \(heat.threshold)" : "off"); "
                    + "overheat sleep (no external display, critical 2 min or battery ≥ \(Int(ACThermalPolicy.hotBattery)) °C 1 min) is always on.")
@@ -157,7 +160,7 @@ public enum Diagnostics {
 
     - On power: the helper sets `SleepDisabled` (log: "power connected: clamshell on"). The Mac stays awake with the lid closed and the app keeps the display from sleeping, so nothing locks; with no external display it dims the built-in screen instead.
     - Unplugged: the helper clears `SleepDisabled` ("power disconnected: clamshell off"). If the lid is already closed it asks for sleep ("lid already closed: sleeping"; powerd then waits about 5 s, `darkwakelinger`).
-    - Battery hold: clamshell stays on on battery until the time is up or a safety limit ends it ("battery hold ended: …"), then a closed Mac sleeps. Holds never survive a helper restart.
+    - Battery hold: clamshell stays on on battery until the time is up or a safety limit ends it ("battery hold ended: …"), then a closed Mac sleeps. Holds never survive a helper restart. With auto-adjust on (control.json "autoLimits": true) the temperature limits and the longest hold follow this Mac's measurements, never looser than the defaults; the helper logs the limits in force whenever they change ("limits (auto-adjusted): …").
     - Heat guard: on power with the lid closed, thermal pressure at the threshold turns AC Low Power Mode on; it is restored after 2 cool minutes or when the lid opens.
     - Safety net on power with the lid closed and no external display: critical heat for 2 min, a battery at 45 °C for 1 min, or a battery at the floor still draining for 1 min (a charger that can't keep up) puts the Mac to sleep ("putting the Mac to sleep").
     - Dark wakes: clamshell mode is only turned on in a full wake, so a Mac put to sleep on power goes back to sleep after Power Nap wakes.

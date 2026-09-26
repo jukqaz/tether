@@ -24,6 +24,11 @@ public struct UsageSummary: Equatable, Sendable {
         self.sessions = sessions
     }
 
+    /// The last seven days of `usage`: what Settings shows and auto-adjust follows.
+    public init(_ usage: Usage?, now: Date) {
+        self.init(week: (usage?.stats ?? StatsTracker()).week(now: now), sessions: usage?.recentSessions ?? [])
+    }
+
     /// Percentage points per hour while a hold kept the Mac awake on battery; needs 15 minutes.
     public var drainPerHour: Double? {
         guard holdSeconds >= 900, holdDrain > 0 else { return nil }
@@ -88,8 +93,48 @@ public enum Advisor {
         return Advice(value: 2, reason: L("it stayed cool with the lid closed", "덮개를 닫아도 발열이 높지 않았어요"))
     }
 
+    /// The battery-hold limits in force: `user`, or with auto-adjust on, `user` with each limit
+    /// the measurements recommend following the recommendation and the rest as chosen.
+    /// Recommendations are never looser than the defaults, and `SafetyPolicy` clamps whatever
+    /// comes out anyway.
+    public static func limitsInForce(_ user: UserLimits?, auto: Bool, summary: UsageSummary) -> UserLimits? {
+        guard auto else { return user }
+        return Recommendations(summary, floor: SafetyPolicy.floor(user)).applied(to: user)
+    }
+
     /// The smallest choice at or above `target`, or the loosest one (the default) if none is.
     static func pick(_ choices: [Double], atLeast target: Double) -> Double {
         choices.sorted().first { $0 >= target } ?? choices.max() ?? target
+    }
+}
+
+/// Everything the measurements recommend, for Settings and auto-adjust.
+public struct Recommendations: Equatable, Sendable {
+    public var closedLid: Advice<Double>?
+    public var openLid: Advice<Double>?
+    public var maxHold: Advice<Double>?
+    public var heatLevel: Advice<Int>?
+
+    public init(_ s: UsageSummary, floor: Int) {
+        closedLid = Advisor.closedLidLimit(s)
+        openLid = Advisor.openLidLimit(s)
+        maxHold = Advisor.maxHold(s, floor: floor)
+        heatLevel = Advisor.heatGuardLevel(s)
+    }
+
+    public var isEmpty: Bool { closedLid == nil && openLid == nil && maxHold == nil && heatLevel == nil }
+
+    /// Whether any battery-hold limit has a recommendation yet (auto-adjust has something to follow).
+    public var coversLimits: Bool { closedLid != nil || openLid != nil || maxHold != nil }
+
+    /// `user` with each battery-hold limit that has a recommendation set to it; the floor and
+    /// the rest stay as they are. A recommendation equal to the default is stored as nil, the
+    /// way Settings stores defaults.
+    public func applied(to user: UserLimits?) -> UserLimits? {
+        var out = user ?? UserLimits()
+        if let a = closedLid { out.closedLidMaxTemperature = a.value == SafetyPolicy.closedLid.hardTemperature ? nil : a.value }
+        if let a = openLid { out.openLidMaxTemperature = a.value == SafetyPolicy.openLid.hardTemperature ? nil : a.value }
+        if let a = maxHold { out.maxHoldHours = a.value == SafetyPolicy.maxHold / 3600 ? nil : a.value }
+        return out.isDefault ? nil : out
     }
 }

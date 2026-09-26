@@ -151,6 +151,70 @@ final class AdvisorTests: XCTestCase {
         XCTAssertEqual(Advisor.heatGuardLevel(summary(maxThermal: 3))?.value, 1)
     }
 
+    // MARK: Auto-adjust
+
+    /// A cool Mac: lid closed around 32.5 °C, open around 35 °C, holds using 30 % an hour.
+    private var coolWeek: UsageSummary { summary(closedAt: 32.5, openAt: 35, holdSeconds: 3600, holdDrain: 30) }
+
+    func testRecommendationsSetOnlyTheLimitsTheyCover() {
+        let r = Recommendations(coolWeek, floor: 30)
+        XCTAssertTrue(r.coversLimits)
+        // 32.5 + 4 → 38 °C; 35 + 4 → 40 °C; 70 points at 30 %/h is 2.3 h → 2 h. The floor stays.
+        XCTAssertEqual(r.applied(to: UserLimits(batteryFloor: 30)),
+                       UserLimits(batteryFloor: 30, closedLidMaxTemperature: 38, openLidMaxTemperature: 40, maxHoldHours: 2))
+        XCTAssertFalse(Recommendations(UsageSummary(week: [], sessions: []), floor: 20).coversLimits)
+    }
+
+    func testAutoAdjustOffKeepsTheChosenLimits() {
+        let chosen = UserLimits(batteryFloor: 30, closedLidMaxTemperature: 41)
+        XCTAssertEqual(Advisor.limitsInForce(chosen, auto: false, summary: coolWeek), chosen)
+    }
+
+    func testAutoAdjustFollowsTheMeasurements() {
+        let result = Advisor.limitsInForce(UserLimits(closedLidMaxTemperature: 41), auto: true, summary: coolWeek)
+        XCTAssertEqual(result?.closedLidMaxTemperature, 38)
+        XCTAssertEqual(result?.openLidMaxTemperature, 40)
+        XCTAssertEqual(result?.maxHoldHours, 2)
+        XCTAssertEqual(SafetyPolicy.limits(lidClosed: true, user: result).hardTemperature, 38)
+    }
+
+    func testAutoAdjustWaitsForData() {
+        let chosen = UserLimits(closedLidMaxTemperature: 41)
+        XCTAssertEqual(Advisor.limitsInForce(chosen, auto: true, summary: UsageSummary(week: [], sessions: [])), chosen)
+        // Half an hour closed isn't there yet: the chosen closed-lid limit stays, the open one follows.
+        let partial = Advisor.limitsInForce(chosen, auto: true, summary: summary(closedAt: 30, closedFor: 600, openAt: 35))
+        XCTAssertEqual(partial?.closedLidMaxTemperature, 41)
+        XCTAssertEqual(partial?.openLidMaxTemperature, 40)
+    }
+
+    /// A Mac that runs hot gets the defaults back, even over a stricter choice, and never more.
+    func testAutoAdjustIsNeverLooserThanTheDefaults() {
+        let hot = summary(closedAt: 41, openAt: 43)
+        let result = Advisor.limitsInForce(UserLimits(closedLidMaxTemperature: 40), auto: true, summary: hot)
+        XCTAssertNil(result)
+        XCTAssertEqual(SafetyPolicy.limits(lidClosed: true, user: result).hardTemperature, SafetyPolicy.closedLid.hardTemperature)
+        XCTAssertEqual(SafetyPolicy.limits(lidClosed: false, user: result).hardTemperature, SafetyPolicy.openLid.hardTemperature)
+        XCTAssertEqual(SafetyPolicy.maxHold(result), SafetyPolicy.maxHold)
+    }
+
+    func testControlLimitsInForce() {
+        var control = Control(limits: UserLimits(batteryFloor: 25))
+        XCTAssertEqual(control.limitsInForce(coolWeek), control.limits)
+        control.autoLimits = true
+        XCTAssertEqual(control.limitsInForce(coolWeek)?.closedLidMaxTemperature, 38)
+        XCTAssertEqual(control.limitsInForce(coolWeek)?.batteryFloor, 25)
+    }
+
+    func testSummaryFromUsageFile() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        var usage = Usage()
+        usage.stats.tick(now: now.addingTimeInterval(-30), sample: UsageSample(lidClosed: true, clamshellOn: true, temperature: 33))
+        usage.stats.tick(now: now, sample: UsageSample(lidClosed: true, clamshellOn: true, temperature: 33))
+        XCTAssertEqual(UsageSummary(usage, now: now).closed.seconds, 30)
+        XCTAssertEqual(UsageSummary(usage, now: now).lidClosedSeconds, 30)
+        XCTAssertEqual(UsageSummary(nil, now: now).lidClosedSeconds, 0)
+    }
+
     func testTypicalSessionNeedsAFew() {
         let s = { (d: Double) in LidSession(start: 0, end: d, lastSeen: d, maxTemperature: nil, maxThermal: 0,
                                            batteryStart: nil, batteryEnd: nil, lowPower: false, onBattery: false) }

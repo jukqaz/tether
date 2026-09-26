@@ -20,7 +20,8 @@ First public release.
   keep up can no longer run the battery flat with the lid closed; a battery hold can't start at or
   below the floor; the app relaunches after a crash.
 - Data-based settings: time-weighted battery temperatures, battery use during holds, and
-  recommended limits from them.
+  recommended limits from them; "Adjust to this Mac" applies them by itself as measurements come
+  in, never looser than the defaults.
 - Sleep log: duration, charge per hour, sleep and wake causes, dark wakes; alerts on high drain.
 - Screen off without locking after a few idle minutes.
 - `tether` command with `status --json`, `hold`, `sleep`, `run -- <command>` and `diagnose`.
