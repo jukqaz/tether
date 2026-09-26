@@ -16,8 +16,8 @@ cp "$BIN/Tether" "$APP/Contents/MacOS/Tether"
 cp "$BIN/TetherCLI" "$APP/Contents/Helpers/tether"
 cp "$BIN/TetherHelper" "$APP/Contents/Resources/tether-helper"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
-cp Resources/local.tether.helper.plist Resources/install-helper.sh Resources/uninstall-helper.sh \
-  "$APP/Contents/Resources/"
+cp Resources/local.tether.helper.plist Resources/local.tether.watchdog.plist Resources/tether-watchdog.sh \
+  Resources/install-helper.sh Resources/uninstall-helper.sh "$APP/Contents/Resources/"
 # The Icon Composer icon: Assets.car for macOS 26 (Liquid Glass, dark, clear and tinted looks)
 # plus a flat AppIcon.icns fallback. Info.plist names both "AppIcon".
 xcrun actool Resources/AppIcon.icon --compile "$APP/Contents/Resources" --platform macosx \
