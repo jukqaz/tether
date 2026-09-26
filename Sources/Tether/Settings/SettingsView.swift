@@ -6,20 +6,15 @@ import TetherCore
 /// "History".
 struct SettingsView: View {
     @ObservedObject var model: AppModel
-    @State private var page: SettingsPage?
     /// Offscreen screenshots can't draw the system's sidebar selection (it comes out as a black
     /// bar hiding the title), so they mark the current page themselves.
-    private let screenshot: Bool
-
-    init(model: AppModel, initialPage: SettingsPage = .general, screenshot: Bool = false) {
-        self.model = model
-        self.screenshot = screenshot
-        _page = State(initialValue: initialPage)
-    }
+    var screenshot = false
 
     var body: some View {
+        let page = model.settingsPage
+        let selection = Binding<SettingsPage?>(get: { model.settingsPage }, set: { if let new = $0 { model.settingsPage = new } })
         NavigationSplitView {
-            List(SettingsPage.allCases, selection: screenshot ? .constant(nil) : $page) { item in
+            List(SettingsPage.allCases, selection: screenshot ? .constant(nil) : selection) { item in
                 Label {
                     Text(item.title)
                 } icon: {
@@ -33,9 +28,10 @@ struct SettingsView: View {
             .navigationSplitViewColumnWidth(min: 200, ideal: 214, max: 260)
             .toolbar(removing: .sidebarToggle)
         } detail: {
-            let current = page ?? .general
-            current.page(model: model)
-                .navigationTitle(current.title)
+            page.page(model: model)
+                .navigationTitle(page.title)
+                .environment(\.settingsGuide, page == .help ? nil : page)
+                .environmentObject(model)
         }
         .frame(width: 800, height: 620)
         .background(SettingsWindowBridge())
@@ -43,7 +39,7 @@ struct SettingsView: View {
 }
 
 enum SettingsPage: String, CaseIterable, Identifiable {
-    case general, lid, safety, history, notifications, automation, system
+    case general, lid, safety, history, notifications, automation, system, help
 
     var id: Self { self }
 
@@ -56,6 +52,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .notifications: L("Notifications", "알림")
         case .automation: L("Automation", "자동화")
         case .system: L("System", "시스템")
+        case .help: L("Help", "도움말")
         }
     }
 
@@ -68,6 +65,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .notifications: "bell.badge.fill"
         case .automation: "terminal.fill"
         case .system: "wrench.and.screwdriver.fill"
+        case .help: "questionmark"
         }
     }
 
@@ -80,6 +78,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .notifications: .red
         case .automation: .purple
         case .system: Color(white: 0.45)
+        case .help: .indigo
         }
     }
 
@@ -93,6 +92,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .notifications: NotificationsPage(model: model)
         case .automation: AutomationPage(model: model)
         case .system: SystemPage(model: model)
+        case .help: HelpPage(model: model)
         }
     }
 }

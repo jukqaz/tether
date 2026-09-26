@@ -90,6 +90,9 @@ final class AppModel: ObservableObject {
     @Published var diagnosticsBusy = false
     /// What happened to the last report ("Copied", "Saved to the Desktop").
     @Published var reportNote: String?
+    /// The page the settings window shows, kept while the app runs; the Help menu and the
+    /// panel open it on Help.
+    @Published var settingsPage = SettingsPage.general
 
     /// Ticks every second while a battery hold counts down, for the menu bar and the panel.
     let clock = HoldClock()

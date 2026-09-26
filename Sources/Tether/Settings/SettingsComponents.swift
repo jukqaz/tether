@@ -15,12 +15,28 @@ struct SidebarIcon: View {
     }
 }
 
+extension EnvironmentValues {
+    /// The page whose guide the "?" at the bottom of a settings page opens; nil leaves it out.
+    @Entry var settingsGuide: SettingsPage?
+}
+
 struct Page<Content: View>: View {
     @ViewBuilder var content: Content
+    @Environment(\.settingsGuide) private var guide
 
     var body: some View {
-        Form { content }
-            .formStyle(.grouped)
+        Form {
+            content
+            if let guide {
+                Section {} footer: {
+                    HStack {
+                        Spacer()
+                        GuideButton(page: guide)
+                    }
+                }
+            }
+        }
+        .formStyle(.grouped)
     }
 }
 

@@ -106,7 +106,8 @@ Prefer to see what you run? [Build it yourself](#build-from-source): it takes a 
   connected again, so it can't be forgotten off. Start a battery hold below it. The footer switches
   between the full and compact panels.
 - **Settings** (the gear): language, lid behaviour, safety limits with recommendations, history,
-  notifications, automation, and everything Tether changes on your Mac.
+  notifications, automation, everything Tether changes on your Mac, and Help with a glossary.
+  The **?** at the bottom of each page explains its settings.
 - **Terminal**: turn on "Install the tether command" in Settings › Automation.
 
 ```sh
@@ -199,6 +200,29 @@ Settings › System › **Uninstall Tether…** removes the helper and its watch
 sleep" back off), their files, the login item, the `tether` command and preferences, then moves
 the app to the Trash. An app dragged to the Trash without this is noticed by the helper, which
 restores normal sleep and removes itself after 10 minutes.
+
+## Glossary
+
+The same list is in Settings › Help, and the **?** at the bottom of each settings page explains
+that page's settings.
+
+| Term | Meaning |
+|---|---|
+| Clamshell mode | Using the Mac with its lid closed. With Tether, on power it stays awake and unlocked with the lid closed; unplugged, it sleeps as usual. |
+| Battery hold | A timed exception, 30 minutes to 4 hours, that keeps clamshell mode on battery. The safety limits end it early. |
+| Safety limits | What ends a battery hold: battery temperature, heat, the battery floor and the longest hold. Stricter only. |
+| Battery floor | The charge at which a battery hold ends, 20% unless you choose more. A hold can't start at or below it. |
+| Heat | macOS thermal pressure: normal, fair, serious, critical. |
+| Heat guard | On power with the lid closed, Low Power Mode while the Mac runs hot; your setting comes back once it cools. |
+| Safety net | Always on: a closed Mac on power with no display is put to sleep if it overheats or its charger can't keep up. |
+| Auto-adjust | Temperature limits and the longest hold set from this Mac's measurements, never looser than the defaults. |
+| Low Power Mode | macOS's setting for less heat and drain. Tether switches it only where you allow, then puts yours back. |
+| Screen off without locking | The screen goes black after idle minutes and comes straight back with any input, no password. |
+| Lid session | One stretch awake with the lid closed, from closing the lid to opening it or sleeping. |
+| Helper | Tether's background service with administrator rights; it keeps every rule and limit, even with the app closed. |
+| Watchdog | A tiny script launchd runs every minute so sleep is never left off on battery should the helper stop. |
+| Prevent sleep | The hidden macOS setting behind clamshell mode (`pmset disablesleep`), on only while power is connected or a hold runs. |
+| Dark wake | A short wake with the screen off (Power Nap, charging); Tether leaves it alone, so a sleeping Mac goes back to sleep. |
 
 ## FAQ
 

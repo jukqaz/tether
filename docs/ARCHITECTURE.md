@@ -225,6 +225,7 @@ A System Settings style sidebar (the gear in the panel, or ⌘, while it is open
 | Notifications | sleep drain, battery hold ended, overheating; a stopped helper and a weak-charger sleep are always reported |
 | Automation | install the `tether` command, command and URL reference |
 | System | helper status/reinstall/remove/log, live values of what Tether changes, apps keeping the Mac awake, diagnostics, updates, uninstall |
+| Help | how Tether works and the glossary (`Glossary`); every other page ends in a **?** (`HelpLink`) opening its guide, one entry per setting (`SettingsPage.guide`, in `HelpContent.swift`). Help › Tether Help and the panel's … menu open this page |
 
 ## Data-based settings
 

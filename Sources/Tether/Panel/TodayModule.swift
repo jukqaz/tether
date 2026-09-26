@@ -26,6 +26,8 @@ struct TodayModule: View {
                         .lineLimit(1)
                 }
             }
+            .help(L("Time awake with the lid closed today, and the latest lid session, sleep or temperature worth a look. History has them all.",
+                    "오늘 덮개를 닫고 깨어 있던 시간과, 눈여겨볼 최근 덮개 세션·잠자기·온도예요. 전체는 기록에 있어요."))
             Spacer(minLength: 0)
             Chart(Array(week.enumerated()), id: \.offset) { index, day in
                 BarMark(x: .value(L("Day", "날짜"), index), y: .value(L("Hours", "시간"), day.lidClosedSeconds / 3600), width: 6)

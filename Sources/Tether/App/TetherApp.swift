@@ -33,6 +33,24 @@ struct TetherApp: App {
         Settings {
             SettingsView(model: model)
         }
+        .commands {
+            CommandGroup(replacing: .help) { HelpCommand(model: model) }
+        }
+    }
+}
+
+/// Help › Tether Help, in the menu bar while the settings window is open: the Help page,
+/// instead of macOS's "Help isn't available".
+private struct HelpCommand: View {
+    @ObservedObject var model: AppModel
+    @Environment(\.openSettings) private var openSettings
+
+    var body: some View {
+        Button(L("Tether Help", "Tether 도움말")) {
+            model.settingsPage = .help
+            openSettings()
+        }
+        .keyboardShortcut("?", modifiers: .command)
     }
 }
 

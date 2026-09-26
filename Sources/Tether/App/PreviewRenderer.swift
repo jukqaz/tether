@@ -6,7 +6,8 @@ import TetherCore
 /// through the menu bar. Liquid Glass does not render offscreen, so pass `-liquidGlass NO`.
 ///
 ///     Tether --render-preview out.png [dark] [--sample] [--hold]
-///     Tether --render-settings out.png general|lid|safety|history|notifications|automation|system [dark] [--sample] [--auto]
+///     Tether --render-settings out.png general|lid|safety|history|notifications|automation|system|help [dark] [--sample] [--auto]
+///     Tether --render-guide out.png <page> [dark]
 ///     Tether --render-welcome out.png [dark]
 ///     Tether --render-menubar out.png
 ///
@@ -26,7 +27,11 @@ enum PreviewRenderer {
         } else if let out = path(after: "--render-settings", extra: 1),
                   let page = SettingsPage(rawValue: args[args.firstIndex(of: "--render-settings")! + 2]) {
             let model = AppModel(preview: true, sample: sample, autoSample: args.contains("--auto"))
-            render(SettingsView(model: model, initialPage: page, screenshot: true), to: out, dark: dark)
+            model.settingsPage = page
+            render(SettingsView(model: model, screenshot: true), to: out, dark: dark)
+        } else if let out = path(after: "--render-guide", extra: 1),
+                  let page = SettingsPage(rawValue: args[args.firstIndex(of: "--render-guide")! + 2]) {
+            render(GuideView(page: page, showTerms: {}).background(.background), to: out, dark: dark)
         } else if let out = path(after: "--render-welcome") {
             render(WelcomePreview(model: AppModel(preview: true)), to: out, dark: dark)
         } else if let out = path(after: "--render-preview") {
