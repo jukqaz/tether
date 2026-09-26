@@ -49,8 +49,11 @@ public enum Policy {
         var out: [Action] = []
         if wantsClamshell(s, enabled: enabled, sleepNowPending: sleepNowPending, batteryHold: batteryHold) {
             // Clamshell mode keeps the session exactly as it was: no sleep, no display
-            // sleep (which locks this Mac), so the lid is not touched here at all.
-            if !s.sleepDisabled { out.append(.setSleepDisabled(true)) }
+            // sleep (which locks this Mac), so the lid is not touched here at all. It keeps an
+            // awake Mac awake but never wakes a sleeping one: during a dark wake (Power Nap, a
+            // maintenance wake, a charger connected while asleep) the Mac is left to go back to
+            // sleep, and the next full wake turns clamshell mode on.
+            if !s.sleepDisabled, s.fullWake { out.append(.setSleepDisabled(true)) }
             return out
         }
 

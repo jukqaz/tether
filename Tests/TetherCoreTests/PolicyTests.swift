@@ -19,6 +19,21 @@ final class PolicyTests: XCTestCase {
         XCTAssertEqual(actions(.ac, lid: true, sd: false), [.setSleepDisabled(true)])
     }
 
+    // A sleeping Mac is never woken into clamshell mode: a dark wake on AC (Power Nap, a charger
+    // connected while asleep, after "sleep now") goes back to sleep.
+    func testDarkWakeOnACLeavesASleepingMacAsleep() {
+        XCTAssertEqual(actions(.ac, lid: true, sd: false, full: false, triggers: [.wake]), [])
+        XCTAssertEqual(actions(.ac, lid: true, sd: false, full: false, triggers: [.power]), [])
+    }
+
+    func testFullWakeOnACTurnsClamshellOn() {
+        XCTAssertEqual(actions(.ac, lid: true, sd: false, full: true, triggers: [.wake]), [.setSleepDisabled(true)])
+    }
+
+    func testDarkWakeKeepsClamshellThatIsAlreadyOn() {
+        XCTAssertEqual(actions(.ac, lid: true, sd: true, full: false, triggers: [.timer]), [])
+    }
+
     func testAlreadyOnDoesNothing() {
         XCTAssertEqual(actions(.ac, lid: true, sd: true, triggers: [.timer]), [])
     }
