@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.0.1 (2026-09-27)
+
+Security fix; please update, including the helper (the app asks you to).
+
+- Fixed a local privilege escalation. 2.0.0 left `/Library/Application Support/Tether` writable by
+  the `admin` group and the root helper wrote its files through predictable temporary names, so a
+  process running as an administrator could, without the password, make the helper overwrite or
+  change the mode of other files as root. The folder is now root's alone, control.json is rewritten
+  in place with links and hard links refused, the helper's own files go through `mkstemp` and
+  `rename`, oversized files aren't read, and both the installer and the helper's start take the
+  folder back and remove anything unexpected in it.
+- The watchdog runs with a fixed `PATH`, and a path read from control.json can't add lines to the
+  helper log.
+- CI: `actions/checkout@v7` pinned to its commit, read-only token, Dependabot for actions.
+
 ## 2.0.0 (2026-09-26)
 
 First public release.
