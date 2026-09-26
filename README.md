@@ -77,6 +77,8 @@ closed.
 
 - A MacBook with Apple silicon.
 - macOS 26 Tahoe or later.
+- An administrator account: the helper installs with your password, and only administrators can
+  change Tether's settings.
 
 On a desktop Mac (no lid, no battery) Tether leaves sleep settings alone.
 
@@ -85,8 +87,8 @@ On a desktop Mac (no lid, no battery) Tether leaves sleep settings alone.
 1. Download `Tether-x.y.z.zip` from [Releases](https://github.com/jukqaz/tether/releases), unzip it
    and move **Tether.app** to Applications.
 2. Tether isn't notarized (that needs a paid Apple developer account), so macOS blocks the first
-   launch. Open it once, then go to **System Settings › Privacy & Security** and click
-   **Open Anyway**. Or, in Terminal:
+   launch. Open it once, then go to **System Settings › Privacy & Security**, click
+   **Open Anyway** and confirm. Or, in Terminal:
 
    ```sh
    xattr -dr com.apple.quarantine /Applications/Tether.app
@@ -94,10 +96,36 @@ On a desktop Mac (no lid, no battery) Tether leaves sleep settings alone.
 
 3. Click **Install Helper…** in the welcome window and enter your administrator password once.
 
-To check the download first, keep `Tether-x.y.z.zip.sha256` from the release next to the zip and
-run `shasum -a 256 -c Tether-x.y.z.zip.sha256` in that folder.
+Or install from Terminal, checking the download against the release's SHA-256 first. Files fetched
+with `curl` aren't quarantined, so step 2 isn't needed; carry on with step 3. For an update, quit
+Tether and move the old app to the Trash first.
+
+```sh
+cd ~/Downloads
+v=$(curl -fs https://api.github.com/repos/jukqaz/tether/releases/latest | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p')
+curl -fLO "https://github.com/jukqaz/tether/releases/download/v$v/Tether-$v.zip"
+curl -fLO "https://github.com/jukqaz/tether/releases/download/v$v/Tether-$v.zip.sha256"
+shasum -a 256 -c "Tether-$v.zip.sha256" && ditto -x -k "Tether-$v.zip" /Applications && open /Applications/Tether.app
+```
+
+To check a browser download instead, keep `Tether-x.y.z.zip.sha256` from the release next to the
+zip and run `shasum -a 256 -c Tether-x.y.z.zip.sha256` in that folder before unzipping. Safari may
+unzip downloads by itself and remove the zip.
 
 Prefer to see what you run? [Build it yourself](#build-from-source): it takes a minute.
+
+### Update
+
+Tether checks GitHub once a day and offers a newer version in the panel's **…** menu and in
+Settings › System.
+
+1. Quit Tether (panel › **…** › **Quit Tether**).
+2. Move the old **Tether.app** to the Trash, then put the new one in Applications. Copying over
+   the old app in place can fail.
+3. Open Tether. If the panel says the helper needs an update, click **Update…** and enter your
+   password. Settings and records are kept.
+
+2.0.1 is a security fix: update from 2.0.0, helper included.
 
 ## Use
 
@@ -201,6 +229,17 @@ sleep" back off), their files, the login item, the `tether` command and preferen
 the app to the Trash. An app dragged to the Trash without this is noticed by the helper, which
 restores normal sleep and removes itself after 10 minutes.
 
+If the app won't open, remove the helper and the login item from Terminal, then drag Tether.app to
+the Trash:
+
+```sh
+sudo sh /Applications/Tether.app/Contents/Resources/uninstall-helper.sh
+launchctl bootout gui/$(id -u)/local.tether.app 2>/dev/null
+rm -f ~/Library/LaunchAgents/local.tether.app.plist
+```
+
+If you installed the `tether` command in `~/.local/bin`, delete that link too.
+
 ## Glossary
 
 In Settings, the options that need explaining have an **ⓘ** next to them.
@@ -240,14 +279,17 @@ and building it yourself is one script.
 
 ## Build from source
 
-Requires Xcode 26 (Swift 6) on macOS 26 or later.
+Requires Xcode 26 or later (Swift 6) on macOS 26 or later.
 
 ```sh
 git clone https://github.com/jukqaz/tether.git && cd tether
 swift test
-scripts/build.sh                     # ad-hoc signed build/Tether.app
-cp -R build/Tether.app /Applications/
+scripts/build.sh                                  # ad-hoc signed build/Tether.app
+ditto build/Tether.app /Applications/Tether.app   # quit Tether and trash an older copy first
+open /Applications/Tether.app                     # then Install Helper…
 ```
+
+A build of your own isn't quarantined, so macOS opens it without the Gatekeeper step.
 
 `scripts/release.sh` also packs `dist/Tether-<version>.zip` with its SHA-256.
 

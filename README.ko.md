@@ -72,6 +72,7 @@ macOS는 외장 모니터가 없으면 덮개를 닫을 때 MacBook을 재웁니
 
 - Apple 실리콘 MacBook
 - macOS 26 Tahoe 이상
+- 관리자 계정: 도우미를 설치할 때 암호가 필요하고, Tether 설정은 관리자만 바꿀 수 있습니다.
 
 덮개나 배터리가 없는 데스크톱 Mac에서는 잠자기 설정을 건드리지 않습니다.
 
@@ -80,8 +81,8 @@ macOS는 외장 모니터가 없으면 덮개를 닫을 때 MacBook을 재웁니
 1. [Releases](https://github.com/jukqaz/tether/releases)에서 `Tether-x.y.z.zip`을 받아 압축을 풀고
    **Tether.app**을 응용 프로그램 폴더로 옮깁니다.
 2. Tether는 공증을 받지 않아(유료 Apple 개발자 계정이 필요) 처음 실행이 막힙니다. 한 번 연 뒤
-   **시스템 설정 › 개인정보 보호 및 보안**에서 **그래도 열기**를 누르세요. 터미널에서는 다음과
-   같이 해도 됩니다.
+   **시스템 설정 › 개인정보 보호 및 보안**에서 **그래도 열기**를 누르고 확인하세요. 터미널에서는
+   다음과 같이 해도 됩니다.
 
    ```sh
    xattr -dr com.apple.quarantine /Applications/Tether.app
@@ -89,10 +90,36 @@ macOS는 외장 모니터가 없으면 덮개를 닫을 때 MacBook을 재웁니
 
 3. 시작 창에서 **도우미 설치…**를 누르고 관리자 암호를 한 번 입력합니다.
 
-받은 파일을 먼저 확인하려면 릴리스의 `Tether-x.y.z.zip.sha256`을 zip과 같은 폴더에 받아 두고, 그
-폴더에서 `shasum -a 256 -c Tether-x.y.z.zip.sha256`을 실행하세요.
+또는 터미널에서, 받은 파일을 릴리스의 SHA-256으로 먼저 확인한 뒤 설치할 수 있습니다. `curl`로 받은
+파일에는 격리 표시가 붙지 않아 2단계가 필요 없고, 바로 3단계로 넘어가면 됩니다. 업데이트라면 먼저
+Tether를 종료하고 이전 앱을 휴지통으로 옮기세요.
+
+```sh
+cd ~/Downloads
+v=$(curl -fs https://api.github.com/repos/jukqaz/tether/releases/latest | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p')
+curl -fLO "https://github.com/jukqaz/tether/releases/download/v$v/Tether-$v.zip"
+curl -fLO "https://github.com/jukqaz/tether/releases/download/v$v/Tether-$v.zip.sha256"
+shasum -a 256 -c "Tether-$v.zip.sha256" && ditto -x -k "Tether-$v.zip" /Applications && open /Applications/Tether.app
+```
+
+브라우저로 받은 파일을 확인하려면 릴리스의 `Tether-x.y.z.zip.sha256`을 zip과 같은 폴더에 받아 두고,
+압축을 풀기 전에 그 폴더에서 `shasum -a 256 -c Tether-x.y.z.zip.sha256`을 실행하세요. Safari는
+받은 파일을 알아서 풀고 zip을 지울 수 있습니다.
 
 직접 확인하고 싶다면 [소스에서 빌드](#소스에서-빌드)하세요. 1분이면 됩니다.
+
+### 업데이트
+
+Tether는 하루에 한 번 GitHub를 확인해서, 새 버전이 있으면 패널의 **…** 메뉴와 설정 › 시스템에서
+알려 줍니다.
+
+1. Tether를 종료합니다(패널 › **…** › **Tether 종료**).
+2. 이전 **Tether.app**을 휴지통으로 옮긴 뒤 새 앱을 응용 프로그램 폴더에 넣습니다. 이전 앱 위에
+   그대로 덮어쓰면 실패할 수 있습니다.
+3. Tether를 엽니다. 패널에 도우미 업데이트가 필요하다고 나오면 **업데이트…**를 누르고 암호를
+   입력합니다. 설정과 기록은 그대로 남습니다.
+
+2.0.1은 보안 수정판입니다. 2.0.0을 쓰고 있다면 도우미까지 업데이트하세요.
 
 ## 사용법
 
@@ -190,6 +217,16 @@ Mac 이름은 가려집니다. 이슈에 첨부하거나 AI 도우미에게 붙�
 설정·기록 파일, 로그인 항목, `tether` 명령, 환경설정을 지우고 앱을 휴지통으로 옮깁니다. 이렇게 하지
 않고 앱만 휴지통에 버려도 도우미가 알아채고 10분 뒤 잠자기를 원래대로 돌린 다음 스스로 지웁니다.
 
+앱이 열리지 않으면 터미널에서 도우미와 로그인 항목을 지운 뒤 Tether.app을 휴지통에 버리세요.
+
+```sh
+sudo sh /Applications/Tether.app/Contents/Resources/uninstall-helper.sh
+launchctl bootout gui/$(id -u)/local.tether.app 2>/dev/null
+rm -f ~/Library/LaunchAgents/local.tether.app.plist
+```
+
+`tether` 명령을 `~/.local/bin`에 설치했다면 그 링크도 지우세요.
+
 ## 용어
 
 설정에서는 설명이 필요한 항목 옆의 **ⓘ**를 누르면 그 항목을 설명합니다.
@@ -229,14 +266,17 @@ Mac 이름은 가려집니다. 이슈에 첨부하거나 AI 도우미에게 붙�
 
 ## 소스에서 빌드
 
-macOS 26 이상과 Xcode 26(Swift 6)이 필요합니다.
+macOS 26 이상과 Xcode 26 이상(Swift 6)이 필요합니다.
 
 ```sh
 git clone https://github.com/jukqaz/tether.git && cd tether
 swift test
-scripts/build.sh                     # ad-hoc 서명된 build/Tether.app
-cp -R build/Tether.app /Applications/
+scripts/build.sh                                  # ad-hoc 서명된 build/Tether.app
+ditto build/Tether.app /Applications/Tether.app   # 먼저 Tether를 종료하고 이전 앱은 휴지통으로
+open /Applications/Tether.app                     # 그다음 도우미 설치…
 ```
+
+직접 빌드한 앱에는 격리 표시가 없어서 Gatekeeper 단계 없이 열립니다.
 
 `scripts/release.sh`는 `dist/Tether-<버전>.zip`과 SHA-256도 만듭니다.
 
