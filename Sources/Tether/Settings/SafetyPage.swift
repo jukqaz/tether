@@ -42,15 +42,16 @@ struct SafetyPage: View {
 
             Section {
                 Toggle(isOn: Binding(get: { model.autoLimits }, set: { model.setAutoLimits($0) })) {
-                    Text(L("Adjust to this Mac", "이 Mac에 맞춰 자동 조정"))
+                    InfoLabel(L("Adjust to this Mac", "이 Mac에 맞춰 자동 조정"), info: SettingsInfo.autoAdjust)
                     Text(L("Temperatures and the longest hold follow the measurements, never looser than the defaults",
                            "온도와 최대 시간을 측정값에 맞춰요. 기본값보다 느슨해지지 않아요"))
                 }
-                Picker(L("End at this much battery", "배터리가 이만큼 남으면 끝내기"),
-                       selection: limit(\.batteryFloor, SafetyPolicy.floor(model.limits), default: SafetyPolicy.batteryFloor)) {
+                Picker(selection: limit(\.batteryFloor, SafetyPolicy.floor(model.limits), default: SafetyPolicy.batteryFloor)) {
                     ForEach(SafetyPolicy.floorChoices, id: \.self) { value in
                         Text(choice("\(value)%", isDefault: value == SafetyPolicy.batteryFloor, isRecommended: false)).tag(value)
                     }
+                } label: {
+                    InfoLabel(L("End at this much battery", "배터리가 이만큼 남으면 끝내기"), info: SettingsInfo.floor)
                 }
                 if model.autoLimits {
                     autoRows(advice)
@@ -58,7 +59,7 @@ struct SafetyPage: View {
                     limitPickers(advice)
                 }
             } header: {
-                Text(L("Battery Hold", "배터리 유지"))
+                InfoLabel(L("Battery Hold", "배터리 유지"), info: SettingsInfo.batteryHold)
             } footer: {
                 Note((model.autoLimits
                       ? L("Recommendations are applied by themselves and re-checked as measurements come in. Until there's enough data (about 30 minutes with the lid closed), the current values stay. ",
@@ -71,13 +72,14 @@ struct SafetyPage: View {
             Section {
                 Toggle(L("During a battery hold", "배터리 유지 중"),
                        isOn: Binding(get: { model.holdLowPower }, set: { model.setHoldLowPower($0) }))
-                Picker(L("On power, lid closed and hot", "전원 연결 중 덮개를 닫은 채 뜨거울 때"),
-                       selection: Binding(get: { model.heatLowPowerLevel }, set: { model.setHeatLowPowerLevel($0) })) {
+                Picker(selection: Binding(get: { model.heatLowPowerLevel }, set: { model.setHeatLowPowerLevel($0) })) {
                     Text(choice(L("From “serious” heat", "발열 '심각'부터"), isDefault: true,
                                 isRecommended: advice.heatLevel?.value == 2)).tag(2)
                     Text(choice(L("From “fair” heat", "발열 '주의'부터"), isDefault: false,
                                 isRecommended: advice.heatLevel?.value == 1)).tag(1)
                     Text(L("Never", "켜지 않음")).tag(0)
+                } label: {
+                    InfoLabel(L("On power, lid closed and hot", "전원 연결 중 덮개를 닫은 채 뜨거울 때"), info: SettingsInfo.heatLevel)
                 }
             } header: {
                 Text(L("Low Power Mode", "저전력 모드"))
@@ -115,7 +117,7 @@ struct SafetyPage: View {
     /// The limits auto-adjust sets, read-only: the value in force, and whether it follows the data yet.
     @ViewBuilder
     private func autoRows(_ advice: Recommendations) -> some View {
-        autoRow(L("Lid closed · end at once at", "덮개 닫힘 · 이 온도면 바로 끝내기"),
+        autoRow(L("Lid closed · end at once at", "덮개 닫힘 · 이 온도면 바로 끝내기"), info: SettingsInfo.closedLidLimit,
                 "\(Int(model.safetyLimits(lidClosed: true).hardTemperature))°C", following: advice.closedLid != nil)
         autoRow(L("Lid open · end at once at", "덮개 열림 · 이 온도면 바로 끝내기"),
                 "\(Int(model.safetyLimits(lidClosed: false).hardTemperature))°C", following: advice.openLid != nil)
@@ -123,26 +125,29 @@ struct SafetyPage: View {
                 following: advice.maxHold != nil)
     }
 
-    private func autoRow(_ title: String, _ value: String, following: Bool) -> some View {
-        LabeledContent(title) {
+    private func autoRow(_ title: String, info: String? = nil, _ value: String, following: Bool) -> some View {
+        LabeledContent {
             HStack(spacing: 6) {
                 Text(following ? L("Auto", "자동") : L("Collecting data", "기록 모으는 중"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Text(value)
             }
+        } label: {
+            if let info { InfoLabel(title, info: info) } else { Text(title) }
         }
     }
 
     @ViewBuilder
     private func limitPickers(_ advice: Recommendations) -> some View {
-        Picker(L("Lid closed · end at once at", "덮개 닫힘 · 이 온도면 바로 끝내기"),
-               selection: limit(\.closedLidMaxTemperature, model.safetyLimits(lidClosed: true).hardTemperature,
+        Picker(selection: limit(\.closedLidMaxTemperature, model.safetyLimits(lidClosed: true).hardTemperature,
                                 default: SafetyPolicy.closedLid.hardTemperature)) {
             ForEach(SafetyPolicy.closedLidChoices, id: \.self) { value in
                 Text(choice("\(Int(value))°C", isDefault: value == SafetyPolicy.closedLid.hardTemperature,
                             isRecommended: value == advice.closedLid?.value)).tag(value)
             }
+        } label: {
+            InfoLabel(L("Lid closed · end at once at", "덮개 닫힘 · 이 온도면 바로 끝내기"), info: SettingsInfo.closedLidLimit)
         }
         Picker(L("Lid open · end at once at", "덮개 열림 · 이 온도면 바로 끝내기"),
                selection: limit(\.openLidMaxTemperature, model.safetyLimits(lidClosed: false).hardTemperature,

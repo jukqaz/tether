@@ -15,28 +15,56 @@ struct SidebarIcon: View {
     }
 }
 
-extension EnvironmentValues {
-    /// The page whose guide the "?" at the bottom of a settings page opens; nil leaves it out.
-    @Entry var settingsGuide: SettingsPage?
-}
-
 struct Page<Content: View>: View {
     @ViewBuilder var content: Content
-    @Environment(\.settingsGuide) private var guide
 
     var body: some View {
-        Form {
-            content
-            if let guide {
-                Section {} footer: {
-                    HStack {
-                        Spacer()
-                        GuideButton(page: guide)
-                    }
-                }
-            }
+        Form { content }
+            .formStyle(.grouped)
+    }
+}
+
+/// An ⓘ right after a setting whose meaning isn't clear from its name; it opens a short
+/// explanation (`SettingsInfo`).
+struct InfoButton: View {
+    let text: String
+    @State private var shown = false
+
+    init(_ text: String) { self.text = text }
+
+    var body: some View {
+        Button { shown.toggle() } label: {
+            Image(systemName: "info.circle")
+                .foregroundStyle(.secondary)
         }
-        .formStyle(.grouped)
+        .buttonStyle(.borderless)
+        .help(L("What this means", "설명 보기"))
+        .accessibilityLabel(L("About this setting", "이 설정 설명"))
+        .popover(isPresented: $shown, arrowEdge: .bottom) {
+            Text(text)
+                .font(.callout)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(width: 320, alignment: .leading)
+                .padding(14)
+        }
+    }
+}
+
+/// A setting's name followed by its ⓘ.
+struct InfoLabel: View {
+    let title: String
+    let info: String
+
+    init(_ title: String, info: String) {
+        self.title = title
+        self.info = info
+    }
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(title)
+            InfoButton(info)
+        }
     }
 }
 

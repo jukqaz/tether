@@ -59,7 +59,7 @@ struct HistoryPage: View {
                     ForEach(sessions, id: \.start) { SessionRow(session: $0) }
                 }
             } header: {
-                Text(L("Recent Lid Sessions", "최근 덮개 세션"))
+                InfoLabel(L("Recent Lid Sessions", "최근 덮개 세션"), info: SettingsInfo.lidSessions)
             }
 
             Section {

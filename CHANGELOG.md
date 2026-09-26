@@ -35,8 +35,8 @@ First public release.
   Korean with a choice in Settings.
 - `tether doctor` and a checks list in Settings › System and at the top of the report; "+30m"
   for a running battery hold (`tether hold +30m`), still capped at 4 hours from its start.
-- Help: a Help page with how Tether works and a glossary, a **?** guide on every settings page
-  explaining each setting, Help › Tether Help, and tooltips throughout the panel.
+- In-place help: an ⓘ next to each setting that needs explaining (what it does, the words it
+  uses), Help › Tether Help opening the README, and a glossary in the README.
 - First-run welcome, update check against GitHub releases, full uninstall.
 - A quiet panel: controls that can't act right now are hidden rather than greyed out, and there
   are no lid-open or toggle notifications (the last lid session is in the panel and History).

@@ -106,8 +106,8 @@ Prefer to see what you run? [Build it yourself](#build-from-source): it takes a 
   connected again, so it can't be forgotten off. Start a battery hold below it. The footer switches
   between the full and compact panels.
 - **Settings** (the gear): language, lid behaviour, safety limits with recommendations, history,
-  notifications, automation, everything Tether changes on your Mac, and Help with a glossary.
-  The **?** at the bottom of each page explains its settings.
+  notifications, automation, and everything Tether changes on your Mac. Options that need
+  explaining have an **ⓘ** next to them.
 - **Terminal**: turn on "Install the tether command" in Settings › Automation.
 
 ```sh
@@ -203,8 +203,7 @@ restores normal sleep and removes itself after 10 minutes.
 
 ## Glossary
 
-The same list is in Settings › Help, and the **?** at the bottom of each settings page explains
-that page's settings.
+In Settings, the options that need explaining have an **ⓘ** next to them.
 
 | Term | Meaning |
 |---|---|

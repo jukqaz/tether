@@ -55,12 +55,6 @@ struct FooterButtons: View {
                     Button(L("Download Tether \(update)…", "Tether \(update) 받기…")) { model.openReleases() }
                 }
                 Divider()
-                Button(L("Tether Help", "Tether 도움말")) {
-                    model.settingsPage = .help
-                    NSApp.activate()
-                    openSettings()
-                    dismiss()
-                }
                 Button(L("Create Diagnostic Report", "진단 보고서 만들기")) { model.createDiagnosticReport() }
                     .disabled(model.diagnosticsBusy)
                 Divider()
@@ -72,7 +66,7 @@ struct FooterButtons: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
-            .help(L("More: help, a diagnostic report, quit", "더 보기: 도움말, 진단 보고서, 종료"))
+            .help(L("More: a diagnostic report, quit", "더 보기: 진단 보고서, 종료"))
         }
         .foregroundStyle(.secondary)
     }

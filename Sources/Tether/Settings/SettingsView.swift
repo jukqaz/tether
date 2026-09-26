@@ -30,8 +30,6 @@ struct SettingsView: View {
         } detail: {
             page.page(model: model)
                 .navigationTitle(page.title)
-                .environment(\.settingsGuide, page == .help ? nil : page)
-                .environmentObject(model)
         }
         .frame(width: 800, height: 620)
         .background(SettingsWindowBridge())
@@ -39,7 +37,7 @@ struct SettingsView: View {
 }
 
 enum SettingsPage: String, CaseIterable, Identifiable {
-    case general, lid, safety, history, notifications, automation, system, help
+    case general, lid, safety, history, notifications, automation, system
 
     var id: Self { self }
 
@@ -52,7 +50,6 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .notifications: L("Notifications", "알림")
         case .automation: L("Automation", "자동화")
         case .system: L("System", "시스템")
-        case .help: L("Help", "도움말")
         }
     }
 
@@ -65,7 +62,6 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .notifications: "bell.badge.fill"
         case .automation: "terminal.fill"
         case .system: "wrench.and.screwdriver.fill"
-        case .help: "questionmark"
         }
     }
 
@@ -78,7 +74,6 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .notifications: .red
         case .automation: .purple
         case .system: Color(white: 0.45)
-        case .help: .indigo
         }
     }
 
@@ -92,7 +87,6 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .notifications: NotificationsPage(model: model)
         case .automation: AutomationPage(model: model)
         case .system: SystemPage(model: model)
-        case .help: HelpPage(model: model)
         }
     }
 }

@@ -7,9 +7,11 @@ struct LidPage: View {
     var body: some View {
         Page {
             Section {
-                Picker(L("When the lid closes", "덮개를 닫으면"), selection: $model.lidCloseLocks) {
+                Picker(selection: $model.lidCloseLocks) {
                     Text(L("Stay unlocked, dim the screen", "잠그지 않고 화면만 어둡게")).tag(false)
                     Text(L("Lock the screen", "화면 잠그기")).tag(true)
+                } label: {
+                    InfoLabel(L("When the lid closes", "덮개를 닫으면"), info: SettingsInfo.lidCloses)
                 }
                 .disabled(!ScreenLock.available && !model.lidCloseLocks)
             } header: {
@@ -24,10 +26,12 @@ struct LidPage: View {
 
             if !model.lidCloseLocks {
                 Section {
-                    Picker(L("Turn the screen off when idle", "입력이 없으면 화면 끄기"), selection: $model.idleBlankMinutes) {
+                    Picker(selection: $model.idleBlankMinutes) {
                         ForEach(AppModel.idleChoices, id: \.self) { minutes in
                             Text(minutes == 0 ? L("Never", "사용 안 함") : L("After \(minutes) min", "\(minutes)분 뒤")).tag(minutes)
                         }
+                    } label: {
+                        InfoLabel(L("Turn the screen off when idle", "입력이 없으면 화면 끄기"), info: SettingsInfo.idleScreenOff)
                     }
                 } header: {
                     Text(L("Screen Off Without Locking", "잠금 없이 화면 끄기"))
