@@ -18,6 +18,8 @@ public struct Control: Codable, Equatable, Sendable {
     public var appPath: String?
     /// Detailed logging: the helper logs every check and its reasons, for troubleshooting.
     public var debugLog: Bool?
+    /// Low Power Mode during a battery hold; nil means on (see `LowPowerPolicy`).
+    public var holdLowPower: Bool?
 
     public init(enabled: Bool = true, sleepNowRequest: Double? = nil, batteryHoldUntil: Double? = nil,
                 limits: UserLimits? = nil, heatGuard: HeatGuardSettings? = nil, holdSource: String? = nil,

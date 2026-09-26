@@ -63,7 +63,9 @@ public enum Diagnostics {
                    + "\(Int(closed.earlyTemperature ?? 0)) °C or thermal ≥ 2; thermal 3 at once.")
         out.append("- Battery hold, lid open: end at \(Int(open.hardTemperature)) °C or thermal 3.")
         out.append("- Battery floor \(SafetyPolicy.floor(control?.limits))%, longest hold \(SafetyPolicy.maxHold(control?.limits) / 3600) h.")
-        out.append("- Heat guard: \(heat.enabled ? "on, Low Power Mode from thermal \(heat.threshold)" : "off").")
+        out.append("- Low Power Mode during battery holds: \(control?.holdLowPower == false ? "off" : "on").")
+        out.append("- Heat guard: \(heat.enabled ? "on, Low Power Mode from thermal \(heat.threshold)" : "off"); "
+                   + "overheat sleep (no external display, critical 2 min or battery ≥ \(Int(ACThermalPolicy.hotBattery)) °C 1 min) is always on.")
         out.append("")
 
         out.append("## Settings (control.json)")

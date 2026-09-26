@@ -43,6 +43,8 @@ extension Helper {
             overheatSleepAt = now.timeIntervalSince1970
             criticalSince = nil
             hotSince = nil
+            // Like "sleep now", sleeping ends an armed hold; quietly, as overheating is reported.
+            if holdWasActive { consumeHold() }
             sleepNowReason = .overheatSleep
             sleepNowUntil = now.addingTimeInterval(20)
             schedule(.sleepNow)
@@ -59,7 +61,9 @@ extension Helper {
             usage.stats.recordHeatGuard(now: Date())
             if current != 1 { pmset(["-c", "lowpowermode", "1"]) }
         } else if !on, let saved = state.savedACLowPower {
-            if saved != 1 { pmset(["-c", "lowpowermode", String(saved)]) }
+            if LowPowerPolicy.shouldRestore(current: SystemProbe.lowPowerMode(section: "AC Power"), saved: saved) {
+                pmset(["-c", "lowpowermode", String(saved)])
+            }
             state.savedACLowPower = nil
             saveState()
             note(.heatGuardOff)

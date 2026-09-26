@@ -114,7 +114,7 @@ public enum EventKind: String, Codable, Sendable {
         case .sleepNow: "sleep now requested"
         case .sleepRefused: "sleep refused by the system: fell back to pmset sleepnow"
         case .stopping: "helper stopping: clamshell off"
-        case .holdOnBattery: "on battery with a battery hold: clamshell kept, Low Power Mode on"
+        case .holdOnBattery: "on battery with a battery hold: clamshell kept"
         case .holdEndedTime: "battery hold ended: time is up"
         case .holdEndedBattery: "battery hold ended: battery at the floor"
         case .holdEndedHeat: "battery hold ended: battery too hot"

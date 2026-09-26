@@ -191,7 +191,8 @@ final class Helper {
     @discardableResult
     func loadControl(initial: Bool) -> Bool {
         guard let loaded = JSONFile.read(Control.self, from: controlPath) else { return false }
-        if initial || loaded.limits != control.limits || loaded.heatGuard != control.heatGuard {
+        if initial || loaded.limits != control.limits || loaded.heatGuard != control.heatGuard
+            || loaded.holdLowPower != control.holdLowPower {
             logSettings(loaded)
         }
         if loaded.debugLog != control.debugLog || (initial && loaded.debugLog == true) {
@@ -223,9 +224,10 @@ final class Helper {
         let closed = SafetyPolicy.limits(lidClosed: true, user: c.limits)
         let open = SafetyPolicy.limits(lidClosed: false, user: c.limits)
         let guardSettings = c.heatGuard ?? .standard
-        log(String(format: "limits: floor %d%%, lid closed %.0f°C (early %.0f°C), lid open %.0f°C, max %.1f h; heat guard %@",
+        log(String(format: "limits: floor %d%%, lid closed %.0f°C (early %.0f°C), lid open %.0f°C, max %.1f h; Low Power Mode during holds %@, when hot on power %@",
                    SafetyPolicy.floor(c.limits), closed.hardTemperature, closed.earlyTemperature ?? 0,
                    open.hardTemperature, SafetyPolicy.maxHold(c.limits) / 3600,
+                   c.holdLowPower == false ? "off" : "on",
                    guardSettings.enabled ? "from thermal \(guardSettings.threshold)" : "off"))
     }
 

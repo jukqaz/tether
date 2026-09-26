@@ -37,16 +37,19 @@ extension Helper {
 
         let active = deadline != nil
         holdWasActive = active
-        holdingOnBattery = active && s.power == .battery
-        manageLowPower(on: holdingOnBattery)
+        let onBattery = active && s.power == .battery
+        // Recorded whether or not Low Power Mode is allowed to help.
+        if onBattery, !holdingOnBattery {
+            note(.holdOnBattery)
+            usage.stats.recordBatteryHold(now: now)
+        }
+        holdingOnBattery = onBattery
+        manageLowPower(on: LowPowerPolicy.wantsOnBattery(holdingOnBattery: onBattery, allowed: control.holdLowPower))
         return active
     }
 
     func endHold(_ reason: HoldEnd, readings: SafetyReadings?) {
-        state.consumedHold = state.holdValue
-        saveState()
-        holdWasActive = false
-        warmSince = nil
+        consumeHold()
         lastHoldEnd = reason
         lastHoldEndAt = Date().timeIntervalSince1970
         note(.holdEnded(reason))
@@ -58,17 +61,27 @@ extension Helper {
                    r.batteryPercent.map(String.init) ?? "?"))
     }
 
-    /// Low Power Mode caps heat and drain while a closed Mac runs on battery.
+    /// Marks the hold used up, so it never comes back on its own.
+    func consumeHold() {
+        state.consumedHold = state.holdValue
+        saveState()
+        holdWasActive = false
+        warmSince = nil
+    }
+
+    /// Low Power Mode caps heat and drain while a closed Mac runs on battery, unless the user
+    /// turned that off (see `LowPowerPolicy`).
     func manageLowPower(on: Bool) {
         if on, state.savedBatteryLowPower == nil {
             let current = SystemProbe.lowPowerMode(section: "Battery Power") ?? 0
             state.savedBatteryLowPower = current
             saveState()
-            note(.holdOnBattery)
-            usage.stats.recordBatteryHold(now: Date())
+            log("battery hold: Low Power Mode on\(current == 1 ? " (already on)" : "")")
             if current != 1 { pmset(["-b", "lowpowermode", "1"]) }
         } else if !on, let saved = state.savedBatteryLowPower {
-            if saved != 1 { pmset(["-b", "lowpowermode", String(saved)]) }
+            let restore = LowPowerPolicy.shouldRestore(current: SystemProbe.lowPowerMode(section: "Battery Power"), saved: saved)
+            log("battery hold: Low Power Mode off, \(restore ? "restored" : "left as it is")")
+            if restore { pmset(["-b", "lowpowermode", String(saved)]) }
             state.savedBatteryLowPower = nil
             saveState()
         }

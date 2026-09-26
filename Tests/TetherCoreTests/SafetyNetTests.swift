@@ -91,3 +91,27 @@ final class TetherStateTests: XCTestCase {
         XCTAssertEqual(state(heatGuard: true, sleepDisabled: false), .clamshellOff)
     }
 }
+
+final class LowPowerPolicyTests: XCTestCase {
+    func testOnlyDuringAHoldOnBatteryAndOnlyIfAllowed() {
+        XCTAssertTrue(LowPowerPolicy.wantsOnBattery(holdingOnBattery: true, allowed: nil), "on by default")
+        XCTAssertTrue(LowPowerPolicy.wantsOnBattery(holdingOnBattery: true, allowed: true))
+        XCTAssertFalse(LowPowerPolicy.wantsOnBattery(holdingOnBattery: true, allowed: false))
+        XCTAssertFalse(LowPowerPolicy.wantsOnBattery(holdingOnBattery: false, allowed: true))
+    }
+
+    func testRestoresOnlyWhatTetherChanged() {
+        XCTAssertTrue(LowPowerPolicy.shouldRestore(current: 1, saved: 0))
+        // The user switched it off meanwhile, or it was already on before Tether: leave it.
+        XCTAssertFalse(LowPowerPolicy.shouldRestore(current: 0, saved: 0))
+        XCTAssertFalse(LowPowerPolicy.shouldRestore(current: 1, saved: 1))
+        XCTAssertFalse(LowPowerPolicy.shouldRestore(current: nil, saved: 0))
+    }
+
+    func testOlderControlFilesKeepLowPowerModeOn() throws {
+        let old = #"{"enabled": true, "batteryHoldUntil": 1800000000}"#
+        let control = try JSONDecoder().decode(Control.self, from: Data(old.utf8))
+        XCTAssertNil(control.holdLowPower)
+        XCTAssertTrue(LowPowerPolicy.wantsOnBattery(holdingOnBattery: true, allowed: control.holdLowPower))
+    }
+}

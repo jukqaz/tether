@@ -120,7 +120,7 @@ extension EventKind {
         case .sleepNow: L("sleep now", "지금 잠자기")
         case .sleepRefused: L("sleep refused → retried", "잠자기 거부됨 → 다시 시도")
         case .stopping: L("helper stopping → clamshell off", "도우미 종료 → 클램쉘 끔")
-        case .holdOnBattery: L("battery hold started · Low Power Mode", "배터리 유지 시작 · 저전력 모드")
+        case .holdOnBattery: L("battery hold started on battery", "배터리로 유지 시작")
         case .holdEndedTime: L("battery hold ended · time up", "배터리 유지 종료 · 시간 끝")
         case .holdEndedBattery: L("battery hold ended · battery low", "배터리 유지 종료 · 배터리 부족")
         case .holdEndedHeat: L("battery hold ended · battery hot", "배터리 유지 종료 · 배터리 과열")
