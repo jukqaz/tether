@@ -1,0 +1,7 @@
+.build/
+.swiftpm/
+build/
+dist/
+.claude/
+Resources/*.iconset/
+.DS_Store
