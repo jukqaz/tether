@@ -1,11 +1,11 @@
 import Foundation
 import TetherCore
 
-/// Heat with the lid closed on power: Low Power Mode, an alert, and sleep as a last resort.
+/// Heat with the lid closed on power: Low Power Mode, and an alert when it stays critical. The
+/// last-resort sleep is in `Helper+SafetyNet`.
 extension Helper {
-    /// Lid closed on AC blocks the hinge vent. Cool the Mac with Low Power Mode first and raise
-    /// an alert when critical pressure lasts; with no external display attached, sustained
-    /// critical pressure or a hot battery puts it to sleep.
+    /// Lid closed on AC blocks the hinge vent. Cool the Mac with Low Power Mode and raise an alert
+    /// when critical pressure lasts.
     func updateHeatGuard(_ s: Snapshot, clamshellOn: Bool, readings r: SafetyReadings) {
         let now = Date()
         let settings = control.heatGuard ?? .standard
@@ -30,24 +30,6 @@ extension Helper {
             thermalAlertAt = now.timeIntervalSince1970
             note(.heatCritical)
             logReadings(r)
-        }
-        if clamshellOn, s.power == .ac, s.lidClosed, (r.temperature ?? 0) >= ACThermalPolicy.hotBattery {
-            if hotSince == nil { hotSince = now }
-        } else {
-            hotSince = nil
-        }
-        // Low Power Mode was not enough and nothing shows it's at a desk: sleep, like a hold would.
-        if ACThermalPolicy.shouldSleep(clamshellOn: clamshellOn, onAC: s.power == .ac, lidClosed: s.lidClosed,
-                                       externalDisplay: s.externalDisplay, criticalSince: criticalSince,
-                                       hotSince: hotSince, now: now) {
-            overheatSleepAt = now.timeIntervalSince1970
-            criticalSince = nil
-            hotSince = nil
-            // Like "sleep now", sleeping ends an armed hold; quietly, as overheating is reported.
-            if holdWasActive { consumeHold() }
-            sleepNowReason = .overheatSleep
-            sleepNowUntil = now.addingTimeInterval(20)
-            schedule(.sleepNow)
         }
     }
 

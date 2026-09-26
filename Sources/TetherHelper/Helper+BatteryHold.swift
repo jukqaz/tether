@@ -57,8 +57,8 @@ extension Helper {
     }
 
     func logReadings(_ r: SafetyReadings) {
-        log(String(format: "  battery %.1f°C, thermal %d, charge %@%%", r.temperature ?? -1, r.thermal,
-                   r.batteryPercent.map(String.init) ?? "?"))
+        log(String(format: "  battery %.1f°C, thermal %d, charge %@%%, current %@ mA", r.temperature ?? -1, r.thermal,
+                   r.batteryPercent.map(String.init) ?? "?", r.current.map(String.init) ?? "?"))
     }
 
     /// Marks the hold used up, so it never comes back on its own.

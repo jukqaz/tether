@@ -24,6 +24,7 @@ final class Notifier {
         static let session = "lastNotifiedSessionEnd"
         static let heat = "lastNotifiedThermalAlert"
         static let overheat = "lastNotifiedOverheatSleep"
+        static let weakCharger = "lastNotifiedWeakChargerSleep"
         static let sleep = "lastNotifiedSleep"
     }
 
@@ -31,6 +32,7 @@ final class Notifier {
     init(status: Status?, usage: Usage?) {
         for (key, value) in [(Key.holdEnd, status?.lastHoldEndAt), (Key.session, usage?.recentSessions.last?.end),
                              (Key.heat, status?.thermalAlertAt), (Key.overheat, status?.overheatSleepAt),
+                             (Key.weakCharger, status?.weakChargerSleepAt),
                              (Key.sleep, usage?.sleeps.recent.last?.wokeAt)]
         where defaults.object(forKey: key) == nil {
             defaults.set(value ?? Date().timeIntervalSince1970, forKey: key)
@@ -41,6 +43,7 @@ final class Notifier {
     func check(status: Status?, usage: Usage?, lidClosed: Bool, choices: Choices) {
         holdEnded(status, allowed: choices.holdEnd)
         overheated(status, allowed: choices.heat)
+        chargerTooWeak(status)
         if !lidClosed { sessionEnded(usage?.recentSessions.last, allowed: choices.sessions) }
         sleepDrained(usage?.sleeps.recent.last, allowed: choices.sleepDrain)
     }
@@ -69,6 +72,16 @@ final class Notifier {
                  body: L("\(time) · It was overheating with the lid closed on power and no display attached, as in a bag with a power bank.",
                          "\(time) · 전원이 연결된 채 덮개가 닫혀 있고 모니터도 없이 과열됐어요. 보조배터리를 꽂고 가방에 넣은 경우 등이에요."))
         }
+    }
+
+    /// A charger that couldn't keep up let the battery reach the floor, and the Mac was put to sleep.
+    /// Always reported: it explains a Mac that slept on power.
+    private func chargerTooWeak(_ status: Status?) {
+        guard let at = status?.weakChargerSleepAt, isNew(at, Key.weakCharger) else { return }
+        let time = Date(timeIntervalSince1970: at).formatted(date: .omitted, time: .shortened)
+        post(title: L("Tether put your Mac to sleep", "Tether가 Mac을 잠재웠습니다"),
+             body: L("\(time) · The charger couldn't keep up and the battery reached its floor with the lid closed. Use a stronger charger to keep it awake.",
+                     "\(time) · 충전기 출력이 부족해 덮개를 닫은 채 배터리가 하한선까지 줄었어요. 계속 깨워 두려면 더 센 충전기를 쓰세요."))
     }
 
     /// When the lid opens after a long closed stretch, summarise it.

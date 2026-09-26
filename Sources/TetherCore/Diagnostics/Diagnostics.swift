@@ -153,6 +153,8 @@ public enum Diagnostics {
     - Unplugged: the helper clears `SleepDisabled` ("power disconnected: clamshell off"). If the lid is already closed it asks for sleep ("lid already closed: sleeping"; powerd then waits about 5 s, `darkwakelinger`).
     - Battery hold: clamshell stays on on battery until the time is up or a safety limit ends it ("battery hold ended: …"), then a closed Mac sleeps. Holds never survive a helper restart.
     - Heat guard: on power with the lid closed, thermal pressure at the threshold turns AC Low Power Mode on; it is restored after 2 cool minutes or when the lid opens.
+    - Safety net on power with the lid closed and no external display: critical heat for 2 min, a battery at 45 °C for 1 min, or a battery at the floor still draining for 1 min (a charger that can't keep up) puts the Mac to sleep ("putting the Mac to sleep").
+    - Dark wakes: clamshell mode is only turned on in a full wake, so a Mac put to sleep on power goes back to sleep after Power Nap wakes.
     - "Sleep now" is cancelled by any input during powerd's pre-sleep window; the app waits for input to settle first.
     - Idle-sleep assertions from other apps (see "Power assertions") do not stop lid-close sleep or Tether's own sleep, but keep an open Mac awake on battery.
     - Desktop Macs (no battery or lid): Tether changes nothing.

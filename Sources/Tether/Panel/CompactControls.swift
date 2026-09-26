@@ -48,9 +48,9 @@ struct CompactControls: View {
             .buttonStyle(.plain)
             .menuIndicator(.hidden)
             .fixedSize()
-            .disabled(!model.enabled)
-            .opacity(model.enabled ? 1 : 0.45)
-            .help(L("Battery hold", "배터리에서도 유지"))
+            .disabled(!model.enabled || !model.canStartHold)
+            .opacity(model.enabled && model.canStartHold ? 1 : 0.45)
+            .help(model.canStartHold ? L("Battery hold", "배터리에서도 유지") : model.holdBlockedReason)
             .accessibilityLabel(L("Battery hold", "배터리 유지"))
         }
     }

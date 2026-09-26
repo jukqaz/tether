@@ -131,6 +131,7 @@ extension EventKind {
         case .heatGuardOff: L("heat guard off · Low Power Mode restored", "발열 보호 끝 · 저전력 모드 복원")
         case .heatCritical: L("critical heat for 3 minutes", "발열 위험 3분 지속")
         case .overheatSleep: L("overheating on power → put to sleep", "전원 연결 중 과열 → 잠재움")
+        case .weakChargerSleep: L("charger too weak, battery low → put to sleep", "충전 부족, 배터리 부족 → 잠재움")
         }
     }
 }

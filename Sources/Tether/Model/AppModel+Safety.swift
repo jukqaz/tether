@@ -15,6 +15,17 @@ extension AppModel {
 
     func safetyLimits(lidClosed: Bool) -> SafetyLimits { SafetyPolicy.limits(lidClosed: lidClosed, user: limits) }
 
+    var batteryPercent: Int? { status?.batteryPercent ?? SystemProbe.batteryPercent() }
+
+    /// A hold started at or below the battery floor would end at once, so it isn't offered.
+    var canStartHold: Bool { SafetyPolicy.canStartHold(batteryPercent: batteryPercent, user: limits) }
+
+    /// Why a hold can't start, for the panel.
+    var holdBlockedReason: String {
+        L("Battery at \(batteryPercent ?? 0)%, at or under the \(batteryFloor)% floor",
+          "배터리 \(batteryPercent ?? 0)%, 하한선 \(batteryFloor)% 이하")
+    }
+
     func setLimits(_ new: UserLimits) {
         save { ControlStore.update { $0.limits = new.isDefault ? nil : new } }
     }

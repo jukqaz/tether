@@ -176,6 +176,8 @@ final class AppModel: ObservableObject {
         if supportedMac, !defaults.bool(forKey: Key.launchAtLoginConfigured) {
             setLaunchAtLogin(true)
             defaults.set(true, forKey: Key.launchAtLoginConfigured)
+        } else if launchAtLogin, !isTranslocated {
+            SystemIntegration.updateLoginItemIfNeeded()
         }
         // The helper posts a notification whenever it writes its status, which it does on every
         // power, lid or thermal change and at least every 30 seconds; the timer only turns an
@@ -309,6 +311,10 @@ final class AppModel: ObservableObject {
     }
 
     func startBatteryHold(minutes: Int, source: String = "app") {
+        guard canStartHold else {
+            errorText = L("A battery hold needs more charge than the floor. ", "배터리 유지는 하한선보다 충전돼 있어야 해요. ") + holdBlockedReason
+            return
+        }
         save { ControlStore.startHold(minutes: minutes, source: source) }
     }
 

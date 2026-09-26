@@ -18,19 +18,26 @@ enum SystemIntegration {
     static var launchAgentPath: String { NSHomeDirectory() + "/Library/LaunchAgents/\(launchAgentLabel).plist" }
     static var launchAtLogin: Bool { FileManager.default.fileExists(atPath: launchAgentPath) }
 
-    /// A per-user LaunchAgent works without a Developer ID signature, unlike SMAppService.
+    /// A per-user LaunchAgent works without a Developer ID signature, unlike SMAppService. It
+    /// relaunches the app after a crash (not after Quit), since a crash with the lid closed would
+    /// leave the built-in screen at 0 brightness and the session free to lock.
+    private static var loginItem: [String: Any] {
+        [
+            "Label": launchAgentLabel,
+            "ProgramArguments": [Bundle.main.executablePath ?? "/Applications/Tether.app/Contents/MacOS/Tether"],
+            "RunAtLoad": true,
+            "KeepAlive": ["SuccessfulExit": false],
+            "LimitLoadToSessionType": "Aqua",
+        ]
+    }
+
     static func setLaunchAtLogin(_ on: Bool) throws {
         let url = URL(fileURLWithPath: launchAgentPath)
         guard on else {
             try? FileManager.default.removeItem(at: url)
             return
         }
-        let plist: [String: Any] = [
-            "Label": launchAgentLabel,
-            "ProgramArguments": [Bundle.main.executablePath ?? "/Applications/Tether.app/Contents/MacOS/Tether"],
-            "RunAtLoad": true,
-            "LimitLoadToSessionType": "Aqua",
-        ]
+        let plist = loginItem
         do {
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0).write(to: url, options: .atomic)
@@ -38,6 +45,14 @@ enum SystemIntegration {
             throw Failure.message(L("Couldn't create the login item: \(error.localizedDescription)",
                                     "로그인 항목을 만들지 못했습니다: \(error.localizedDescription)"))
         }
+    }
+
+    /// Rewrites a login item from an older version, or one pointing at an app that moved; the
+    /// change applies from the next login.
+    static func updateLoginItemIfNeeded() {
+        let current = NSDictionary(contentsOfFile: launchAgentPath)
+        guard current != NSDictionary(dictionary: loginItem) else { return }
+        try? setLaunchAtLogin(true)
     }
 
     // MARK: Terminal command

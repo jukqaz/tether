@@ -52,6 +52,12 @@ case .sleep:
 case .hold(let minutes):
     requireHelper(state)
     guard state.control.enabled else { fail(L("Tether is off. Run 'tether on' first.", "Tether가 꺼져 있습니다. 먼저 'tether on'을 실행해 주세요.")) }
+    let percent = state.status?.batteryPercent ?? SystemProbe.batteryPercent()
+    guard SafetyPolicy.canStartHold(batteryPercent: percent, user: state.control.limits) else {
+        let floor = SafetyPolicy.floor(state.control.limits)
+        fail(L("The battery is at \(percent ?? 0)%, at or under the \(floor)% floor, so a hold would end at once.",
+               "배터리가 \(percent ?? 0)%로 하한선 \(floor)% 이하라 유지해도 바로 끝납니다."))
+    }
     let after = change { ControlStore.startHold(minutes: minutes, source: "cli") }
     guard let until = after.status?.batteryHoldUntil else {
         fail(L("The helper didn't take the battery hold. Check 'tether status'.", "도우미가 배터리 유지를 받지 않았습니다. 'tether status'로 상태를 확인해 주세요."))

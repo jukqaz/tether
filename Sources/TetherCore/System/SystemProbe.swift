@@ -136,7 +136,20 @@ public enum SystemProbe {
     public static func safetyReadings() -> SafetyReadings {
         SafetyReadings(temperature: batteryTemperature(),
                        thermal: ProcessInfo.processInfo.thermalState.rawValue,
-                       batteryPercent: batteryPercent())
+                       batteryPercent: batteryPercent(), current: batteryCurrent())
+    }
+
+    /// Battery current in mA from IOPS: negative while the battery drains, also on a charger that
+    /// can't keep up.
+    public static func batteryCurrent() -> Int? {
+        guard let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
+              let list = IOPSCopyPowerSourcesList(info)?.takeRetainedValue() as? [CFTypeRef] else { return nil }
+        for source in list {
+            guard let description = IOPSGetPowerSourceDescription(info, source)?.takeUnretainedValue() as? [String: Any],
+                  description[kIOPSTypeKey] as? String == kIOPSInternalBatteryType else { continue }
+            return description[kIOPSCurrentKey] as? Int
+        }
+        return nil
     }
 
     /// IOPMrootDomain lives as long as the system does, so it is looked up once, not per read.

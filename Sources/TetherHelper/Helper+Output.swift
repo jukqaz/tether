@@ -31,6 +31,7 @@ extension Helper {
         status.heatGuard = state.savedACLowPower != nil
         status.thermalAlertAt = thermalAlertAt
         status.overheatSleepAt = overheatSleepAt
+        status.weakChargerSleepAt = weakChargerSleepAt
         if JSONFile.write(status, to: statusPath, permissions: 0o644) {
             DarwinNotification.post(TetherPaths.statusChanged)
         }
@@ -50,5 +51,14 @@ extension Helper {
 
     func log(_ message: String) {
         print("\(Self.stampFormat.string(from: Date())) \(message)")
+    }
+
+    /// launchd appends to the log forever, and detailed logging adds a line per check: start over
+    /// past 2 MB. (main.swift does the same at 1 MB when the helper starts.)
+    func trimLogIfNeeded() {
+        var info = stat()
+        guard fstat(STDOUT_FILENO, &info) == 0, (info.st_mode & S_IFMT) == S_IFREG, info.st_size > 2_000_000 else { return }
+        ftruncate(STDOUT_FILENO, 0)
+        log("log trimmed at 2 MB")
     }
 }

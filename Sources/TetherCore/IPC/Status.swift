@@ -27,11 +27,13 @@ public struct Status: Codable, Equatable, Sendable {
     public var thermalAlertAt: Double?
     /// When overheating on AC with the lid closed put the Mac to sleep; the app reports it after wake.
     public var overheatSleepAt: Double?
+    /// When a charger that couldn't keep up let the battery reach the floor and the Mac was put to sleep.
+    public var weakChargerSleepAt: Double?
 
     private enum CodingKeys: String, CodingKey {
         case updatedAt, version, enabled, power, lidClosed, sleepDisabled, lastEvent, lastEventAt
         case batteryHoldUntil, batteryTemperature, thermal, batteryPercent, lastHoldEnd, lastHoldEndAt
-        case batteryHoldSince, heatGuard, thermalAlertAt, overheatSleepAt
+        case batteryHoldSince, heatGuard, thermalAlertAt, overheatSleepAt, weakChargerSleepAt
     }
 
     /// Tolerates an event this build does not know, so an app and helper from different
@@ -56,6 +58,7 @@ public struct Status: Codable, Equatable, Sendable {
         heatGuard = try? c.decodeIfPresent(Bool.self, forKey: .heatGuard)
         thermalAlertAt = try? c.decodeIfPresent(Double.self, forKey: .thermalAlertAt)
         overheatSleepAt = try? c.decodeIfPresent(Double.self, forKey: .overheatSleepAt)
+        weakChargerSleepAt = try? c.decodeIfPresent(Double.self, forKey: .weakChargerSleepAt)
     }
 
     public init(updatedAt: Double, version: String, enabled: Bool, power: PowerSource,
@@ -82,7 +85,7 @@ public enum EventKind: String, Codable, Sendable {
     case lidSleep, sleepNow, sleepRefused, stopping
     case holdOnBattery, holdEndedTime, holdEndedBattery, holdEndedHeat, holdEndedThermal
     case holdEndedSensor, holdCancelled
-    case heatGuardOn, heatGuardOff, heatCritical, overheatSleep
+    case heatGuardOn, heatGuardOff, heatCritical, overheatSleep, weakChargerSleep
 
     public static func holdEnded(_ reason: HoldEnd) -> EventKind {
         switch reason {
@@ -125,6 +128,7 @@ public enum EventKind: String, Codable, Sendable {
         case .heatGuardOff: "heat guard released: Low Power Mode restored"
         case .heatCritical: "lid closed on AC: critical thermal pressure for 3 minutes"
         case .overheatSleep: "lid closed on AC with no external display and overheating: putting the Mac to sleep"
+        case .weakChargerSleep: "lid closed on a charger that can't keep up, battery at the floor and draining: putting the Mac to sleep"
         }
     }
 }

@@ -11,11 +11,14 @@ public struct SafetyReadings: Equatable, Sendable {
     /// ProcessInfo.ThermalState raw value: 0 nominal, 1 fair, 2 serious, 3 critical.
     public var thermal: Int
     public var batteryPercent: Int?
+    /// Battery current in mA: negative while it drains, even on a charger that can't keep up.
+    public var current: Int?
 
-    public init(temperature: Double?, thermal: Int, batteryPercent: Int?) {
+    public init(temperature: Double?, thermal: Int, batteryPercent: Int?, current: Int? = nil) {
         self.temperature = temperature
         self.thermal = thermal
         self.batteryPercent = batteryPercent
+        self.current = current
     }
 }
 
@@ -118,6 +121,12 @@ public enum SafetyPolicy {
         if let percent = r.batteryPercent, percent <= floor(user) { return .battery }
         if now >= holdUntil { return .time }
         return nil
+    }
+
+    /// A hold started at or below the floor would end at once.
+    public static func canStartHold(batteryPercent: Int?, user: UserLimits? = nil) -> Bool {
+        guard let batteryPercent else { return true }
+        return batteryPercent > floor(user)
     }
 
     /// Clamp a requested deadline to the maximum hold length.

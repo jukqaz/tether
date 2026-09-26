@@ -44,6 +44,8 @@ final class Helper {
     var thermalAlertAt: Double?
     var hotSince: Date?
     var overheatSleepAt: Double?
+    var drainingSince: Date?
+    var weakChargerSleepAt: Double?
 
     // Usage stats and lid sessions
     let usagePath: String
@@ -117,7 +119,9 @@ final class Helper {
         fast.schedule(deadline: .now() + 10, repeating: 10)
         fast.setEventHandler { [weak self] in
             guard let self else { return }
-            if self.holdingOnBattery || self.criticalSince != nil || self.hotSince != nil { self.schedule(.timer) }
+            if self.holdingOnBattery || self.criticalSince != nil || self.hotSince != nil || self.drainingSince != nil {
+                self.schedule(.timer)
+            }
         }
         fast.resume()
         fastTimer = fast
@@ -125,7 +129,10 @@ final class Helper {
         // Safety net in case a notification is ever missed.
         let timer = DispatchSource.makeTimerSource(queue: .main)
         timer.schedule(deadline: .now() + 30, repeating: 30)
-        timer.setEventHandler { [weak self] in self?.schedule(.timer) }
+        timer.setEventHandler { [weak self] in
+            self?.trimLogIfNeeded()
+            self?.schedule(.timer)
+        }
         timer.resume()
         self.timer = timer
 
@@ -183,6 +190,7 @@ final class Helper {
         let clamshellOn = actions.contains(.setSleepDisabled(true))
             || (snapshot.sleepDisabled && !actions.contains(.setSleepDisabled(false)))
         updateHeatGuard(snapshot, clamshellOn: clamshellOn, readings: readings)
+        updateSafetyNet(snapshot, clamshellOn: clamshellOn, readings: readings)
         updateUsage(snapshot, clamshellOn: clamshellOn, readings: readings)
         writeStatus(readings: readings)
     }
@@ -248,7 +256,7 @@ final class Helper {
             let event = triggers.contains(.sleepNow) ? sleepNowReason : .lidSleep
             sleepNowReason = .sleepNow
             note(event)
-            if event == .overheatSleep { logReadings(currentReadings()) }
+            if event == .overheatSleep || event == .weakChargerSleep { logReadings(currentReadings()) }
             usage.stats.recordForcedSleep(now: Date())
             lastSleepRequestAt = Date()
             sleepRetryActive = true

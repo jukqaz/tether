@@ -45,10 +45,12 @@ struct HoldModule: View {
                     .foregroundStyle(.orange)
                 Text(L("Safe in a bag", "가방에 넣어도 돼요"))
                     .font(.callout.weight(.semibold))
-                Text(L("\(model.batteryFloor)% · sleeps if hot", "\(model.batteryFloor)% · 뜨거우면 잠들어요"))
+                Text(model.canStartHold ? L("\(model.batteryFloor)% · sleeps if hot", "\(model.batteryFloor)% · 뜨거우면 잠들어요")
+                                        : model.holdBlockedReason)
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .foregroundStyle(model.canStartHold ? Color.secondary : Color.orange)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 Menu(L("Start", "켜기")) {
                     ForEach(model.holdChoices, id: \.self) { minutes in
                         Button(Texts.duration(TimeInterval(minutes * 60))) {
@@ -58,7 +60,7 @@ struct HoldModule: View {
                 }
                 .fixedSize()
                 .controlSize(.small)
-                .disabled(!model.enabled)
+                .disabled(!model.enabled || !model.canStartHold)
             }
         }
         .padding(Metrics.padding)
