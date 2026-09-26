@@ -162,3 +162,93 @@ final class HoldStartTests: XCTestCase {
         XCTAssertTrue(SafetyPolicy.canStartHold(batteryPercent: nil), "no reading: the helper's own check still applies")
     }
 }
+
+/// The last-resort timers, run on a simulated clock.
+final class SafetyNetTrackerTests: XCTestCase {
+    private let start = Date(timeIntervalSince1970: 1_800_000_000)
+    private let closedOnPower = Snapshot(power: .ac, lidClosed: true, sleepDisabled: true)
+
+    private func readings(thermal: Int = 0, temperature: Double = 32, percent: Int = 80, current: Int = 0) -> SafetyReadings {
+        SafetyReadings(temperature: temperature, thermal: thermal, batteryPercent: percent, current: current)
+    }
+
+    private func run(_ tracker: inout SafetyNetTracker, _ s: Snapshot, _ r: SafetyReadings, at seconds: TimeInterval) -> EventKind? {
+        tracker.update(s, clamshellOn: true, readings: r, floor: 20, now: start.addingTimeInterval(seconds))
+    }
+
+    func testCriticalForTwoMinutesSleeps() {
+        var t = SafetyNetTracker()
+        XCTAssertNil(run(&t, closedOnPower, readings(thermal: 3), at: 0))
+        XCTAssertTrue(t.isWatching)
+        XCTAssertNil(run(&t, closedOnPower, readings(thermal: 3), at: 119))
+        XCTAssertEqual(run(&t, closedOnPower, readings(thermal: 3), at: 120), .overheatSleep)
+        XCTAssertFalse(t.isWatching, "starts over after a sleep")
+    }
+
+    func testCoolingDownStartsTheCountAgain() {
+        var t = SafetyNetTracker()
+        _ = run(&t, closedOnPower, readings(thermal: 3), at: 0)
+        _ = run(&t, closedOnPower, readings(thermal: 1), at: 60)
+        XCTAssertNil(run(&t, closedOnPower, readings(thermal: 3), at: 100))
+        XCTAssertNil(run(&t, closedOnPower, readings(thermal: 3), at: 219))
+        XCTAssertEqual(run(&t, closedOnPower, readings(thermal: 3), at: 220), .overheatSleep)
+    }
+
+    func testHotBatteryForAMinuteSleeps() {
+        var t = SafetyNetTracker()
+        XCTAssertNil(run(&t, closedOnPower, readings(temperature: 45.5), at: 0))
+        XCTAssertEqual(run(&t, closedOnPower, readings(temperature: 45.5), at: 60), .overheatSleep)
+    }
+
+    func testWeakChargerAtTheFloorSleeps() {
+        var t = SafetyNetTracker()
+        XCTAssertNil(run(&t, closedOnPower, readings(percent: 19, current: -900), at: 0))
+        XCTAssertEqual(run(&t, closedOnPower, readings(percent: 19, current: -900), at: 60), .weakChargerSleep)
+    }
+
+    func testAnExternalDisplayMeansADeskButStillTimesTheAlert() {
+        var t = SafetyNetTracker()
+        let desk = Snapshot(power: .ac, lidClosed: true, sleepDisabled: true, externalDisplay: true)
+        XCTAssertNil(run(&t, desk, readings(thermal: 3), at: 0))
+        XCTAssertNil(run(&t, desk, readings(thermal: 3), at: 600))
+        XCTAssertEqual(t.criticalSince, start, "the critical-heat alert still counts")
+    }
+
+    func testNothingWithTheLidOpenOrOnBattery() {
+        var t = SafetyNetTracker()
+        let open = Snapshot(power: .ac, lidClosed: false, sleepDisabled: true)
+        let battery = Snapshot(power: .battery, lidClosed: true, sleepDisabled: true)
+        XCTAssertNil(run(&t, open, readings(thermal: 3), at: 0))
+        XCTAssertNil(run(&t, battery, readings(thermal: 3), at: 600))
+        XCTAssertFalse(t.isWatching)
+    }
+}
+
+final class HoldExtensionTests: XCTestCase {
+    func testPlusMinutesExtends() {
+        XCTAssertEqual(TetherCommand.parse(["hold", "+30m"]), .extendHold(minutes: 30))
+        XCTAssertEqual(TetherCommand.parse(url: URL(string: "tether://hold/+1h")!), .extendHold(minutes: 60))
+        XCTAssertNil(TetherCommand.parse(["hold", "+5h"]), "beyond the cap")
+    }
+
+    func testTheCapCountsFromTheFirstSighting() {
+        // An extension keeps holdSeenAt, so the deadline can't pass 4 h from the start.
+        let seen = 1_800_000_000.0
+        let state = HelperState(holdValue: seen + 5 * 3600, holdSeenAt: seen)
+        let deadline = state.holdDeadline(requested: seen + 5 * 3600, now: Date(timeIntervalSince1970: seen + 3600))
+        XCTAssertEqual(deadline?.timeIntervalSince1970, seen + 4 * 3600)
+    }
+}
+
+final class AppPresencePathTests: XCTestCase {
+    func testOnlyATetherAppPathCounts() {
+        var presence = AppPresence()
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        _ = presence.shouldRetire(path: "/Users/x/Library/LaunchAgents/other", exists: false, now: now)
+        XCTAssertFalse(presence.shouldRetire(path: "/Users/x/Library/LaunchAgents/other", exists: false,
+                                             now: now.addingTimeInterval(AppPresence.grace + 1)))
+        _ = presence.shouldRetire(path: "/Applications/Tether.app/Contents/MacOS/Tether", exists: false, now: now)
+        XCTAssertTrue(presence.shouldRetire(path: "/Applications/Tether.app/Contents/MacOS/Tether", exists: false,
+                                            now: now.addingTimeInterval(AppPresence.grace + 1)))
+    }
+}

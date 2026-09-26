@@ -25,6 +25,12 @@ public enum Diagnostics {
                    + " · macOS \(osVersion()) · \(model())")
         out.append("Logs from \(stamp(from))\(since == nil ? " (last \(String(format: "%g", hours)) h)" : " (recording)").")
         out.append("")
+        out.append("## Checks")
+        out.append("")
+        for check in HealthChecks.run(now: now, language: .english) {
+            out.append("- [\(check.result.rawValue.uppercased())] \(check.name): \(check.detail)")
+        }
+        out.append("")
         out.append(expectations)
 
         out.append("## State now")

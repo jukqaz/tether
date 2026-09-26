@@ -13,7 +13,9 @@ public struct AppPresence: Sendable {
     /// `path` is the app executable the app last reported. Translocated paths (an app opened
     /// straight from Downloads) are temporary by design and never count.
     public mutating func shouldRetire(path: String?, exists: Bool, now: Date) -> Bool {
-        guard let path, !path.contains("/AppTranslocation/"), !exists else {
+        // Only a path that is an app named Tether counts, so a hand-edited control file can't
+        // point the clean-up elsewhere.
+        guard let path, path.hasSuffix(".app/Contents/MacOS/Tether"), !path.contains("/AppTranslocation/"), !exists else {
             missingSince = nil
             return false
         }

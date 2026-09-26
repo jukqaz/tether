@@ -3,9 +3,10 @@ import Foundation
 public enum TetherCommand: Equatable, Sendable {
     case status, on, off, toggle, sleep
     case hold(minutes: Int)
+    case extendHold(minutes: Int)
     case cancelHold
 
-    /// `on`, `off`, `toggle`, `sleep`, `hold 90m`, `hold off`, `status`.
+    /// `on`, `off`, `toggle`, `sleep`, `hold 90m`, `hold +30m`, `hold off`, `status`.
     /// Returns nil for anything else, including a hold length outside 1 min–4 h.
     public static func parse(_ words: [String]) -> TetherCommand? {
         guard let first = words.first?.lowercased() else { return .status }
@@ -19,6 +20,7 @@ public enum TetherCommand: Equatable, Sendable {
             guard words.count >= 2 else { return nil }
             let argument = words[1...].joined().lowercased()
             if ["off", "cancel", "stop"].contains(argument) { return .cancelHold }
+            if argument.hasPrefix("+") { return HoldDuration.minutes(String(argument.dropFirst())).map { .extendHold(minutes: $0) } }
             return HoldDuration.minutes(argument).map { .hold(minutes: $0) }
         default: return nil
         }

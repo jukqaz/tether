@@ -39,14 +39,12 @@ final class Helper {
     var lastHoldEnd: HoldEnd?
     var lastHoldEndAt: Double?
 
-    // AC heat guard
+    // AC heat guard and the last-resort sleeps on power
     var coolSince: Date?
-    var criticalSince: Date?
     var criticalAlerted = false
     var thermalAlertAt: Double?
-    var hotSince: Date?
+    var safetyNet = SafetyNetTracker()
     var overheatSleepAt: Double?
-    var drainingSince: Date?
     var weakChargerSleepAt: Double?
 
     // Usage stats and lid sessions
@@ -122,9 +120,7 @@ final class Helper {
         fast.schedule(deadline: .now() + 10, repeating: 10)
         fast.setEventHandler { [weak self] in
             guard let self else { return }
-            if self.holdingOnBattery || self.criticalSince != nil || self.hotSince != nil || self.drainingSince != nil {
-                self.schedule(.timer)
-            }
+            if self.holdingOnBattery || self.safetyNet.isWatching { self.schedule(.timer) }
         }
         fast.resume()
         fastTimer = fast
@@ -217,10 +213,13 @@ final class Helper {
         }
         control = loaded
         if let hold = loaded.batteryHoldUntil, hold != state.holdValue {
+            // A later deadline for the running hold extends it: the 4-hour cap keeps counting from
+            // when the hold was first seen, so extending can't get round it.
+            let extending = holdWasActive && state.holdSeenAt != nil
             state.holdValue = hold
-            state.holdSeenAt = Date().timeIntervalSince1970
+            if !extending { state.holdSeenAt = Date().timeIntervalSince1970 }
             saveState()
-            if !initial { log("battery hold armed") }
+            if !initial { log(extending ? "battery hold extended" : "battery hold armed") }
         }
         // A hold never survives a helper restart or reboot: ending it is the safe side.
         if initial, let hold = loaded.batteryHoldUntil, hold != state.consumedHold {

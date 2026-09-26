@@ -64,6 +64,15 @@ public enum ControlStore {
         }
     }
 
+    /// Pushes the running hold's deadline back; the helper keeps the 4-hour cap from its start.
+    @discardableResult
+    public static func extendHold(minutes: Int) -> Bool {
+        update {
+            let now = Date().timeIntervalSince1970
+            $0.batteryHoldUntil = max($0.batteryHoldUntil ?? now, now) + TimeInterval(minutes * 60)
+        }
+    }
+
     @discardableResult
     public static func cancelHold() -> Bool {
         update {

@@ -1,43 +1,30 @@
 import Foundation
 import TetherCore
 
-/// Last-resort sleep with the lid closed on power and no external display, where the Mac may be in
-/// a bag on a power bank: overheating (`ACThermalPolicy.shouldSleep`) or a charger that can't keep
-/// up while the battery is at the floor (`WeakChargerPolicy`).
+/// With the lid closed on power: the critical-heat alert, and the last-resort sleep where the Mac
+/// may be in a bag on a power bank (overheating, or a charger that can't keep up). The timing is
+/// `SafetyNetTracker`, tested in Core.
 extension Helper {
     func updateSafetyNet(_ s: Snapshot, clamshellOn: Bool, readings r: SafetyReadings) {
         let now = Date()
-        let onAC = s.power == .ac
-        if clamshellOn, onAC, s.lidClosed, (r.temperature ?? 0) >= ACThermalPolicy.hotBattery {
-            if hotSince == nil { hotSince = now }
-        } else {
-            hotSince = nil
+        let reason = safetyNet.update(s, clamshellOn: clamshellOn, readings: r,
+                                      floor: SafetyPolicy.floor(control.limits), now: now)
+        if safetyNet.criticalSince == nil { criticalAlerted = false }
+        if ACThermalPolicy.shouldAlert(criticalSince: safetyNet.criticalSince, alreadyAlerted: criticalAlerted, now: now) {
+            criticalAlerted = true
+            thermalAlertAt = now.timeIntervalSince1970
+            note(.heatCritical)
+            logReadings(r)
         }
-        if WeakChargerPolicy.isRunningDown(r, onAC: onAC, lidClosed: s.lidClosed, clamshellOn: clamshellOn,
-                                           floor: SafetyPolicy.floor(control.limits)) {
-            if drainingSince == nil { drainingSince = now }
-        } else {
-            drainingSince = nil
+        switch reason {
+        case .overheatSleep: overheatSleepAt = now.timeIntervalSince1970
+        case .weakChargerSleep: weakChargerSleepAt = now.timeIntervalSince1970
+        default: return
         }
-        if ACThermalPolicy.shouldSleep(clamshellOn: clamshellOn, onAC: onAC, lidClosed: s.lidClosed,
-                                       externalDisplay: s.externalDisplay, criticalSince: criticalSince,
-                                       hotSince: hotSince, now: now) {
-            overheatSleepAt = now.timeIntervalSince1970
-            sleepForSafety(.overheatSleep, now: now)
-        } else if WeakChargerPolicy.shouldSleep(externalDisplay: s.externalDisplay, drainingSince: drainingSince, now: now) {
-            weakChargerSleepAt = now.timeIntervalSince1970
-            sleepForSafety(.weakChargerSleep, now: now)
-        }
-    }
-
-    /// Sleep through the "sleep now" path. Like "sleep now", it ends an armed hold; quietly, as
-    /// the reason is reported after wake.
-    private func sleepForSafety(_ reason: EventKind, now: Date) {
-        criticalSince = nil
-        hotSince = nil
-        drainingSince = nil
+        // Like "sleep now", it ends an armed hold; quietly, as the reason is reported after wake.
+        criticalAlerted = false
         if holdWasActive { consumeHold() }
-        sleepNowReason = reason
+        sleepNowReason = reason ?? .sleepNow
         sleepNowUntil = now.addingTimeInterval(20)
         schedule(.sleepNow)
     }

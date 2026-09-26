@@ -1,11 +1,10 @@
 import Foundation
 import TetherCore
 
-/// Heat with the lid closed on power: Low Power Mode, and an alert when it stays critical. The
-/// last-resort sleep is in `Helper+SafetyNet`.
+/// Heat with the lid closed on power: Low Power Mode. The critical-heat alert and the
+/// last-resort sleep are in `Helper+SafetyNet`.
 extension Helper {
-    /// Lid closed on AC blocks the hinge vent. Cool the Mac with Low Power Mode and raise an alert
-    /// when critical pressure lasts.
+    /// Lid closed on AC blocks the hinge vent: cool the Mac with Low Power Mode.
     func updateHeatGuard(_ s: Snapshot, clamshellOn: Bool, readings r: SafetyReadings) {
         let now = Date()
         let settings = control.heatGuard ?? .standard
@@ -14,23 +13,11 @@ extension Helper {
         } else {
             coolSince = nil
         }
-        if clamshellOn, s.power == .ac, s.lidClosed, r.thermal >= 3 {
-            if criticalSince == nil { criticalSince = now }
-        } else {
-            criticalSince = nil
-            criticalAlerted = false
-        }
         let want = ACThermalPolicy.wantsLowPower(clamshellOn: clamshellOn, onAC: s.power == .ac,
                                                  lidClosed: s.lidClosed, thermal: r.thermal,
                                                  lowPowerOn: state.savedACLowPower != nil,
                                                  coolSince: coolSince, now: now, settings: settings)
         manageACLowPower(on: want, readings: r)
-        if ACThermalPolicy.shouldAlert(criticalSince: criticalSince, alreadyAlerted: criticalAlerted, now: now) {
-            criticalAlerted = true
-            thermalAlertAt = now.timeIntervalSince1970
-            note(.heatCritical)
-            logReadings(r)
-        }
     }
 
     func manageACLowPower(on: Bool, readings: SafetyReadings) {
