@@ -58,5 +58,5 @@ let cannotWrite = L("Can't write the control file (\(TetherPaths.controlPath)). 
                     "설정 파일을 쓸 수 없습니다 (\(TetherPaths.controlPath)). 도우미를 다시 설치해 보세요.")
 
 func time(_ t: Double) -> String {
-    Date(timeIntervalSince1970: t).formatted(date: .omitted, time: .shortened)
+    Texts.time(Date(timeIntervalSince1970: t))
 }

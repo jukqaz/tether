@@ -49,7 +49,7 @@ final class Notifier {
     private func holdEnded(_ status: Status?, allowed: Bool) {
         guard let status, let reason = status.lastHoldEnd, reason != .cancelled,
               let at = status.lastHoldEndAt, isNew(at, Key.holdEnd), allowed else { return }
-        let time = Date(timeIntervalSince1970: at).formatted(date: .omitted, time: .shortened)
+        let time = Texts.time(Date(timeIntervalSince1970: at))
         post(title: L("Battery hold ended", "배터리 유지를 끝냈습니다"),
              body: L("\(time) · \(reason.displayReason). If the lid was closed, the Mac was put to sleep.",
                      "\(time) · \(reason.displayReason). 덮개가 닫혀 있었다면 Mac을 잠재웠습니다."))
@@ -64,7 +64,7 @@ final class Notifier {
                          "덮개를 닫은 채 발열 '위험' 단계가 3분 넘게 이어지고 있어요. 저전력 모드를 켰지만, 덮개를 열거나 작업을 줄여 주세요."))
         }
         if let at = status?.overheatSleepAt, isNew(at, Key.overheat), allowed {
-            let time = Date(timeIntervalSince1970: at).formatted(date: .omitted, time: .shortened)
+            let time = Texts.time(Date(timeIntervalSince1970: at))
             post(title: L("Tether put your Mac to sleep", "Tether가 Mac을 잠재웠습니다"),
                  body: L("\(time) · It was overheating with the lid closed on power and no display attached, as in a bag with a power bank.",
                          "\(time) · 전원이 연결된 채 덮개가 닫혀 있고 모니터도 없이 과열됐어요. 보조배터리를 꽂고 가방에 넣은 경우 등이에요."))
@@ -75,7 +75,7 @@ final class Notifier {
     /// Always reported: it explains a Mac that slept on power.
     private func chargerTooWeak(_ status: Status?) {
         guard let at = status?.weakChargerSleepAt, isNew(at, Key.weakCharger) else { return }
-        let time = Date(timeIntervalSince1970: at).formatted(date: .omitted, time: .shortened)
+        let time = Texts.time(Date(timeIntervalSince1970: at))
         post(title: L("Tether put your Mac to sleep", "Tether가 Mac을 잠재웠습니다"),
              body: L("\(time) · The charger couldn't keep up and the battery reached its floor with the lid closed. Use a stronger charger to keep it awake.",
                      "\(time) · 충전기 출력이 부족해 덮개를 닫은 채 배터리가 하한선까지 줄었어요. 계속 깨워 두려면 더 센 충전기를 쓰세요."))

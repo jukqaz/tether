@@ -216,7 +216,7 @@ extension AppModel {
 
     var lastEventText: String? {
         guard let status, let event = status.lastEvent, let at = status.lastEventAt else { return nil }
-        let time = Date(timeIntervalSince1970: at).formatted(date: .omitted, time: .shortened)
+        let time = Texts.time(Date(timeIntervalSince1970: at))
         return "\(time) · \(event.displayText)"
     }
 }

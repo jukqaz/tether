@@ -11,6 +11,16 @@ public enum Texts {
         }
     }
 
+    /// A time of day in Tether's language and the user's clock: "11:30 PM" / "오후 11:30" or "23:30".
+    public static func time(_ date: Date) -> String {
+        date.formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(Localization.locale))
+    }
+
+    /// A day and time: "Sep 26, 5:32 AM" / "9월 26일 오전 5:32".
+    public static func dateTime(_ date: Date) -> String {
+        date.formatted(Date.FormatStyle.dateTime.month(.abbreviated).day().hour().minute().locale(Localization.locale))
+    }
+
     /// "1 h 23 min" / "1시간 23분", "42 min" / "42분", "30 s" / "30초".
     public static func duration(_ seconds: TimeInterval) -> String {
         let s = max(0, Int(seconds.rounded()))

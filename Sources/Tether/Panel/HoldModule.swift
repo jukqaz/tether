@@ -94,7 +94,7 @@ struct HoldModule: View {
 
     /// "until 21:02", plus who armed it when it wasn't this panel.
     private func untilLine(_ until: Date) -> String {
-        let time = until.formatted(date: .omitted, time: .shortened)
+        let time = Texts.time(until)
         return [L("until \(time)", "\(time)까지"), model.holdSourceText].compactMap { $0 }.joined(separator: " · ")
     }
 

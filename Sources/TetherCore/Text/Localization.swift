@@ -31,6 +31,15 @@ public enum Localization {
     /// Tests pin this; the app sets it when the choice changes.
     nonisolated(unsafe) public static var current: Language = savedChoice.language
 
+    /// The user's locale, with its region, clock and other preferences, in Tether's language: dates
+    /// and times read "Sep 26, 05:32" in English even on a Mac set to Korean, and the other way
+    /// round.
+    public static var locale: Locale {
+        var components = Locale.Components(locale: .autoupdatingCurrent)
+        components.languageComponents = Locale.Language.Components(identifier: current == .korean ? "ko" : "en")
+        return Locale(components: components)
+    }
+
     /// The choice saved by the app. The `tether` command reads the app's preferences, so it
     /// speaks the same language.
     public static var savedChoice: LanguageChoice {

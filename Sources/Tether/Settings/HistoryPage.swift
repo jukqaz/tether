@@ -203,7 +203,7 @@ struct SleepRow: View {
     }
 
     static func when(_ t: Double) -> String {
-        Date(timeIntervalSince1970: t).formatted(.dateTime.month(.abbreviated).day().hour().minute())
+        Texts.dateTime(Date(timeIntervalSince1970: t))
     }
 }
 

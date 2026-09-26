@@ -56,3 +56,18 @@ final class StatusTests: XCTestCase {
         XCTAssertEqual(decoded, status)
     }
 }
+
+final class DateTextTests: XCTestCase {
+    private let saved = Localization.current
+    override func tearDown() { Localization.current = saved }
+
+    /// Dates follow Tether's language, not the Mac's, so English never shows "9월".
+    func testDatesFollowTheAppLanguage() {
+        let date = Date(timeIntervalSince1970: 1_790_395_200)  // late September 2026
+        Localization.current = .english
+        XCTAssertTrue(Texts.dateTime(date).contains("Sep"), Texts.dateTime(date))
+        Localization.current = .korean
+        XCTAssertTrue(Texts.dateTime(date).contains("9월"), Texts.dateTime(date))
+        XCTAssertFalse(Texts.time(date).isEmpty)
+    }
+}
