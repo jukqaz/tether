@@ -67,3 +67,7 @@
 .app-picker-list{display:grid;gap:5px}.app-picker-list button{display:flex;gap:10px;align-items:center;background:transparent;border:1px solid var(--line);border-radius:7px;padding:11px 12px;text-align:left;font-size:12px}.app-picker-list button>span{flex:1}.app-picker-list button>svg{color:var(--accent)}.app-picker-list button:hover{background:var(--control)}
 .permission-state{color:var(--muted)}.setting-link{overflow-wrap:anywhere}.menu-footer:has(.footer-spacer:only-child){display:none}
 @media(max-width:560px){.fixture-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.condition-card{padding:10px}.weekday-picker{gap:4px}.settings-inline-status{flex-wrap:wrap}.settings-inline-status>div{flex-basis:100%}.time-range{gap:7px}.mock-app select{min-height:28px}.settings-content #app-language{max-width:190px}}
+
+/* Descriptions derive from the same state as their actions. */
+.condition-status{margin:9px 0 0;padding-top:8px;border-top:1px solid var(--line-soft);font-size:11px;line-height:1.5;color:var(--muted)}
+.setting-note{overflow-wrap:anywhere}.settings-inline-status>div>strong{display:block;font-size:12px;line-height:1.5}.settings-inline-status>.app-button{flex-shrink:0}.state-description{overflow-wrap:anywhere}.switch:has(input:disabled){opacity:.5;cursor:not-allowed}
