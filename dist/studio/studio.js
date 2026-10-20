@@ -1,0 +1,436 @@
+(() => {
+  'use strict';
+  const copy = {
+    tetherOff:['Tether 유지 꺼짐','Tether keep-awake off'],resumeAutomatic:['자동 시작 재개','Resume automatic starts'],closedAllowed:['덮개 유지 허용','Closed-lid work allowed'],closedNotAllowed:['덮개 유지 안 함','Closed-lid work off'],displayOn:['화면 켜짐 유지','Display kept awake'],displayAuto:['화면 자동','Display automatic'],optionsSummaryLabel:['설정된 덮개·화면 옵션','Configured lid and display options'],reviewProtection:['보호 설정 확인…','Review protection settings…'],lockGuidance:['화면 잠금 안내','About screen locking'],endingGuide:['종료 동작 안내','Guide to ending work'],guideOnly:['안내','Guide'],timerEndGuide:['수동 타이머만 끝냅니다. 켜 둔 자동 조건은 계속 적용됩니다.','Ends only the manual timer. Enabled automatic rules continue.'],stopAllGuide:['수동을 끝내고 자동 시작을 멈춥니다. 자동 재개는 타이머를 복원하지 않습니다.','Ends manual work and pauses automatic starts. Resuming never restores an ended timer.'],quitGuide:['자체 요청을 해제하고 종료합니다. 다음 실행에 타이머를 복원하지 않습니다.','Releases Tether’s requests before quitting. Timers do not return on relaunch.'],automaticCoreHint:['전원 연결 중 선택한 조건과 보호 기준을 충족하면 시작합니다. 전원을 빼면 모두 끝냅니다.','Starts on AC when the selected conditions and protection checks allow it. Unplugging ends all Tether work.'],notifyEndShort:['종료','Timer end'],notifyWarningShort:['만료 예고','Warning'],notifyProtectionShort:['보호','Protection'],notificationsOff:['모두 꺼짐','All off'],notificationsOn:[' 켬',' on'],manualCheck:['직접 확인','Manual checks'],automaticCheck:['자동 확인','Automatic checks'],asNeeded:['필요할 때 확인','Review when needed'],previewChecks:['시안 검사','Preview checks'],previewHelper:['덮개 도우미 예시','Sample closed-lid helper'],example:['예시','Example'],
+    boardTitle:['핵심 기능 시안','Core feature study'],edition:['DESIGN STUDY · 20 OCT 2026','DESIGN STUDY · 20 OCT 2026'],eyebrow:['LESS NOISE. MORE CONTROL.','LESS NOISE. MORE CONTROL.'],studyTitle:['필요한 순간에, 깨어 있도록.','Awake when you need it.'],studyDescription:['현재 상태는 메뉴바에서. 동작 방식은 세 개의 설정에서.','The current state in your menu bar. The details in three simple tabs.'],prototypeNote:['직접 조작할 수 있는 브라우저 시안입니다. 실제 Mac의 전원·설정은 바뀌지 않습니다.','An interactive browser prototype. It does not change your Mac’s power or settings.'],appearance:['화면','Appearance'],dark:['어둡게','Dark'],light:['밝게','Light'],language:['언어','Language'],scenario:['상태','State'],menuCaption:['01 / 메뉴바','01 / MENU BAR'],settingsCaption:['02 / 설정','02 / SETTINGS'],inspectDetails:['세부 화면 확인','INSPECT DETAILS'],expandAll:['모두 펼치기','Expand all'],collapseAll:['접기','Collapse'],scrollTop:['처음으로','Top'],scrollEnd:['끝으로','Bottom'],noteTitle1:['상태에 필요한 정보만','Only what the state needs'],noteBody1:['남은 시간과 조작은 가까이, 중복 목록은 생략했습니다.','Time and actions stay together; repeated single-item lists are removed.'],noteTitle2:['옵션과 실행을 구분','Options are distinct from actions'],noteBody2:['덮개·화면 옵션은 시작 조작과 분리해 보여줍니다.','Lid and display options stay separate from starting a session.'],noteTitle3:['안내와 진단은 한곳에','Guidance and diagnostics, grouped'],noteBody3:['긴 안내는 접고, 연관된 기록·보고서는 모았습니다.','Long guidance stays collapsed; related records and reports stay together.'],overviewEyebrow:['THE COMPLETE PICTURE','THE COMPLETE PICTURE'],allScreens:['설정 세 화면을 한눈에','All three settings pages'],showOverview:['전체 화면 펼치기','Show all screens'],hideOverview:['전체 화면 접기','Hide overview'],previousCaptures:['참고 · 변경 전 정적 캡처 11장','Reference · 11 previous static captures'],previousNote:['이전 소스의 모의 렌더입니다. 실제 설치 상태나 현재 시안의 동작을 보여 주는 자료는 아닙니다.','Simulated renders from the previous source. They are not evidence of an installed app or this prototype’s behavior.'],footerNote:['핵심 기능에 집중한 디자인 제안 · 앱 미적용','A focused design proposal · Not applied to the app'],backTop:['맨 위로 ↑','Back to top ↑'],
+    idle:['대기','Idle'],automatic:['AC 자동','AC automatic'],manual:['수동 타이머','Manual timer'],protected:['보호 정지','Protection stop'],conflict:['다른 앱 영향','Other app requests'],onPower:['전원 연결','On power'],onBattery:['배터리','On battery'],simulateUnplug:['전원 분리해 보기','Try unplugging'],simulateConnect:['전원 연결해 보기','Try connecting power'],keep:['잠자기 방지','Keep awake'],auto:['자동 시작','Automatic start'],app:['앱 설정','App settings'],keeping:['잠자기 방지 중','Keeping your Mac awake'],off:['유지 꺼짐','Keep-awake off'],paused:['전체 일시 중지','All work paused'],protectedTitle:['기기 보호로 중지','Stopped for protection'],automaticDescription:['전원 연결 조건으로 유지 중','Keeping awake while connected to power'],manualDescription:['직접 시작한 타이머','Manually started timer'],bothDescription:['자동 시작 · 직접 시작한 타이머','Automatic start · Manual timer'],idleDescription:['필요할 때 직접 시작할 수 있어요','Start manually whenever you need it'],batteryDescription:['배터리에서는 직접 시작하세요','Start manually on battery'],pausedDescription:['다시 시작해도 끝난 타이머는 돌아오지 않아요','Resuming does not restore an ended timer'],protectedDescription:['열 상태가 높아 모든 유지를 끝냈어요','All work ended because thermal pressure is high'],conditionWaiting:['앱 실행 조건을 기다리고 있어요','Waiting for the selected app to run'],externalDescription:['다른 앱의 유지 요청이 남아 있어요','Other apps still have keep-awake requests'],duration:['유지 시간','Duration'],min30:['30분','30 min'],hour1:['1시간','1 hour'],hour2:['2시간','2 hours'],unlimited:['무제한 · 전원 연결','Unlimited · AC'],start:['직접 시작','Start manually'],timeRemaining:['남은 시간','Time remaining'],endTimer:['타이머 끝내기','End timer'],endUnlimited:['수동 유지 끝내기','End manual work'],add30:['30분 추가','Add 30 min'],ends:['에 끝나요','Ends at'],unlimitedTitle:['시간 제한 없음','No time limit'],autoContinues:['타이머를 끝내도 자동 유지는 계속됩니다.','Automatic work continues after the timer ends.'],manualEnds:['끝내면 잠자기 방지가 꺼집니다.','Ending this session turns keep-awake off.'],unplugNote:['전원 분리 시 Tether 유지 모두 종료','Unplugging ends all Tether work'],allowAutomatic:['자동 시작 허용','Allow automatic start'],activeWork:['유지 중인 작업','Active work'],stopAll:['모두 중지','Stop all'],resume:['작업 재개','Resume work'],settings:['설정…','Settings…'],more:['다른 동작','More actions'],manualTag:['직접 시작','Manual'],autoTag:['자동','Automatic'],acRule:['전원 연결','Power connected'],batteryCap:['배터리 최대 2시간','Up to 2 hours on battery'],protectionAction:['보호 해제 예시','Clear simulated protection'],protectionActionNote:['예시 열 상태를 정상으로 바꿉니다.','Sets the simulated thermal state to normal.'],reviewInfluences:['다른 앱 요청 2개 · 확인…','2 other app requests · Review…'],
+    whatKeep:['잠들지 않게 할 항목','What to keep awake'],configureAutomatic:['자동 시작에서 설정…','Configure in Automatic start…'],closedLid:['덮개를 닫아도 계속','Continue with the lid closed'],displayAwake:['작업 중 화면 끄지 않기','Keep the display awake during work'],displayHint:['화면·덮개 선택만으로 새 유지를 시작하지 않습니다.','Display and lid options do not start work by themselves.'],lockHint:['모든 잠금을 막지는 않습니다. 암호 요구는 macOS 설정을 따릅니다.','This does not prevent every lock. Password requirements follow macOS settings.'],lockSettings:['macOS 잠금 화면 설정…','macOS Lock Screen settings…'],powerDuration:['전원과 사용 시간','Power and duration'],whenUnplugged:['전원을 뺐을 때','When power is unplugged'],endEvery:['잠자기 방지 모두 끝내기','End all Tether work'],ifLidClosed:['덮개가 닫혀 있으면','If the lid is closed'],requestSleep:['잠자기 요청','Request sleep'],leaveOS:['macOS에 맡김','Let macOS decide'],sleepNote:['요청이 성공해도 다른 앱이나 macOS가 잠자기를 막을 수 있습니다.','Other apps or macOS may prevent sleep even after a request.'],osNote:['Tether의 유지 요청만 끝내고, 실제 잠자기는 macOS가 결정합니다.','Only Tether’s requests end; macOS decides whether to sleep.'],maximumBattery:['배터리에서 최대','Maximum on battery'],batteryHint:['전원 분리 후 승계하지 않습니다. 배터리 유지는 메뉴에서 직접 시작하세요.','No timer carries over after unplugging. Start battery work manually.'],protection:['기기 보호','Device protection'],protectionSummary:['열 상태 · 잔량 20%','Thermal state · 20% reserve'],thermalProtection:['열 보호','Thermal protection'],alwaysOn:['항상 켬','Always on'],thermalState:['현재 열 상태','Current thermal state'],normal:['정상','Normal'],high:['높음','High'],batteryThreshold:['배터리가 이보다 낮으면 끝내기','Stop below battery level'],thermalHint:['macOS 열 상태가 심각·위험이면 전원과 관계없이 모두 끝냅니다.','Serious or critical macOS thermal pressure ends all work on every power source.'],restartHint:['보호가 해제돼도 직접 다시 시작해야 합니다.','Start again explicitly after protection clears.'],afterWork:['끝내기와 다시 시작','Ending and resuming'],afterWorkSummary:['끝난 타이머는 복원하지 않음','Ended timers never restart'],manualEndHint:['타이머만 끝내면 켜 둔 자동 조건은 계속 적용됩니다.','Ending only the timer leaves enabled automatic rules running.'],stopAllHint:['모두 중지는 수동 유지를 끝내고 자동 시작을 멈춥니다.','Stop all ends manual work and pauses automatic starts.'],reconnectHint:['다시 연결해도 끝난 타이머를 되살리지 않습니다.','Reconnecting never restores an ended timer.'],lowPower:['저전력 모드가 되면 멈추기','Stop in Low Power Mode'],
+    startWhen:['자동으로 시작할 조건','Start automatically when'],automaticHint:['전원과 보호 조건을 충족할 때 자동으로 시작합니다.','Automatic work starts when power and protection conditions allow it.'],automaticOffHint:['자동 시작을 꺼도 수동 유지는 사용할 수 있습니다.','Manual work remains available while automatic start is off.'],automaticOn:['자동 시작 켬','Automatic start on'],automaticOff:['자동 시작 꺼짐','Automatic start off'],ruleDescription:['연결하면 시작하고, 분리하면 끝냅니다.','Start when connected. End when unplugged.'],ruleAppDescription:['전원 연결 중 선택한 앱이 실행되면 시작합니다.','Start while on power when the selected app is running.'],extraConditions:['추가 시작 조건','Additional start conditions'],onlyAC:['전원 연결 중에만','Only while on power'],appCondition:['선택한 앱이 실행 중일 때','When a selected app is running'],selectedApp:['선택한 앱','Selected app'],appRunning:['예시 앱 실행 중','Simulated app is running'],noAdditional:['추가 조건 없음','No additional conditions'],triggerHint:['앱 조건을 추가해도 전원 연결은 항상 필요합니다.','AC is always required, including with an app condition.'],automaticBehavior:['자동 시작 동작 방식','How automatic work runs'],autoLidHint:['덮개를 닫는 것만으로 시작하지 않습니다. 덮개 유지는 별도로 허용하세요.','Closing the lid does not start work. Allow closed-lid work separately.'],missingHint:['조건이나 권한을 확인하지 못하면 자동으로 시작하지 않습니다.','Automatic work does not start when required conditions or permissions are unknown.'],displayLidSettings:['화면·덮개 설정…','Display and closed-lid settings…'],
+    startupDisplay:['시작과 표시','Startup and display'],launchLogin:['로그인 시 시작','Launch at login'],closedHelper:['덮개 유지 도우미','Closed-lid helper'],ready:['사용 준비됨','Ready'],helperHint:['MacBook의 덮개 유지에 사용하는 도우미입니다.','The helper used for closed-lid work on MacBooks.'],notifications:['알림','Notifications'],notificationSummary:['종료 · 만료 예고','Timer end · Expiry warning'],notifyEnd:['수동 유지 종료 알림','Manual timer end notification'],notifyWarning:['만료 5분 전 예고','Warn 5 minutes before expiry'],expiryHint:['연장할 수 있을 때만 알림에 연장 조작을 제공합니다.','An extension action appears only when an extension is allowed.'],protectNotify:['기기 보호 알림','Device protection alerts'],notifyProtection:['과열·배터리 부족','Thermal pressure and low battery'],protectionNotifyHint:['알림을 꺼도 보호는 계속 동작합니다.','Protection remains active when notifications are off.'],updates:['업데이트','Updates'],currentVersion:['현재 버전','Current version'],autoUpdate:['업데이트 자동 확인','Check for updates automatically'],checkUpdates:['업데이트 확인','Check for updates'],updateHint:['설치 전 진행 중인 유지가 끝날 수 있음을 확인합니다.','Review active work before installing an update.'],diagnostics:['진단과 문제 확인','Diagnostics and troubleshooting'],influences:['다른 앱의 절전 영향','Other apps’ sleep requests'],review:['확인…','Review…'],problemRecords:['문제 재현 기록','Problem recording'],recordingOff:['기록하지 않는 중','Not recording'],recordingOn:['기록 중 · 15분 후 종료','Recording · Ends in 15 min'],startRecording:['기록 시작','Start recording'],stopRecording:['기록 끝내기','End recording'],recordHint:['문제 재현 전에 시작하세요. 기록은 이 Mac에만 남습니다.','Start before reproducing a problem. Records stay on this Mac.'],problemReport:['문제 보고서','Problem report'],saveReport:['보고서 저장…','Save report…'],reportHint:['개인 이름과 요청 원문을 제외한 예시 보고서를 만듭니다.','Creates a sample report without personal names or request payloads.'],recentActivity:['최근 동작','Recent activity'],activity1:['수동 유지 종료 · 시간 만료','Manual work ended · Timer expired'],activity2:['전원 연결 · 자동 유지 시작','Power connected · Automatic work started'],quit:['앱 종료 시','When Tether quits'],quitNote:['자체 요청을 해제하고 종료합니다. 다음 실행에 타이머를 복원하지 않습니다.','Tether releases its requests before quitting. Timers do not return on relaunch.'],previewOnly:['시안의 동작입니다. Mac 설정은 바뀌지 않았습니다.','Prototype interaction only. Your Mac settings did not change.'],timerLimit:['배터리 유지 상한은 2시간입니다.','Battery work is limited to 2 hours.'],protectionToast:['보호 정지 중입니다. 상태 선택에서 정상 예시로 바꿔 주세요.','Protection is active. Choose a normal example in the state selector.'],diagnosticsTitle:['앱·시스템 절전 영향','App and system sleep influences'],exampleRequests:['아래 항목은 디자인 확인을 위한 예시 요청입니다.','These requests are simulated examples for the design study.'],influenceWarning:['다른 앱의 요청은 Tether가 끄지 않습니다.','Tether does not cancel other apps’ requests.'],requestNotProof:['요청이 있다는 사실만으로 실제 잠자기 실패의 원인을 단정하지 않습니다.','A request alone does not establish the cause of an actual sleep failure.'],screenConflict:['화면 꺼짐과 충돌 가능','May oppose display sleep'],idleSleepRequest:['유휴 잠자기 방지','Prevents idle system sleep'],technicalDetails:['기술 정보','Technical details'],adjustHint:['해당 앱의 화면 유지·세션 옵션을 직접 확인하세요.','Review the keep-awake and session options in that app.'],close:['닫기','Close'],justNow:['방금 확인 · 모의 관측값','Checked now · Simulated observations'],updateToast:['시안에서는 업데이트를 조회하거나 설치하지 않습니다.','This prototype does not check or install updates.'],recordToast:['예시 기록을 시작했습니다. 실제 시스템 로그는 수집하지 않습니다.','Sample recording started. No system logs are collected.'],sampleReportToast:['예시 보고서를 내려받았습니다. 실제 Mac 정보는 포함하지 않습니다.','Downloaded a sample report. It contains no real Mac information.'],overviewNote:['각 화면의 구성 미리 보기입니다. “크게 보기”로 위의 실제 조작 화면을 전환하세요.','Layout previews. Choose “Open” to use a page in the interactive view above.'],openLarge:['크게 보기','Open'],expanded:['상세 펼침','Details expanded'],base:['기본 화면','Default view']
+  };
+  Object.assign(copy, {
+    general:['일반','General'], protectionPage:['기기 보호','Protection'], alerts:['알림','Notifications'], diagnosticPage:['진단','Diagnostics'],
+    studyDescription:['메뉴바는 간결하게. 자세한 선택은 여섯 개의 설정에서.','A compact menu bar. Six focused settings pages.'],
+    allScreens:['설정 메뉴를 한눈에','All settings at a glance'],
+    noteTitle1:['메뉴바에는 지금 할 일만','Only the immediate actions'],noteBody1:['상태, 시간, 시작과 끝내기. 자동 시작은 설정으로 옮겼습니다.','State, time, start and stop. Automatic start lives in Settings.'],
+    noteTitle2:['여섯 메뉴로 명확하게','Six focused categories'],noteBody2:['설정은 기능별로 나누고, 조절할 수 있는 옵션을 먼저 보여줍니다.','Settings are grouped by purpose, with editable options first.'],
+    noteTitle3:['중복을 줄이고 기능은 보존','Less repetition, same useful controls'],noteBody3:['연장·알림·보호·진단은 유지하고 반복 요약과 예시 이력은 뺐습니다.','Extension, alerts, protection and diagnostics stay. Repeated summaries and sample history are removed.'],
+    compactStart:['시작','Start'], compactEnd:['끝내기','End timer'], compactExtend:['+30분','+30 min'], compactKeeping:['잠자기 방지 중','Keeping awake'],
+    compactAutomatic:['전원 연결 · 분리하면 종료','On power · Ends when unplugged'], compactBoth:['자동 유지 + 타이머','Automatic + timer'],
+    autoPausedTitle:['자동 시작 일시 중지','Automatic starts paused'], autoPausedHint:['전체 중지로 자동 시작을 멈췄습니다. 다시 허용해도 끝난 타이머는 복원하지 않습니다.','Stop all paused automatic starts. Resuming will not restore an ended timer.'],
+    pausedMenuHint:['수동 시작 가능 · 자동 재개는 설정에서','Manual start available · Resume automatic in Settings'],
+    notifyTiming:['타이머 알림','Timer notifications'], safetyAlerts:['보호 알림','Protection alerts'],
+    thermalGroup:['열 상태 보호','Thermal protection'], batteryGroup:['배터리 보호','Battery protection'],
+    diagnosticsHelp:['유지가 끝났는데 잠들지 않거나, 덮개 유지가 동작하지 않을 때 확인하세요.','Check here if your Mac stays awake after work ends, or closed-lid work does not start.']
+  });
+
+  Object.assign(copy, {
+    compactEnd:['타이머 종료','End timer'], autoPausedTitle:['전체 일시 중지','All work paused'], autoPausedHint:['자동·수동 시작을 모두 멈췄습니다. 재개해도 끝난 타이머는 돌아오지 않습니다.','Automatic and manual starts are paused. Resuming never restores an ended timer.'],pausedMenuHint:['설정에서 재개한 뒤 시작하세요','Resume in Settings before starting'],resumeAutomatic:['작업 재개','Resume work'],stopAllGuide:['자동·수동 시작을 모두 멈춥니다. 설정의 작업 재개 후 다시 시작할 수 있습니다.','Pauses automatic and manual starts. Resume in Settings before starting again.'], lowPower:['배터리 저전력 모드에서 중지','Stop on battery in Low Power Mode'],launchLogin:['로그인 시 Tether 실행','Launch Tether at login'],
+    addCondition:['조건 추가…','Add a condition…'],allConditions:['추가한 조건을 모두 만족할 때 시작','Start when all added conditions match'],conditionWaiting:['추가한 조건을 기다리는 중','Waiting for the added conditions'],conditionNone:['전원 연결만으로 시작합니다. 필요할 때 조건을 추가하세요.','Power connected is enough. Add conditions only if you need them.'],remove:['제거','Remove'], appKind:['앱 실행','App running'],displayKind:['외장 화면 연결','External display'],scheduleKind:['요일과 시간','Days and time'],chooseApp:['앱 선택…','Choose app…'],chooseAppTitle:['실행할 앱 선택','Choose an app'],mockAppNote:['시안용 앱 목록입니다. 실제 설치된 앱을 조회하지 않습니다.','Example apps only. This prototype does not scan installed apps.'],selectedDisplay:['선택한 외장 화면','Selected external display'],everyDay:['매일','Every day'],weekdays:['요일','Days'],from:['시작','From'],to:['종료','Until'],scheduleHelp:['종료 시각이 더 이르면 다음 날까지. 같은 시각은 24시간, 요일을 모두 해제하면 매일 적용합니다.','An earlier end crosses midnight. Equal times mean 24 hours; no selected days means every day.'],conditionGuide:['조건이 바뀌면','When conditions change'],conditionGuideText:['조건이 풀리면 자동 유지만 끝납니다. 수동 타이머는 계속되며, 전원을 빼면 둘 다 끝납니다.','An unmet condition ends only automatic work. Manual timers continue; unplugging ends both.'],
+    permission:['macOS 알림 허용','macOS notification permission'],allowed:['허용됨','Allowed'],denied:['차단됨','Blocked'],notDetermined:['아직 요청하지 않음','Not requested'],permissionHint:['앱의 알림 선택은 저장되지만, macOS에서 허용해야 전달됩니다.','Your choices are saved, but macOS must allow notifications for delivery.'],requestPermission:['알림 허용 요청','Request permission'],openNotificationSettings:['알림 설정 열기…','Open notification settings…'],systemLanguage:['시스템 설정 따르기','Follow system language'],helperMissing:['설치 필요','Installation needed'],helperApproval:['승인 대기','Awaiting approval'],helperDisconnected:['연결 확인 필요','Check connection'],helperAction:['도우미 설정…','Set up helper…'],helperUnavailable:['덮개 유지를 사용하려면 도우미 준비가 필요합니다. 일반 잠자기 방지는 사용할 수 있습니다.','The helper must be ready for closed-lid work. Ordinary keep-awake remains available.'],desktopNote:['데스크탑 Mac에는 덮개 옵션과 도우미가 필요하지 않습니다.','Desktop Macs do not need lid options or a closed-lid helper.'],device:['기기 예시','Sample device'],helperState:['도우미 예시','Sample helper'],thermalRecovered:['보호 원인은 해소됨 · 재개 필요','Protection cleared · Resume required'],restartHint:['원인이 해소된 뒤 작업 재개를 누르세요. 배터리는 기준보다 5% 이상 여유가 필요합니다.','Resume after the cause clears. Battery level must be at least 5% above the threshold.'],
+    extensionCap:['배터리에서 시작한 시각부터 최대 2시간','Up to 2 hours from the original battery start'],extensionCapNote:['전원을 연결해도 이 타이머의 2시간 상한은 유지됩니다.','Connecting power does not remove this timer’s original 2-hour limit.'],cannotExtend:['지금은 30분을 더할 수 없습니다.','30 minutes cannot be added now.'],resumeBlocked:['보호 원인이 남아 있어 재개할 수 없습니다.','Work cannot resume while protection is active.'],resumeFirst:['먼저 설정에서 작업을 재개하세요.','Resume work in Settings first.'],sampleNow:['예시 현재 시각','Sample current time'],sampleDisplay:['선택한 외장 화면 연결됨','Selected display connected'],sampleBattery:['예시 배터리 잔량','Sample battery level'],sampleLowPower:['예시 저전력 모드','Sample Low Power Mode'],sampleStates:['예외 상태 확인','Inspect exception states'],fixedProtection:['열 보호는 항상 적용됩니다.','Thermal protection is always applied.'],batteryFloorHelp:['20% 아래로 낮출 수 없습니다. 선택한 잔량 미만에서 배터리 유지를 끝냅니다.','The floor cannot be set below 20%. Battery work ends below the chosen level.'],
+    protectedDescription:['기기 보호로 모든 유지를 끝냈어요','All work ended for device protection'],thermalCause:['열 상태가 높아 중지했어요','Stopped because thermal pressure is high'],noAutoChange:['재개는 자동 시작 설정을 바꾸지 않습니다.','Resuming does not change the automatic-start setting.'],appConfigured:['조건에 적용할 앱','App used for this condition'],scheduleSummary:['선택한 요일과 시간에만','Only on selected days and times']
+  });
+  Object.assign(copy, {
+    cannotStart:['지금은 시작할 수 없음','Cannot start yet'],readyToResume:['다시 시작할 수 있음','Ready to resume'],
+    batteryThreshold:['이 잔량 이하에서 끝내기','Stop at or below battery level'],batteryFloorHelp:['선택한 잔량 이하에서 배터리 유지를 끝냅니다. 최저 기준은 20%입니다.','Battery work ends at or below this level. The minimum is 20%.'],
+    lowBatteryReason:['배터리 {level}% · 중지 기준 {floor}% 이하','Battery {level}% · At or below the {floor}% limit'],lowPowerReason:['배터리 저전력 모드 · 중지 옵션 적용 중','On battery in Low Power Mode · Stop option applies'],thermalReason:['열 상태 높음 · 정상으로 돌아오면 재개 가능','High thermal pressure · Wait for normal temperature'],
+    recoveryBattery:['배터리 {level}% · {resume}%부터 재개 가능','Battery {level}% · Resume at {resume}% or higher'],recoveryDone:['보호 원인 해소 · 설정에서 작업 재개','Protection cleared · Resume work in Settings'],
+    resumeResult:['재개하면 {next} 끝난 타이머는 복원하지 않습니다.','After resuming, {next} Ended timers are not restored.'],resumeAuto:['자동 조건을 다시 적용합니다.','automatic conditions apply again.'],resumeManual:['필요할 때 수동으로 시작할 수 있습니다.','you can start manual work when needed.'],
+    autoOffState:['자동 시작이 꺼져 있습니다.','Automatic start is off.'],autoBatteryState:['자동 시작은 전원 연결 대기 중','Automatic start waits for power'],autoPausedState:['전체 중지 중 · 설정은 저장되어 있습니다.','All work is paused · Your settings are saved.'],autoWorkingState:['전원과 조건을 충족해 자동 유지 중입니다.','Automatic work is active: power and conditions match.'],
+    waitingFor:['대기: {reasons}','Waiting: {reasons}'],waitApp:['{app} 실행','{app} to run'],waitDisplay:['{display} 연결','{display} connection'],waitSchedule:['설정한 요일·시간','the scheduled days and time'],invalidSchedule:['시작·종료 시각을 모두 입력하세요.','Enter both start and end times.'],conditionMatched:['조건 충족','Condition matched'],conditionUnmatched:['조건 대기','Condition not matched'],conditionSaved:['자동 시작을 켜면 적용','Applies when automatic start is on'],everyDayHint:['요일 선택 없음 · 매일 적용','No days selected · Every day'],
+    effectNow:['현재 적용: {effects}','Applied now: {effects}'],effectNext:['유지 시작 후 적용: {effects}','Applies after starting: {effects}'],lidEffectOn:['덮개 유지 허용','closed-lid work allowed'],lidEffectOff:['덮개는 macOS 설정 따름','lid behavior follows macOS'],displayEffectOn:['화면 켜짐 유지','display kept awake'],displayEffectOff:['화면은 macOS 설정 따름','display follows macOS'],helperEffect:['덮개 유지 준비 필요','closed-lid helper not ready'],helperStartHint:['덮개 옵션을 사용하려면 도우미부터 준비하세요.','Set up the helper before starting with the lid option.'],helperChosenHint:['덮개 선택은 저장되어 있지만 도우미 준비 전에는 적용되지 않습니다.','Your lid preference is saved but cannot apply until the helper is ready.'],
+    helperAutoActive:['일반 유지 중 · 덮개 도우미 준비 필요','Keeping awake · Lid helper needed'],lowPowerOnAC:['전원 연결 중에는 이 옵션으로 멈추지 않습니다.','This option does not stop work while connected to power.'],lowPowerEnabled:['배터리에서 저전력 모드가 켜지면 수동 유지를 끝냅니다.','On battery, Low Power Mode ends manual work.'],lowPowerDisabled:['저전력 모드만으로는 수동 유지를 끝내지 않습니다.','Low Power Mode alone does not end manual work.'],
+    notificationsNone:['선택한 알림이 없습니다.','No notifications selected.'],notificationsReady:['선택한 알림을 받을 수 있습니다.','Selected notifications can be delivered.'],expiryWarningOn:['유한 타이머가 끝나기 5분 전에 예고합니다.','Warns 5 minutes before a timed session ends.'],expiryWarningOff:['만료 전 예고는 꺼져 있습니다.','Expiry warning is off.'],unlimitedNoWarning:['현재 무제한 유지에는 만료 예고가 없습니다.','The current unlimited session has no expiry warning.'],extensionAtCap:['2시간 상한까지 남은 연장 여유가 30분 미만입니다.','Less than 30 minutes remains before this timer’s 2-hour limit.'],extensionGuide:['유한 타이머에 30분을 더합니다. 배터리에서 시작한 타이머는 처음 시작부터 최대 2시간입니다.','Adds 30 minutes to a timed session. Timers started on battery keep their 2-hour limit from the original start.'],extensionCurrent:['현재 타이머 종료 시각에 30분을 더합니다.','Adds 30 minutes to the current timer’s end time.'],extensionUnlimited:['무제한 유지에는 시간 연장이 필요하지 않습니다.','Unlimited work does not need a time extension.'],extensionSimple:['유한 타이머 종료 시각에 30분을 더합니다.','Adds 30 minutes to a timed session’s end time.'],manualOnly:['수동 유지 중 · 자동 유지 없음','Manual work · No automatic work active'],manualActiveHint:['수동 타이머는 별도로 계속됩니다.','The manual timer continues independently.'],batteryNow:['현재 배터리 {level}% · 중지 기준 {floor}%','Battery now {level}% · Stop limit {floor}%'],acBatteryRule:['배터리로 직접 시작할 때 적용됩니다.','Applies to work started manually on battery.'],idleStatus:['현재 유지 없음 · 메뉴에서 시작하세요.','No work active · Start from the menu.'],recordingSample:['기록 동작 예시 · 실제 수집 없음','Sample recording · No data collected']
+  });
+
+  Object.assign(copy,{
+    boardTitle:['추천 조합 시안','Recommended combination'],
+    studyTitle:['작업은 메뉴에서. 설정은 간결하게.','Your work, in the menu.'],
+    studyDescription:['Keepresso의 바로 조작하기, Amphetamine의 세션 구분, 짧은 시간 선택을 하나로.','Direct controls, clear sessions, and three useful durations.'],
+    keep:['유지','Keep awake'],protectionPage:['보호·알림','Protection'],general:['앱','App'],
+    closedLid:['덮개 닫아도 유지','Keep awake with lid closed'],displayAwake:['화면 켜두기','Keep display awake'],
+    allScreens:['설정 네 탭 한눈에','All four settings tabs'],showOverview:['네 탭 펼쳐 보기','Show four tabs'],
+    noteTitle1:['기본 조작은 메뉴에서','Everyday controls in the menu'],
+    noteBody1:['시작·종료·연장·중지·재개, 덮개·화면 토글까지.','Start, end, extend, pause, resume, lid and display controls.'],
+    noteTitle2:['설정은 같은 값, 설명은 한곳에','Shared values, less repetition'],
+    noteBody2:['메뉴의 토글과 설정을 연결하고 긴 설명은 접었습니다.','Menu toggles and settings stay in sync. Longer help stays collapsed.'],
+    noteTitle3:['중지 이유에 맞는 다음 조작','The right next action'],
+    noteBody3:['보호 중에는 재개를 막고, 원인이 사라지면 메뉴에서 재개합니다.','Resume becomes available only after the protection cause clears.'],
+    compactStart:['시작','Start'],compactEnd:['타이머 종료','End timer'],compactExtend:['30분 추가','Add 30 min'],
+    resume:['다시 시작 허용','Allow starts again'], pausedMenuHint:['자동·수동 시작을 멈췄어요.','Automatic and manual starts are paused.'],
+    readyMenu:['재개할 수 있어요','Ready to resume'],
+    noTimerRestore:['끝난 타이머는 돌아오지 않아요.','Ended timers will not return.'],
+    chooseDuration:['직접 유지하기','Keep awake manually'],
+    shortUnlimited:['무제한','Unlimited'],
+    unplugTitle:['전원 분리로 종료','Ended after unplugging'],
+    unplugBody:['배터리에서는 직접 시작하세요.','Start a new timer on battery.'],
+    blockedResume:['보호 중 · 재개 불가','Protected · Cannot resume'],
+    optionsNext:['다음 시작부터 적용','Applies when work starts'],
+    optionHelper:['덮개 도우미 준비 필요','Closed-lid helper needed'],
+    tabStatusAuto:['자동 유지 중 · 전원 연결','Automatic · On power'],
+    tabStatusManual:['수동 타이머 동작 중','Manual timer running'],
+    tabStatusBoth:['자동 + 수동 유지 중','Automatic + Manual'],
+    tabStatusOff:['유지 꺼짐','Keep-awake off'],
+    galleryTitle:['상태가 바뀌면, 다음 조작도 바뀝니다.','Different states. Clear next steps.'],
+    galleryNote:['아래 화면은 고정된 예시입니다. ‘이 상태 보기’를 누르면 위 메뉴와 설정이 함께 바뀝니다.','These are fixed examples. Choose a state to update the interactive menu and settings above.'],
+    showState:['이 상태 보기','Inspect state'],
+    footerKeep:['메뉴 토글과 동일한 설정','Same values as the menu toggles'],
+    footerAuto:['수동 타이머는 자동 조건과 별개','Manual timers are independent of automatic rules'],
+    footerProtect:['보호 해제 뒤 메뉴에서 재개','Resume in the menu after protection clears'],
+    footerApp:['진단·업데이트 조작은 시안 예시','Diagnostics and updates are preview actions'],
+    noticeNext:['전원 분리로 종료됨 · 새 수동 시작 가능','Unplugged · A new manual timer is available']
+  });
+
+  Object.assign(copy, {
+    lidOnAC:['전원 연결 중','On power'],lidOnBattery:['배터리 사용 중','On battery'],carryLimitLabel:['승계 후 최대 시간','Maximum after unplugging'],
+    whenConnected:['전원을 연결하면','When power connects'],
+    connectValueOn:['자동 조건 확인 후 시작','Start when automatic rules match'],
+    connectValueOff:['자동 시작 안 함','Do not start automatically'],
+    editAutomatic:['조건 설정…','Edit rules…'],
+    connectHelp:['켜 둔 조건만 확인합니다. 종료한 타이머는 되살리지 않아요.','Only enabled rules are evaluated. Ended timers never return.'],
+    unplugPolicyLabel:['전원을 분리하면','When power disconnects'],
+    carryTimer:['남은 수동 타이머만 계속','Continue the manual timer'],
+    endAllShort:['모두 종료 · 기본값','End all work · Default'],
+    newProposal:['새 옵션 제안 · 앱 미적용','Proposed option · Not in the app'],
+    carryHelp:['자동·무제한 유지는 종료. 남은 수동 시간만 배터리 최대 2시간 안에서 계속합니다.','Automatic and unlimited work end. Only a finite manual timer continues, for up to 2 hours on battery.'],
+    endHelp:['자동·수동을 모두 끝냅니다. 배터리에서는 메뉴에서 새로 시작할 수 있어요.','Automatic and manual work end. Start a new timer from the menu on battery.'],
+    carryActive:['전원 분리 후 남은 수동 시간 유지 중','Remaining manual time continues on battery'],
+    closingLid:['덮개를 닫으면','When the lid closes'],
+    lidMode:['덮개 동작','Closed-lid behavior'],
+    lidKeepOption:['진행 중인 작업 유지','Continue active work'],
+    lidOSOption:['macOS 기본 동작','Use macOS behavior'],
+    lidKeepHelp:['이미 실행 중인 유지에만 적용합니다. 덮개를 닫는 것만으로 새 작업을 시작하지 않아요.','Applies only to active work. Closing the lid does not start a session.'],
+    lidOSHelp:['덮개를 닫으면 Tether 요청을 해제합니다. 외장 화면 등 조건에 따라 macOS가 깨어 있을 수 있어요.','Closing the lid releases Tether requests. macOS may stay awake, for example with an external display.'],
+    lidClosedHolding:['덮개 닫힘 · 작업 유지 중','Lid closed · Work continues'],
+    lidReleased:['덮개 닫힘 · Tether 유지 해제','Lid closed · Tether released'],
+    lidReleaseNote:['잠자기 여부는 macOS가 결정합니다. 열어도 끝난 타이머는 복원하지 않아요.','macOS decides whether to sleep. Opening the lid never restores an ended timer.'],
+    openLidBeforeStart:['덮개를 열거나 덮개 유지 옵션을 켜세요.','Open the lid or enable closed-lid work.'],
+    simulateClose:['덮개 닫기 예시','Try closing the lid'],simulateOpen:['덮개 열기 예시','Try opening the lid'],
+    closedDisplay:['닫힌 내장 화면에는 화면 켜두기가 적용되지 않아요.','Keep display awake does not light a closed built-in display.'],
+    sleepEndWhen:['분리로 모두 종료한 뒤, 덮개가 닫혀 있으면','After ending all on unplug, if the lid is closed'],
+    eventRules:['동작 우선순위','Behavior priority'],
+    eventRulesText:['열·잔량 보호와 모두 중지가 가장 우선합니다. 분리 시 계속을 골라도 자동 유지는 배터리에서 시작하지 않습니다.','Protection and Stop all take priority. Continuing a timer never enables automatic work on battery.'],
+    automaticCoreHint:['전원 연결 중 선택한 조건과 보호 기준을 충족하면 시작합니다.','Starts on AC when selected rules and protection checks allow it.'],
+    stopAllGuide:['수동을 끝내고 자동 시작을 멈춥니다. 메뉴의 다시 시작 허용으로 풀 수 있으며 타이머는 복원하지 않습니다.','Ends manual work and pauses automatic starts. Allow starts again in the menu; ended timers never return.'],
+    recoveryDone:['원인이 해소됐어요. 메뉴에서 다시 시작을 허용하세요.','The cause has cleared. Allow starts again in the menu.'],
+    resumeFirst:['메뉴에서 다시 시작을 먼저 허용하세요.','Allow starts again in the menu first.'],
+    studyDescription:['기본 조작은 메뉴에서 끝내고, 전원 연결·분리·덮개 동작은 따로 고르세요.','Everyday controls in the menu. Separate choices for power and lid events.'],
+    noteBody2:['전원 연결·분리·덮개 닫힘을 나누고 보호를 우선합니다.','Power and lid events have separate choices. Protection takes priority.'],
+    footerKeep:['분리 후 타이머 계속은 새 설계 제안','Continuing after unplug is a new design proposal'],
+    cannotStartBattery:['현재 조건에서는 시작할 수 없음','Cannot start in current conditions']
+  });
+
+  Object.assign(copy, {
+    conditionGuideText:['선택한 추가 조건을 모두 충족해야 자동으로 시작합니다. 조건이 풀려도 수동 타이머는 계속되며, 전원 분리는 유지 탭에서 고른 동작을 따릅니다.','Every extra rule must match. Losing a rule does not stop a manual timer; unplug behavior follows your Keep awake settings.'],lidRowKeep:['진행 중인 유지에만 적용','Applies to active work only'],lidRowOS:['유지 종료 · 잠자기는 macOS가 결정','Ends keep-awake; macOS decides sleep'],
+    resume:['중지 해제','Resume'],readyMenu:['다시 시작할 수 있어요','Ready to start again'],
+    blockedResume:['보호 중 · 시작 불가','Protected · Cannot start'],
+    footerProtect:['보호 원인이 사라지면 메뉴에서 중지 해제','Resume from the menu after protection clears'],
+    carryLimitLabel:['배터리로 계속할 시간','Time allowed on battery'],
+    closedLid:['덮개 닫아도 계속','Continue with lid closed'],
+    endEvery:['잠자기 방지 모두 종료','End all keep-awake work'],
+    lidReleased:['덮개 닫힘 · 유지 종료','Lid closed · Keep-awake ended'],
+    lidOSHelp:['덮개를 닫으면 Tether의 잠자기 방지를 끝냅니다. 실제 잠자기는 macOS가 결정해요.','Closing the lid ends Tether keep-awake. macOS decides whether to sleep.'],
+    footerKeep:['덮개 동작·전원 분리 후 계속은 새 설계 제안','Power-specific lid behavior and carry-over are new proposals'],
+    extensionAtCap:['정해 둔 한도까지 30분을 더할 여유가 없어요.','There is not enough room to add 30 minutes within the limit.'],
+    extensionCap:['배터리 시간 한도 안에서만 연장할 수 있어요.','Extensions must stay within the battery time limit.'],
+    extensionCapNote:['전원을 다시 연결해도 이 타이머의 배터리 시간 한도는 초기화하지 않습니다.','Reconnecting power does not reset this timer’s battery time limit.'],
+    acBatteryRule:['배터리로 작업을 유지하는 동안 적용됩니다.','Applies whenever work continues on battery.'],
+    batteryFloorHelp:['선택한 잔량 이하가 되면 배터리 유지를 종료합니다. 재개에는 5%의 여유가 필요해요.','Battery work ends at or below the limit. Resuming requires 5% above it.'],
+    expiryWarningOn:['시간을 정한 수동 유지가 끝나기 5분 전에 알려요.','Warns 5 minutes before a timed session ends.'],
+    carryNext:['다음 전원 분리부터 적용됩니다. 이미 끝난 타이머는 돌아오지 않아요.','Applies on the next unplug. Ended timers will not return.'],
+    carryFinite:['전원을 빼도 현재 타이머의 남은 시간만 계속합니다. 선택한 배터리 한도를 넘기지 않아요.','The current timer continues after unplugging, within its remaining time and the chosen battery limit.'],
+    carryUnlimited:['현재 무제한 유지는 전원을 빼면 종료됩니다. 시간 있는 타이머만 계속할 수 있어요.','Unlimited work ends on unplug. Only a timed session can continue.'],
+    carryAutoOnly:['자동 유지는 분리하면 종료됩니다. 직접 시작한 타이머가 있을 때만 계속할 수 있어요.','Automatic work ends on unplug. Only a manually started timer can continue.'],
+    carryClosedOff:['배터리 덮개 설정이 기본 동작이므로, 닫힌 채 분리하면 타이머도 종료됩니다.','Battery lid behavior is set to macOS, so unplugging with the lid closed ends the timer too.'],
+    savedWhileStopped:['중지를 해제한 뒤 선택한 조건을 적용합니다.','Saved rules apply after you resume.'],
+    lidCurrentAC:['현재 전원 연결 중에 적용','Applies now while on power'],lidCurrentBattery:['현재 배터리 사용 중에 적용','Applies now while on battery'],
+    sleepEndWhen:['전원 분리로 종료할 때 덮개가 닫혀 있으면','If the lid is closed when unplugging ends work'],
+    recoveryDone:['보호 원인이 사라졌어요. 메뉴에서 중지를 해제하세요.','The protection cause has cleared. Resume from the menu.'],
+    resumeFirst:['메뉴에서 중지를 먼저 해제하세요.','Resume from the menu first.'],
+    stopAllGuide:['수동 유지를 끝내고 자동 시작을 멈춥니다. 메뉴에서 중지를 해제해도 끝난 타이머는 돌아오지 않습니다.','Ends manual work and pauses automatic starts. Resuming from the menu never restores ended timers.']
+  });
+  Object.assign(copy, {
+    restartHint:['원인이 사라지면 메뉴에서 중지를 해제하세요. 배터리는 기준보다 5% 이상 여유가 필요합니다.','Resume from the menu after the cause clears. Battery level must be 5% above the stop limit.'],
+    thermalHint:['열 상태가 너무 높아지면 전원 종류와 관계없이 모든 유지를 종료합니다.','High thermal pressure ends all keep-awake work on either power source.'],
+    automatic:['자동 유지','Automatic keep-awake'],
+    autoPausedTitle:['모두 중지됨','All work stopped'],
+    manualOnly:['직접 시작한 타이머로 유지 중','Keeping awake with your timer'],
+    thermalReason:['열 상태 높음 · 정상으로 돌아와야 시작할 수 있어요','High thermal pressure · Wait until it returns to normal'],
+    newProposal:['새 옵션 · 아직 앱에는 미적용','New option · Not yet in the app'],
+    lockHint:['화면 잠금은 잠자기와 별개입니다. 화면 켜두기도 직접 잠금이나 macOS의 모든 잠금을 막지는 않아요.','Screen locking is separate from sleep. Keeping the display awake does not block manual locking or every macOS lock.']
+  });
+  function unplugDescription(){
+    if(state.unplugPolicy==='end')return tr('endHelp');
+    if(state.power==='battery')return tr(state.carryActive&&manualWorking()?'carryActive':'carryNext');
+    if(state.lidClosed&&!state.closedLidBattery)return tr('carryClosedOff');
+    return tr(manualWorking()?(state.initialSeconds?'carryFinite':'carryUnlimited'):'carryAutoOnly');
+  }
+
+  const systemLanguage=()=>((navigator.languages?.[0]||navigator.language||'ko').toLowerCase().startsWith('ko')?'ko':'en');
+  const pages=['keep','auto','protection','general'];
+  const pageLabels={keep:'keep',auto:'auto',protection:'protectionPage',alerts:'alerts',diagnostics:'diagnosticPage',general:'general'};
+  const pageIcons={keep:'moon',auto:'power',protection:'shield',alerts:'bell',diagnostics:'pulse',general:'gear'};
+  const state={language:systemLanguage(),theme:'dark',scenario:'automatic',power:'ac',automatic:true,manual:false,duration:30,remaining:0,startedAt:0,initialSeconds:0,deadlineAt:0,batteryDeadlineAt:0,paused:false,protection:false,conflict:false,page:'keep',closedLid:true,display:false,disconnect:'sleep',lowPower:false,appCondition:false,selectedApp:'Xcode',appRunning:true,launch:true,notifyEnd:false,notifyWarning:false,notifyProtection:true,autoUpdate:true,recording:false,overview:false,expanded:new Set(),scroll:{keep:0,auto:0,protection:0,alerts:0,diagnostics:0,general:0},batteryThreshold:20,protectionLatched:false,protectionOrigin:null,batteryLevel:80,lowPowerMode:false,conditions:[],externalDisplay:true,selectedDisplay:'Studio Display',scheduleDays:[1,2,3,4,5],scheduleStart:540,scheduleEnd:1080,sampleDay:2,sampleMinute:600,helper:'ready',device:'macbook',appLanguage:'system',notificationPermission:'allowed'};
+  let timer=null,toastTimer=null;
+  state.closedLidAC=true;state.closedLidBattery=false;state.carryLimit=120;state.unplugPolicy='end'; state.carryActive=false; state.lidClosed=false; state.examplePreset='automatic'; state.lastEvent=''; state.language='ko'; state.appLanguage='ko';
+  const tr=k=>(copy[k]||[k,k])[state.language==='en'?1:0];
+  const esc=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const icon=(name,cls='')=>{const paths={bell:'<path d="M6 8a6 6 0 0 1 12 0v6l2 3H4l2-3V8Zm4 12h4"/>',pulse:'<path d="M3 12h4l3-7 4 14 3-7h4"/>',gear:'<path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="18" r="2"/>',power:'<path d="M6 7H3v6h3m0-4h6m0-4v10m0-8h5l3 3-3 3h-5"/>',battery:'<rect x="2" y="6" width="16" height="10" rx="2"/><path d="M20 9v4M5 9h8v4H5z"/>',timer:'<path d="M12 3a9 9 0 1 1-7.6 4.2M12 7v5l3 2M3 3v5h5"/>',check:'<path d="m5 12 4 4L19 6"/>',shield:'<path d="M12 2 4 5v6c0 5 8 9 8 9s8-4 8-9V5zM12 7v5m0 4h.01"/>',moon:'<path d="M18 15a8 8 0 0 1-9-10 8 8 0 1 0 9 10Z"/>',warning:'<path d="m12 3 10 17H2L12 3Zm0 5v5m0 3h.01"/>',apps:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>'};return `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]||paths.check}</svg>`};
+  function scheduleMatches(day=state.sampleDay,minute=state.sampleMinute){
+    if(!Number.isInteger(day)||day<1||day>7||!Number.isFinite(minute)||minute<0||minute>=1440)return false;
+    const start=state.scheduleStart,end=state.scheduleEnd,days=state.scheduleDays;
+    if(!Number.isFinite(start)||!Number.isFinite(end))return false;
+    const previous=day===1?7:day-1,selected=d=>days.length===0||days.includes(d);
+    if(start<end)return selected(day)&&minute>=start&&minute<end;
+    if(start===end)return selected(minute>=start?day:previous);
+    return minute>=start?selected(day):minute<end&&selected(previous);
+  }
+  function conditionsSatisfied(){return state.conditions.every(kind=>kind==='app'?!!state.selectedApp&&state.appRunning===true:kind==='display'?!!state.selectedDisplay&&state.externalDisplay===true:kind==='schedule'?scheduleMatches():false)}
+  const format=(key,values={})=>tr(key).replace(/\{(\w+)\}/g,(_,k)=>esc(values[k]??''));
+  function protectionReason(){return state.protection?'thermal':state.device==='macbook'&&state.power==='battery'?(state.batteryLevel<=state.batteryThreshold?'battery':state.lowPower&&state.lowPowerMode?'lowPower':null):null}
+  const healthy=()=>!protectionReason();
+  const lidReady=()=>state.device!=='macbook'||!state.closedLid||state.helper==='ready';
+  const canResumeWork=()=>healthy()&&(state.power!=='battery'||state.batteryLevel>=state.batteryThreshold+5);
+  function protectionDescription(){const reason=protectionReason();if(reason==='thermal')return tr('thermalReason');if(reason==='lowPower')return tr('lowPowerReason');if(reason==='battery')return format(state.protectionLatched||state.paused?'recoveryBattery':'lowBatteryReason',{level:state.batteryLevel,floor:state.batteryThreshold,resume:state.batteryThreshold+5});if(!canResumeWork())return format('recoveryBattery',{level:state.batteryLevel,resume:state.batteryThreshold+5});return tr('recoveryDone')}
+  function conditionMatches(kind){return kind==='app'?!!state.selectedApp&&state.appRunning===true:kind==='display'?!!state.selectedDisplay&&state.externalDisplay===true:kind==='schedule'?scheduleMatches():false}
+  function automaticDescription(){
+    if(state.paused)return tr('autoPausedState');
+    if(state.protectionLatched||!healthy())return protectionDescription();
+    if(state.lidClosed&&!state.closedLid)return tr('lidReleaseNote');
+    if(!state.automatic)return tr('autoOffState');
+    if(state.power==='battery')return tr('autoBatteryState');
+
+    const missing=state.conditions.filter(k=>!conditionMatches(k)).map(k=>k==='app'?format('waitApp',{app:state.selectedApp}):k==='display'?format('waitDisplay',{display:state.selectedDisplay}):!Number.isFinite(state.scheduleStart)||!Number.isFinite(state.scheduleEnd)?tr('invalidSchedule'):tr('waitSchedule'));
+    return missing.length?format('waitingFor',{reasons:missing.join(' · ')}):tr('autoWorkingState');
+  }
+  function holdEffectDescription(){const effects=[...(state.device==='macbook'?[tr(!lidReady()?'helperEffect':state.closedLid?'lidEffectOn':'lidEffectOff')]:[]),tr(state.display?'displayEffectOn':'displayEffectOff')].join(' · ');return format(holding()?'effectNow':'effectNext',{effects})}
+  const automaticWorking=()=>state.automatic&&state.power==='ac'&&!state.paused&&!state.protectionLatched&&healthy()&&!(state.lidClosed&&!state.closedLid)&&conditionsSatisfied();
+  const manualWorking=()=>state.manual&&!state.paused&&!state.protectionLatched&&healthy()&&(!state.deadlineAt||Date.now()<state.deadlineAt);
+  const holding=()=>automaticWorking()||manualWorking();
+  const switchControl=(key,label,disabled=false)=>`<label class="switch"><input type="checkbox" data-toggle="${key}" aria-label="${esc(label)}" ${disabled?'disabled':''} ${state[key]?'checked':''}><span class="switch-track"></span></label>`;
+  const toggleRow=(key,label,disabled=false)=>`<div class="setting-row"><span>${label}</span>${switchControl(key,label,disabled)}</div>`;
+  const row=(label,value)=>`<div class="setting-row"><span>${label}</span><span class="row-value">${value}</span></div>`;
+  const note=(text,warning=false)=>`<p class="setting-note${warning?' warning':''}">${text}</p>`;
+  const button=(text,action,primary=false,extra='')=>`<button type="button" class="app-button${primary?' primary':''}" data-action="${action}" ${extra}>${text}</button>`;
+  const section=(title,content)=>`<section class="setting-section"><h3>${title}</h3>${content}</section>`;
+  const disclosure=(id,title,summary,body,all=false)=>`<details class="setting-details" data-disclosure="${id}" ${all||state.expanded.has(id)?'open':''}><summary><span>${title}</span>${summary?`<span class="summary-value">${summary}</span>`:''}</summary><div class="details-body">${body}</div></details>`;
+  const durationOptions=()=>[30,60,120,...(state.power==='ac'?[0]:[])].map(m=>`<option value="${m}" ${state.duration===m?'selected':''}>${tr({30:'min30',60:'hour1',120:'hour2',0:'unlimited'}[m])}</option>`).join('');
+  function countdown(){if(state.initialSeconds===0)return tr('unlimitedTitle');const s=Math.max(0,state.remaining);return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`}
+  function endTime(){const date=new Date(state.deadlineAt||Date.now()+state.remaining*1000);const time=date.toLocaleTimeString(state.language==='en'?'en-GB':'ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false});return state.language==='ko'?`${time}${tr('ends')}`:`${tr('ends')} ${time}`}
+  function canExtend(){return manualWorking()&&state.initialSeconds>0&&state.deadlineAt>Date.now()&&(!state.batteryDeadlineAt||state.deadlineAt+1800000<=state.batteryDeadlineAt);}
+  function resumeBanner(){if(!state.paused&&!state.protectionLatched)return '';const ready=canResumeWork();const description=ready?format('resumeResult',{next:tr(state.automatic&&state.power==='ac'?'resumeAuto':'resumeManual')}):protectionDescription();return `<div class="settings-inline-status"><div><strong>${tr(ready?(state.protectionLatched?'readyToResume':'autoPausedTitle'):state.protectionLatched?'protectedTitle':'autoPausedTitle')}</strong>${note(description,!ready)}</div>${button(tr('resume'),'resume',false,ready?'':'disabled')}</div>`}
+
+  function stateSummary(){
+    if(state.protectionLatched||!healthy()) return canResumeWork()&&state.protectionLatched?tr('readyMenu'):tr(state.protectionLatched?'protectedTitle':'cannotStartBattery');
+    if(state.paused)return tr('autoPausedTitle');
+    if(state.lidClosed&&!state.closedLid)return tr('lidReleased');
+    if(state.lidClosed&&holding())return tr(lidReady()?'lidClosedHolding':'optionHelper');
+    if(state.carryActive&&manualWorking())return tr('carryActive');
+    if(automaticWorking()&&manualWorking())return tr('tabStatusBoth');
+    if(manualWorking())return tr('tabStatusManual');
+    if(automaticWorking())return tr('tabStatusAuto');
+    if(state.lastEvent==='unplug')return tr('noticeNext');
+    return tr('tabStatusOff');
+  }
+  function menuMarkup(){
+    const auto=automaticWorking(),manual=manualWorking(),active=auto||manual;
+    const latched=state.paused||state.protectionLatched,blocked=latched||!healthy();
+    let title=active?tr('compactKeeping'):tr('tetherOff');
+    let description=auto&&manual?tr('compactBoth'):manual?tr('manualOnly'):automaticDescription();
+    let symbol=manual?'timer':auto?'check':'moon';
+    if(auto&&!manual)description=tr(lidReady()?'compactAutomatic':'helperAutoActive');
+    if(state.lastEvent==='unplug'&&!active&&!blocked){title=tr('unplugTitle');description=tr('unplugBody')}
+    if(state.carryActive&&manual)description=tr('carryActive');
+    if(state.lidClosed){if(active)description=tr(lidReady()?'lidClosedHolding':'optionHelper');else if(!state.closedLid){title=tr('lidReleased');description=tr('lidReleaseNote')}}
+    if(state.paused){title=tr('autoPausedTitle');description=canResumeWork()?tr('pausedMenuHint'):protectionDescription()}
+    if(state.protectionLatched||!healthy()){
+      title=tr(state.protectionLatched&&canResumeWork()?'readyMenu':state.protectionLatched?'protectedTitle':'cannotStart');
+      description=protectionDescription();symbol='shield';
+    }
+    let content='';
+    if(blocked){
+      content=latched?button(tr(canResumeWork()?'resume':'blockedResume'),'resume',true,canResumeWork()?'':'disabled'):`<p class="menu-ready-note">${tr('resumeBlocked')}</p>`;
+      if(latched)content+=`<p class="menu-context-note">${tr('noTimerRestore')}</p>`;
+    } else if(manual){
+      content=`<div class="timer-top"><div><div class="timer-label">${tr(state.initialSeconds?'timeRemaining':'unlimitedTitle')}</div><div class="timer-value" data-countdown>${state.initialSeconds?countdown():'∞'}</div></div><span class="session-chip">${tr('manualTag')}</span></div><div class="timer-actions">${state.initialSeconds?button(tr('compactExtend'),'extend',false,canExtend()?'':`disabled title="${tr('extensionAtCap')}"`):''}${button(tr(state.initialSeconds?'compactEnd':'endUnlimited'),'end-manual')}</div>`;
+      content+=`<p class="menu-context-note">${tr(auto?'autoContinues':'manualEnds')}</p>`;
+      if(state.batteryDeadlineAt)content+=`<p class="menu-context-note">${tr(canExtend()?'extensionCap':'extensionAtCap')}</p>`;
+    } else {
+      content=`<div class="menu-selection-label">${tr('chooseDuration')}</div><div class="quick-duration" role="group" aria-label="${tr('duration')}">${[30,60,120].map(v=>`<button type="button" data-duration="${v}" aria-pressed="${state.duration===v}">${tr({30:'min30',60:'hour1',120:'hour2'}[v])}</button>`).join('')}</div>${state.power==='ac'?`<button type="button" class="menu-unlimited" data-duration="0" aria-pressed="${state.duration===0}">${tr('shortUnlimited')} <span>${state.duration===0?'✓':''}</span></button>`:''}${button(tr('compactStart'),'start',true,lidReady()&&!(state.lidClosed&&!state.closedLid)?'':'disabled')}`;
+      if(!lidReady())content+=`<p class="menu-context-note">${tr('helperStartHint')}</p>${button(tr('helperAction'),'go-diagnostics')}`;
+      else if(state.lidClosed&&!state.closedLid)content+=`<p class="menu-context-note">${tr('openLidBeforeStart')}</p>`;
+      else if(state.power==='battery')content+=`<p class="menu-context-note">${tr('batteryCap')}</p>`;
+    }
+    const options=`<section class="menu-options">${state.device==='macbook'?toggleRow('closedLid',tr('closedLid'),state.helper!=='ready'):''}${toggleRow('display',tr('displayAwake'))}${state.lidClosed?`<p class="menu-context-note">${tr('closedDisplay')}</p>`:!active?`<p class="menu-context-note">${tr('optionsNext')}</p>`:!lidReady()?`<p class="menu-context-note">${tr('optionHelper')}</p>`:''}</section>`;
+    const influences=state.conflict?`<div class="menu-conflict">${button(tr('reviewInfluences'),'diagnostics')}</div>`:'';
+    return `<article class="mock-app menu-window" aria-label="Tether ${tr('menuCaption')}"><header class="menu-header"><div class="menu-brand"><span class="brand-symbol" aria-hidden="true"></span><strong>Tether</strong><span class="power-label">${icon(state.power==='ac'?'power':'battery')}${tr(state.power==='ac'?'onPower':'onBattery')}</span></div><div class="menu-state${state.protectionLatched||!healthy()?' warning':''}">${icon(symbol,active?'':'idle-icon')}<span>${title}</span></div><p class="state-description" aria-live="polite">${description}</p></header><div class="menu-body"><section class="menu-section">${content}</section>${options}${influences}</div><footer class="menu-footer">${!blocked?button(tr('stopAll'),'stop-all'):''}<span class="footer-spacer"></span>${button(tr('settings'),'open-settings')}</footer></article>`;
+  }
+  function helperNotice(){return state.device==='macbook'&&state.helper!=='ready'?`<div class="helper-notice">${icon('warning')}<div><strong>${tr({missing:'helperMissing',approval:'helperApproval',disconnected:'helperDisconnected'}[state.helper])}</strong>${note(tr(state.closedLid?'helperChosenHint':'helperUnavailable'))}<button class="setting-link" data-action="go-diagnostics">${tr('helperAction')}</button></div></div>`:''}
+  function keepPage(all=false){
+    const connect=section(tr('whenConnected'),`<div class="setting-row"><span>${tr(state.automatic?'connectValueOn':'connectValueOff')}</span><button class="setting-link" data-action="go-auto">${tr('editAutomatic')}</button></div>`+((state.paused||state.protectionLatched)?note(tr('savedWhileStopped')):''));
+    const unplug=state.device==='macbook'?section(tr('unplugPolicyLabel'),`<div class="setting-row event-choice"><label for="unplug-policy">${tr('keep')}</label><select id="unplug-policy" data-select="unplugPolicy"><option value="end" ${state.unplugPolicy==='end'?'selected':''}>${tr('endAllShort')}</option><option value="timer" ${state.unplugPolicy==='timer'?'selected':''}>${tr('carryTimer')}</option></select></div>`+note(unplugDescription())+(state.unplugPolicy==='timer'?`<div class="setting-row"><label for="carry-limit">${tr('carryLimitLabel')}</label><select id="carry-limit" data-select="carryLimit">${[30,60,120].map(v=>`<option value="${v}" ${state.carryLimit===v?'selected':''}>${tr({30:'min30',60:'hour1',120:'hour2'}[v])}</option>`).join('')}</select></div><p class="proposal-label">${tr('newProposal')}</p>`:'')+disclosure('disconnect-details',tr('powerDuration'),'',row(tr('maximumBattery'),tr('hour2'))+`<label class="field-label" for="disconnect-choice">${tr('sleepEndWhen')}</label><select id="disconnect-choice" data-select="disconnect"><option value="sleep" ${state.disconnect==='sleep'?'selected':''}>${tr('requestSleep')}</option><option value="os" ${state.disconnect==='os'?'selected':''}>${tr('leaveOS')}</option></select>`+note(tr(state.disconnect==='sleep'?'sleepNote':'osNote')),all)):'';
+    const lid=state.device==='macbook'?section(tr('closingLid'),['AC','Battery'].map(source=>`<div class="setting-row event-choice"><label for="lid-${source}">${tr(source==='AC'?'lidOnAC':'lidOnBattery')}</label><select id="lid-${source}" data-select="lid${source}" ${state.helper!=='ready'?'disabled':''}><option value="keep" ${state['closedLid'+source]?'selected':''}>${tr('lidKeepOption')}</option><option value="os" ${!state['closedLid'+source]?'selected':''}>${tr('lidOSOption')}</option></select></div><p class="setting-note lid-row-note">${tr(state['closedLid'+source]?'lidRowKeep':'lidRowOS')}</p>`).join('')):note(tr('desktopNote'));
+
+    return helperNotice()+connect+unplug+lid+section(tr('whatKeep'),toggleRow('display',tr('displayAwake'))+note(state.lidClosed?tr('closedDisplay'):holdEffectDescription()))
+      +disclosure('lock-guidance',tr('lockGuidance'),'',note(tr('lockHint'))+`<button class="setting-link" data-action="lock-settings">${tr('lockSettings')}</button>`,all)
+      +disclosure('ending-guide',tr('eventRules'),'',note(tr('eventRulesText'))+`<div class="guide-row"><strong>${tr('endTimer')}</strong>${note(tr('timerEndGuide'))}</div><div class="guide-row"><strong>${tr('stopAll')}</strong>${note(tr('stopAllGuide'))}</div><div class="guide-row"><strong>${tr('add30')}</strong>${note(tr(manualWorking()?(state.initialSeconds===0?'extensionUnlimited':state.batteryDeadlineAt?'extensionCapNote':'extensionCurrent'):'extensionGuide'))}</div><div class="guide-row"><strong>${tr('quit')}</strong>${note(tr('quitGuide'))}</div>`,all);
+  }
+  const dayLabels=()=>state.language==='ko'?['월','화','수','목','금','토','일']:['Mo','Tu','We','Th','Fr','Sa','Su'];
+  const timeText=m=>!Number.isFinite(m)?'':`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+  function conditionCard(kind){
+    const title=tr({app:'appKind',display:'displayKind',schedule:'scheduleKind'}[kind]);
+    let body=kind==='app'?`<div class="setting-row"><span class="chosen-value">${esc(state.selectedApp)}</span>${button(tr('chooseApp'),'choose-app')}</div>`:kind==='display'?`<label class="field-label" for="selected-display">${tr('selectedDisplay')}</label><select id="selected-display" data-select="selectedDisplay">${['Studio Display','Dell U2723QE'].map(v=>`<option value="${esc(v)}" ${state.selectedDisplay===v?'selected':''}>${esc(v)}</option>`).join('')}</select>`:`<div class="weekday-picker" role="group" aria-label="${tr('weekdays')}">${dayLabels().map((d,i)=>`<button type="button" data-day="${i+1}" aria-pressed="${state.scheduleDays.includes(i+1)}">${d}</button>`).join('')}</div><div class="time-range"><label>${tr('from')}<input type="time" data-select="scheduleStart" value="${timeText(state.scheduleStart)}"></label><span aria-hidden="true">–</span><label>${tr('to')}<input type="time" data-select="scheduleEnd" value="${timeText(state.scheduleEnd)}"></label></div>${note(!Number.isFinite(state.scheduleStart)||!Number.isFinite(state.scheduleEnd)?tr('invalidSchedule'):state.scheduleDays.length?tr('scheduleHelp'):tr('everyDayHint'),!Number.isFinite(state.scheduleStart)||!Number.isFinite(state.scheduleEnd))}`;
+    return `<div class="condition-card"><div class="condition-heading"><strong>${title}</strong><button type="button" data-remove-condition="${kind}" aria-label="${title} ${tr('remove')}">${tr('remove')}</button></div>${body}<p class="condition-status">${tr(!state.automatic?'conditionSaved':conditionMatches(kind)?'conditionMatched':'conditionUnmatched')}</p></div>`;
+  }
+  function autoPage(all=false){
+    return section(tr('startWhen'),toggleRow('automatic',tr('allowAutomatic'))+note(automaticDescription())+(manualWorking()?note(tr('manualActiveHint')):''))
+      +section(tr('extraConditions'),note(tr(!state.automatic?'conditionSaved':state.conditions.length?'allConditions':'conditionNone'))+state.conditions.map(conditionCard).join('')+(state.conditions.length<3?`<select class="add-condition" data-select="addCondition" aria-label="${tr('addCondition')}"><option value="">${tr('addCondition')}</option>${['app','display','schedule'].filter(k=>!state.conditions.includes(k)).map(k=>`<option value="${k}">${tr({app:'appKind',display:'displayKind',schedule:'scheduleKind'}[k])}</option>`).join('')}</select>`:''))
+      +disclosure('condition-guide',tr('conditionGuide'),'',note(tr('conditionGuideText'))+note(tr('autoLidHint'))+`<button class="setting-link" data-action="go-keep">${tr('displayLidSettings')}</button>`,all);
+  }
+  function protectionPage(){
+    return section(tr('thermalGroup'),row(tr('thermalProtection'),tr('alwaysOn'))+row(tr('thermalState'),`<span${state.protection?' style="color:var(--warning)"':''}>${tr(state.protection?'high':'normal')}</span>`)+note(tr('thermalHint')))
+      +(state.device==='macbook'?section(tr('batteryGroup'),`<div class="setting-row"><label for="battery-threshold">${tr('batteryThreshold')}</label><select id="battery-threshold" data-select="batteryThreshold">${[20,25,30,40,50].map(v=>`<option value="${v}" ${state.batteryThreshold===v?'selected':''}>${v}%</option>`).join('')}</select></div>`+note(state.power==='battery'?format('batteryNow',{level:state.batteryLevel,floor:state.batteryThreshold}):tr('acBatteryRule'))+toggleRow('lowPower',tr('lowPower'))+note(tr(state.power==='ac'?'lowPowerOnAC':state.lowPower?'lowPowerEnabled':'lowPowerDisabled')))+disclosure('battery-protection-guide',tr('conditionGuide'),'',note(tr('batteryFloorHelp'))+note(tr('restartHint'))):'');
+  }
+  function alertsPage(){
+    const permission=state.notificationPermission,selected=state.notifyEnd||state.notifyWarning||state.notifyProtection;
+    return section(tr('notifyTiming'),toggleRow('notifyEnd',tr('notifyEnd'))+toggleRow('notifyWarning',tr('notifyWarning'))+note(tr(state.notifyWarning?(manualWorking()&&state.initialSeconds===0?'unlimitedNoWarning':'expiryWarningOn'):'expiryWarningOff'))+(state.notifyWarning?note(tr('expiryHint')):''))
+      +section(tr('safetyAlerts'),toggleRow('notifyProtection',tr('notifyProtection'))+note(tr('protectionNotifyHint')))
+      +section(tr('permission'),`<p class="setting-note permission-state">${tr(permission)}</p>`+note(tr(!selected?'notificationsNone':permission==='allowed'?'notificationsReady':'permissionHint'))+(permission==='allowed'||!selected?'':`<div class="inline-actions">${button(tr(permission==='notDetermined'?'requestPermission':'openNotificationSettings'),permission==='notDetermined'?'request-permission':'notification-settings')}</div>`));
+  }
+  function generalPage(){
+    return section(tr('startupDisplay'),toggleRow('launch',tr('launchLogin'))+`<div class="setting-row"><label for="app-language">${tr('language')}</label><select id="app-language" data-select="appLanguage">${[['system',tr('systemLanguage')],['ko','한국어'],['en','English']].map(([v,t])=>`<option value="${v}" ${state.appLanguage===v?'selected':''}>${t}</option>`).join('')}</select></div>`)
+      +section(tr('updates'),toggleRow('autoUpdate',tr('autoUpdate'))+`<div class="inline-actions">${button(tr('checkUpdates'),'check-updates')}</div>`+note(tr('updateHint')));
+  }
+  function diagnosticsPage(all=false){
+    const helperLabel=tr({ready:'ready',missing:'helperMissing',approval:'helperApproval',disconnected:'helperDisconnected'}[state.helper]);
+    return `<p class="settings-page-description">${tr('diagnosticsHelp')}</p>`+section(tr('influences'),row(tr('exampleRequests'),button(tr('review'),'diagnostics')))
+      +(state.device==='macbook'?disclosure('helper',tr('closedHelper'),helperLabel,note(tr(state.helper==='ready'?'helperHint':'helperUnavailable'))+(state.helper==='ready'?'':button(tr('helperAction'),'helper-settings')),all):note(tr('desktopNote')))
+      +section(tr('problemRecords'),note(tr('recordHint'))+`<div class="setting-row"><span>${tr(state.recording?'recordingSample':'recordingOff')}</span>${button(tr(state.recording?'stopRecording':'startRecording'),'record',state.recording)}</div>`)
+      +section(tr('problemReport'),note(tr('reportHint'))+`<div class="inline-actions">${button(tr('saveReport'),'report')}</div>`);
+  }
+
+  function settingsMarkup(page=state.page,all=false,mini=false){
+    let body=page==='keep'?keepPage(all):page==='auto'?autoPage(all):page==='protection'?
+      protectionPage()+disclosure('notification-options',tr('alerts'),tr(state.notifyEnd||state.notifyWarning||state.notifyProtection?'notificationsOn':'notificationsOff'),alertsPage(),all):
+      generalPage()+disclosure('diagnostic-options',tr('diagnosticPage'),state.helper!=='ready'?tr('optionHelper'):'',diagnosticsPage(all),all);
+    const prefix=mini?'mini-'+page+'-':'';
+    if(mini)body=body.replace(/\bid="([^"]+)"/g,(_,id)=>`id="${prefix}${id}"`).replace(/\bfor="([^"]+)"/g,(_,id)=>`for="${prefix}${id}"`);
+    return `<article class="mock-app settings-window" ${mini?'inert aria-hidden="true"':`aria-label="Tether ${tr('settings')}"`}><div class="window-titlebar" aria-hidden="true"><span class="traffic-light"></span><span class="traffic-light yellow"></span><span class="traffic-light green"></span><span class="window-title">Tether ${tr('settings').replace('…','')}</span></div><nav class="settings-tabs" role="tablist" aria-label="${tr('settings')}" aria-orientation="horizontal">${pages.map(p=>`<button type="button" class="settings-nav-item" role="tab" id="${prefix}tab-${p}" aria-selected="${p===page}" aria-controls="${prefix}settings-body" tabindex="${p===page?'0':'-1'}" data-page="${p}">${icon(pageIcons[p])}<span>${tr(pageLabels[p])}</span></button>`).join('')}</nav><div class="settings-status${state.protectionLatched||!healthy()?' warning':''}" role="status"><span class="status-dot"></span><span>${stateSummary()}</span></div><div class="settings-content" id="${prefix}settings-body" role="tabpanel" aria-labelledby="${prefix}tab-${page}" tabindex="0">${body}</div><footer class="settings-footer">${tr({keep:'footerKeep',auto:'footerAuto',protection:'footerProtect',general:'footerApp'}[page])}</footer></article>`;
+  }
+  const presets=['idle','automatic','manual','both','unplugged','carry','lidkeeping','lidreleased','paused','protected','recovered','cap','helper','conflict'];
+  const presetLabels={
+    carry:['분리 후 타이머 계속','Timer continues after unplug'],lidkeeping:['덮개 닫힘 · 유지','Lid closed · Keeping awake'],lidreleased:['덮개 닫힘 · 기본 동작','Lid closed · macOS behavior'],
+    idle:['시작 전','Before starting'],automatic:['자동 유지','Automatic'],manual:['수동 유지','Manual timer'],
+    both:['자동 + 수동','Automatic + Manual'],unplugged:['전원 분리','Unplugged'],paused:['모두 중지','All paused'],
+    protected:['보호 중지','Protection stop'],recovered:['보호 해소 · 중지 해제 전','Ready to resume'],cap:['배터리 연장 한도','Battery limit'],
+    helper:['도우미 준비 필요','Helper needed'],conflict:['다른 앱 영향','Other apps']
+  };
+  const presetNotes={
+    carry:['새 옵션 예시. 자동 유지는 끝내고 남은 타이머만 계속해요.','Proposed option. Automatic work ends; the finite timer continues.'],lidkeeping:['진행 중인 유지와 도우미가 있어야 적용돼요.','Applies to active work with the helper ready.'],lidreleased:['Tether 유지를 끝냅니다. 실제 잠자기·잠금 성공을 뜻하지 않아요.','Requests released. This is not proof of sleep or screen locking.'],
+    idle:['30분·1시간·2시간 선택 후 시작.','Choose a duration and start.'],
+    automatic:['자동 유지 중에도 수동 타이머를 시작할 수 있어요.','A manual timer can run alongside automatic work.'],
+    manual:['종료·30분 연장을 메뉴에서 바로.','End or extend without opening settings.'],
+    both:['타이머만 종료하면 자동 유지는 계속돼요.','Ending the timer leaves automatic work running.'],
+    unplugged:['모두 종료했어요. 배터리는 새 수동 시작만.','All work ended. Start a new timer on battery.'],
+    paused:['재개는 자동 조건만 다시 확인해요.','Resuming reevaluates existing automatic rules.'],
+    protected:['원인이 남아 있으면 재개할 수 없어요.','Resume is blocked while the cause remains.'],
+    recovered:['원인 해소 후 직접 재개. 타이머는 복원하지 않아요.','Resume explicitly. Ended timers never return.'],
+    cap:['처음 시작부터 2시간. 연장 여유가 없어요.','Two hours from the original start; no extension available.'],
+    helper:['일반 자동 유지는 가능. 덮개 유지는 준비 필요.','Automatic work continues; lid support needs the helper.'],
+    conflict:['Tether 종료와 실제 잠자기는 달라요.','Tether stopping does not prove the Mac is asleep.']
+  };
+  const localized=pair=>pair[state.language==='en'?1:0];
+  function applyPreset(name){
+    Object.assign(state,{closedLidAC:name!=='lidreleased',closedLidBattery:['carry','cap'].includes(name),carryLimit:120,unplugPolicy:name==='carry'?'timer':'end',carryActive:name==='carry',lidClosed:['lidkeeping','lidreleased'].includes(name),examplePreset:name,lastEvent:'',power:'ac',automatic:['automatic','both','unplugged','paused','protected','recovered','helper','lidkeeping','lidreleased'].includes(name),manual:false,paused:name==='paused',protection:name==='protected',protectionLatched:['protected','recovered'].includes(name),protectionOrigin:['protected','recovered'].includes(name)?'thermal':null,conflict:name==='conflict',duration:30,remaining:0,initialSeconds:0,deadlineAt:0,batteryDeadlineAt:0,conditions:[],appCondition:false,batteryLevel:80,lowPowerMode:false,helper:name==='helper'?'missing':'ready',device:'macbook',closedLid:true,display:false});
+    if(['manual','both','cap','carry'].includes(name)){
+      const cap=name==='cap';state.power=cap?'battery':'ac';state.duration=cap?120:30;state.manual=true;state.initialSeconds=cap?7200:1800;state.remaining=cap?6660:1722;state.startedAt=Date.now()-(state.initialSeconds-state.remaining)*1000;state.deadlineAt=Date.now()+state.remaining*1000;state.batteryDeadlineAt=cap?state.startedAt+7200000:0;
+    }
+    if(name==='lidreleased')state.closedLid=false;
+    if(name==='unplugged')state.closedLid=state.closedLidBattery;
+    if(name==='carry'){state.power='battery';state.batteryDeadlineAt=Date.now()+7200000;}
+    if(name==='unplugged'){state.power='battery';state.lastEvent='unplug'}
+  }
+  function renderStateGallery(){
+    const saved={...state},lang=state.language;
+    document.querySelector('#state-gallery').innerHTML=`<div class="state-grid">${presets.map((key,i)=>{
+      applyPreset(key);state.language=lang;
+      return `<article class="state-card"><header><span>${String(i+1).padStart(2,'0')}</span><h3>${localized(presetLabels[key])}</h3></header><div inert class="state-menu">${menuMarkup()}</div><p class="state-outcome">${localized(presetNotes[key])}</p><button type="button" class="state-inspect" data-preset="${key}">${tr('showState')} ↗</button></article>`;
+    }).join('')}</div>`;
+    Object.assign(state,saved);
+  }
+  function render(){state.scenario=state.protectionLatched||!healthy()?'protected':state.paused?'paused':state.conflict?'conflict':manualWorking()?'manual':automaticWorking()?'automatic':'idle';const focused=document.activeElement;const focusAttrs=['id','data-select','data-toggle','data-duration','data-day','data-language','data-theme-choice','data-action'];const focusAttr=focused&&focusAttrs.find(a=>focused.hasAttribute(a));const focusValue=focusAttr?focused.getAttribute(focusAttr):null;const focusScope=focused?.closest('#settings-preview')?'#settings-preview ':focused?.closest('#menu-preview')?'#menu-preview ':'';const current=document.querySelector('#settings-preview .settings-content');if(current)state.scroll[state.page]=current.scrollTop;document.documentElement.dataset.theme=state.theme;document.documentElement.lang=state.language;document.title=`Tether — ${tr('boardTitle')}`;document.querySelectorAll('[data-copy]').forEach(el=>el.textContent=tr(el.dataset.copy));document.querySelectorAll('[data-theme-choice]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.themeChoice===state.theme)));document.querySelectorAll('[data-language]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.language===state.language)));document.querySelector('#scenario').innerHTML=presets.map(s=>`<option value="${s}" ${s===state.examplePreset?'selected':''}>${localized(presetLabels[s])}</option>`).join('');document.querySelector('#power-toggle').hidden=state.device==='desktop';document.querySelector('#power-toggle').innerHTML=icon(state.power==='ac'?'power':'battery')+tr(state.power==='ac'?'simulateUnplug':'simulateConnect');document.querySelector('#lid-toggle').hidden=state.device==='desktop';document.querySelector('#lid-toggle').textContent=tr(state.lidClosed?'simulateOpen':'simulateClose');const tools=document.querySelector('#scenario-tools');const fixtureOpen=tools.querySelector('details')?.open;tools.hidden=false;tools.innerHTML=`<details class="fixture-details" ${fixtureOpen?'open':''}><summary>${tr('sampleStates')} <span>${tr('example')}</span></summary><div class="fixture-grid"><label>${tr('device')}<select data-select="device"><option value="macbook" ${state.device==='macbook'?'selected':''}>MacBook</option><option value="desktop" ${state.device==='desktop'?'selected':''}>Mac desktop</option></select></label>${state.device==='macbook'?`<label>${tr('helperState')}<select data-select="helper">${['ready','missing','approval','disconnected'].map(v=>`<option value="${v}" ${state.helper===v?'selected':''}>${tr({ready:'ready',missing:'helperMissing',approval:'helperApproval',disconnected:'helperDisconnected'}[v])}</option>`).join('')}</select></label>`:''}<label>${tr('permission')}<select data-select="notificationPermission">${['allowed','denied','notDetermined'].map(v=>`<option value="${v}" ${state.notificationPermission===v?'selected':''}>${tr(v)}</option>`).join('')}</select></label>${state.device==='macbook'?`<label>${tr('sampleBattery')}<select data-select="batteryLevel">${[15,20,25,30,50,80].map(v=>`<option value="${v}" ${state.batteryLevel===v?'selected':''}>${v}%</option>`).join('')}</select></label><label><input type="checkbox" data-toggle="lowPowerMode" ${state.lowPowerMode?'checked':''}>${tr('sampleLowPower')}</label>`:''}${state.protection?button(tr('protectionAction'),'clear-protection'):''}${state.conditions.includes('app')?`<label><input type="checkbox" data-toggle="appRunning" ${state.appRunning?'checked':''}>${tr('appRunning')} · ${esc(state.selectedApp)}</label>`:''}${state.conditions.includes('display')?`<label><input type="checkbox" data-toggle="externalDisplay" ${state.externalDisplay?'checked':''}>${tr('sampleDisplay')}</label>`:''}${state.conditions.includes('schedule')?`<label>${tr('sampleNow')}<span class="fixture-time"><select data-select="sampleDay">${dayLabels().map((d,i)=>`<option value="${i+1}" ${state.sampleDay===i+1?'selected':''}>${d}</option>`).join('')}</select><input type="time" data-select="sampleMinute" value="${timeText(state.sampleMinute)}"></span></label>`:''}</div></details>`;document.querySelector('#menu-preview').innerHTML=menuMarkup();document.querySelector('#settings-preview').innerHTML=settingsMarkup();document.querySelector('#settings-preview .settings-content').scrollTop=state.scroll[state.page]||0;renderStateGallery();renderOverview();document.querySelector('#overview-toggle').textContent=tr(state.overview?'hideOverview':'showOverview');document.querySelector('#overview-toggle').setAttribute('aria-expanded',String(state.overview));if(focusAttr){const restored=document.querySelector(focusScope+'['+focusAttr+'="'+CSS.escape(focusValue)+'"]');if(restored&&!restored.disabled)restored.focus({preventScroll:true});}}
+  function renderOverview(){const el=document.querySelector('#all-screens');el.hidden=!state.overview;if(!state.overview)return;el.innerHTML=`<div class="overview-grid">${pages.map(p=>`<div class="overview-card"><header><span>${tr(pageLabels[p])} · ${tr('expanded')}</span><button data-open-page="${p}">${tr('openLarge')} ↗</button></header><div class="mini-container">${settingsMarkup(p,true,true)}</div></div>`).join('')}</div><p class="overview-note">${tr('overviewNote')}</p>`;requestAnimationFrame(scaleMiniatures)}
+  function scaleMiniatures(){document.querySelectorAll('.mini-container').forEach(el=>{const scale=el.clientWidth/600;const win=el.querySelector('.settings-window');win.style.width='600px';win.style.transform=`scale(${scale})`;el.style.height=`${win.offsetHeight*scale}px`})}
+  function toast(key){const el=document.querySelector('#toast');el.textContent=tr(key);el.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.hidden=true,4200)}
+  function clearManual(){state.carryActive=false;clearInterval(timer);timer=null;state.manual=false;state.remaining=0;state.initialSeconds=0;state.deadlineAt=0;state.batteryDeadlineAt=0}
+  function chooseScenario(name){clearManual();applyPreset(name);if(state.manual)timer=setInterval(tick,1000);render()}
+  function startManual(notify=true){state.carryActive=false;if(state.lidClosed&&!state.closedLid){toast('openLidBeforeStart');return false}state.lastEvent='';if(state.paused){toast('resumeFirst');return false}if(state.protectionLatched||!healthy()){toast('protectionToast');return false}if(!lidReady()){toast('helperStartHint');return false}clearInterval(timer);state.manual=true;state.scenario='manual';if(state.power==='battery'&&state.duration===0)state.duration=30;state.initialSeconds=state.duration*60;state.remaining=state.initialSeconds;state.startedAt=Date.now();state.deadlineAt=state.initialSeconds?state.startedAt+state.initialSeconds*1000:0;state.batteryDeadlineAt=state.power==='battery'?state.startedAt+7200000:0;if(state.initialSeconds>0)timer=setInterval(tick,1000);render();if(notify&&state.power==='battery')toast('timerLimit');return true}
+  function tick(){if(!state.manual){clearInterval(timer);return}state.remaining=Math.max(0,Math.ceil((state.deadlineAt-Date.now())/1000));document.querySelectorAll('#menu-preview [data-countdown]').forEach(e=>e.textContent=countdown());if(state.remaining===0){state.lastEvent='timerExpired';clearManual();render();if(state.notifyEnd&&state.notificationPermission==='allowed')toast('notifyEnd')}}
+  function endManual(){state.lastEvent='timerEnded';clearManual();state.scenario=automaticWorking()?'automatic':'idle';render()}
+  function extendManual(){if(!canExtend()){toast('cannotExtend');return false}state.deadlineAt+=1800000;state.remaining=Math.max(0,Math.ceil((state.deadlineAt-Date.now())/1000));state.initialSeconds+=1800;render();return true}
+  function stopAll(){clearManual();state.paused=true;state.scenario='paused';render()}
+  function resumeWork(){if(!canResumeWork()){toast('resumeBlocked');return false}state.paused=false;state.protectionLatched=false;state.protectionOrigin=null;state.scenario=automaticWorking()?'automatic':'idle';render();return true}
+  function protectionStop(){clearManual();state.protectionOrigin='thermal';state.protection=true;state.protectionLatched=true;state.scenario='protected';render()}
+  function clearProtection(){state.protection=false;render()}
+  function togglePower(){
+    if(state.device==='desktop')return;
+    const liveTimer=manualWorking()&&state.initialSeconds>0;
+    state.power=state.power==='ac'?'battery':'ac';
+    state.closedLid=state.power==='ac'?state.closedLidAC:state.closedLidBattery;
+    if(state.power==='battery'){
+      state.lastEvent='unplug';
+      if(state.unplugPolicy==='timer'&&liveTimer&&healthy()&&!(state.lidClosed&&!state.closedLid)){
+        state.batteryDeadlineAt=Math.min(state.batteryDeadlineAt||Infinity,Date.now()+state.carryLimit*60000);
+        state.deadlineAt=Math.min(state.deadlineAt,state.batteryDeadlineAt);
+        state.remaining=Math.max(0,Math.ceil((state.deadlineAt-Date.now())/1000));
+        state.carryActive=true;
+      } else {const unsafe=!healthy()&&state.manual;clearManual();if(unsafe){state.protectionLatched=true;state.protectionOrigin=protectionReason();}}
+      if(state.duration===0)state.duration=30;
+    } else {state.lastEvent='';state.carryActive=false;}
+    if(state.lidClosed&&!state.closedLid)clearManual();
+    render();
+  }
+  function toggleLid(){
+    if(state.device==='desktop')return;
+    state.lidClosed=!state.lidClosed;
+    if(state.lidClosed&&!state.closedLid)clearManual();
+    render();
+  }
+  function addCondition(kind){if(['app','display','schedule'].includes(kind)&&!state.conditions.includes(kind))state.conditions.push(kind);state.appCondition=state.conditions.includes('app');render()}
+  function removeCondition(kind){state.conditions=state.conditions.filter(v=>v!==kind);state.appCondition=state.conditions.includes('app');render()}
+  function setOption(key,value){
+    if(key==='lidAC'||key==='lidBattery'){const source=key==='lidAC'?'AC':'Battery';state['closedLid'+source]=value==='keep';if((state.power==='ac')===(source==='AC')){key='closedLid';value=value==='keep';}else{render();return}}
+    if(key==='carryLimit')value=Number(value);
+    if(key==='closedLid'&&state.helper==='ready')state[state.power==='ac'?'closedLidAC':'closedLidBattery']=value;
+    if(key==='addCondition'){if(value)addCondition(value);return}
+    if(key==='batteryThreshold'&&![20,25,30,40,50].includes(Number(value)))return;
+    if(key==='batteryThreshold')value=Number(value);
+    const wasHolding=holding();
+    if(key==='closedLid'&&state.device==='macbook'&&state.helper!=='ready')return;
+    state[key]=value;
+    if(key==='closedLid'&&!value&&state.lidClosed)clearManual();
+    if(key==='device'&&value==='desktop'){if(state.power==='battery')clearManual();state.power='ac';state.lidClosed=false;state.lastEvent='';}
+    if(key==='appLanguage')state.language=value==='system'?systemLanguage():value;
+    if(['batteryThreshold','batteryLevel','lowPower','lowPowerMode'].includes(key)&&wasHolding&&!healthy()){state.protectionOrigin=protectionReason();clearManual();state.protectionLatched=true;state.scenario='protected';}
+    render();
+  }
+  function changePage(page){if(page==='diagnostics'){page='general';state.expanded.add('diagnostic-options');state.expanded.add('helper');}if(page==='alerts'){page='protection';state.expanded.add('notification-options');}const scroller=document.querySelector('#settings-preview .settings-content');if(scroller)state.scroll[state.page]=scroller.scrollTop;state.page=page;document.querySelector('#settings-preview').innerHTML=settingsMarkup();document.querySelector('#settings-preview .settings-content').scrollTop=state.scroll[page]||0;document.querySelectorAll('#settings-preview [data-page]').forEach(b=>{if(b.dataset.page===page)b.focus({preventScroll:true})})}
+  function showAppPicker(){const dialog=document.querySelector('#app-picker-dialog');dialog.innerHTML=`<header class="dialog-header"><h2 id="app-picker-title">${tr('chooseAppTitle')}</h2>${button(tr('close'),'close-app-picker')}</header><div class="dialog-body"><p class="dialog-note">${tr('mockAppNote')}</p><div class="app-picker-list">${['Xcode','Terminal','Safari','Music','DaVinci Resolve'].map(a=>`<button type="button" data-app-choice="${a}">${icon('apps')}<span>${a}</span>${state.selectedApp===a?icon('check'):''}</button>`).join('')}</div></div>`;dialog.showModal()}
+  function showDiagnostics(){const dialog=document.querySelector('#diagnostics-dialog');dialog.innerHTML=`<header class="dialog-header"><h2 id="diagnostics-title">${tr('diagnosticsTitle')}</h2>${button(tr('close'),'close-dialog')}</header><div class="dialog-body"><p class="dialog-note">${tr('exampleRequests')}</p><p class="dialog-note" style="color:var(--warning)">${icon('warning')} ${tr('influenceWarning')}</p>${[['Amphetamine','screenConflict'],['LM Studio','idleSleepRequest']].map(([name,effect])=>`<section class="influence-row"><div class="influence-title"><span>${name}</span><span class="status-pill${effect==='screenConflict'?' warning':''}">${tr(effect)}</span></div><p>${tr('adjustHint')}</p><details><summary>${tr('technicalDetails')}</summary><p>${name==='Amphetamine'?'PreventUserIdleDisplaySleep':'PreventUserIdleSystemSleep'} · ${state.language==='ko'?'예시 요청':'Sample request'}</p></details></section>`).join('')}<p class="dialog-note" style="margin-top:16px">${tr('requestNotProof')}</p></div><footer class="dialog-footer">${tr('justNow')}</footer>`;dialog.showModal()}
+  function saveReport(){const report={kind:'Tether design sample',simulated:true,note:'No system data was collected.',power:state.power,scenario:state.scenario,automatic:state.automatic,closedLid:state.closedLid};const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='tether-design-sample.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('sampleReportToast')}
+  document.addEventListener('click',event=>{
+    if(event.target.closest('[inert]'))return;
+    const preset=event.target.closest('[data-preset]');if(preset){chooseScenario(preset.dataset.preset);document.querySelector('.workspace').scrollIntoView({behavior:'smooth',block:'start'});return}
+    const duration=event.target.closest('[data-duration]');if(duration){state.duration=Number(duration.dataset.duration);render();return}
+const theme=event.target.closest('[data-theme-choice]');if(theme){state.theme=theme.dataset.themeChoice;render();return}const lang=event.target.closest('[data-language]');if(lang){setOption('appLanguage',lang.dataset.language);return}const page=event.target.closest('#settings-preview [data-page]');if(page){changePage(page.dataset.page);return}const jump=event.target.closest('[data-open-page]');if(jump){changePage(jump.dataset.openPage);document.querySelector('#settings-preview').scrollIntoView({behavior:'smooth',block:'center'});return}const remove=event.target.closest('[data-remove-condition]');if(remove){removeCondition(remove.dataset.removeCondition);return}const day=event.target.closest('[data-day]');if(day){const n=Number(day.dataset.day);state.scheduleDays=state.scheduleDays.includes(n)?state.scheduleDays.filter(d=>d!==n):[...state.scheduleDays,n];render();return}const appChoice=event.target.closest('[data-app-choice]');if(appChoice){state.selectedApp=appChoice.dataset.appChoice;document.querySelector('#app-picker-dialog').close();render();return}const target=event.target.closest('[data-action]');if(!target)return;const action=target.dataset.action;
+    if(action==='start')startManual();else if(action==='end-manual')endManual();else if(action==='extend')extendManual();else if(action==='stop-all')stopAll();else if(action==='resume')resumeWork();else if(action==='open-settings'){if(state.paused||state.protectionLatched)changePage('keep');document.querySelector('#settings-preview').scrollIntoView({behavior:'smooth',block:'center'});document.querySelector('#settings-preview [aria-selected="true"]').focus({preventScroll:true})}else if(action==='review-protection'){changePage('protection');document.querySelector('#settings-preview').scrollIntoView({behavior:'smooth',block:'center'});}else if(action==='go-diagnostics')changePage('diagnostics');else if(action==='choose-app')showAppPicker();else if(action==='close-app-picker')document.querySelector('#app-picker-dialog').close();else if(action==='request-permission'){state.notificationPermission='allowed';render();toast('previewOnly')}else if(action==='go-auto')changePage('auto');else if(action==='go-keep')changePage('keep');else if(action==='diagnostics')showDiagnostics();else if(action==='close-dialog')document.querySelector('#diagnostics-dialog').close();else if(action==='clear-protection')clearProtection();else if(action==='record'){state.recording=!state.recording;render();if(state.recording)toast('recordToast')}else if(action==='report')saveReport();else if(action==='check-updates')toast('updateToast');else if(action==='expand-all'||action==='collapse-all'){document.querySelectorAll('#settings-preview details').forEach(d=>{d.open=action==='expand-all';if(d.open)state.expanded.add(d.dataset.disclosure);else state.expanded.delete(d.dataset.disclosure)});}else if(action==='scroll-top'||action==='scroll-end'){const el=document.querySelector('#settings-preview .settings-content');el.scrollTo({top:action==='scroll-end'?el.scrollHeight:0,behavior:'smooth'});}else toast('previewOnly');
+  });
+  document.addEventListener('change',event=>{const el=event.target;if(el.id==='scenario'){chooseScenario(el.value);return}if(el.dataset.toggle)setOption(el.dataset.toggle,el.checked);else if(el.dataset.select){const key=el.dataset.select;let value=el.value;if(['duration','batteryThreshold','batteryLevel','sampleDay'].includes(key))value=Number(value);if(['scheduleStart','scheduleEnd','sampleMinute'].includes(key)){if(!value)value=null;else{const [h,m]=value.split(':').map(Number);value=h*60+m;}}setOption(key,value)}});
+  document.addEventListener('toggle',event=>{const el=event.target;if(!el.matches('details[data-disclosure]')||el.closest('[inert]'))return;if(el.open)state.expanded.add(el.dataset.disclosure);else state.expanded.delete(el.dataset.disclosure)},true);
+  document.addEventListener('keydown',event=>{const tab=event.target.closest('#settings-preview [role="tab"]');if(!tab||!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(event.key))return;event.preventDefault();const index=pages.indexOf(state.page);changePage(pages[event.key==='Home'?0:event.key==='End'?pages.length-1:(index+(['ArrowRight','ArrowDown'].includes(event.key)?1:pages.length-1))%pages.length])});
+  document.querySelector('#power-toggle').addEventListener('click',togglePower);document.querySelector('#lid-toggle').addEventListener('click',toggleLid);document.querySelector('#overview-toggle').addEventListener('click',()=>{state.overview=!state.overview;render()});window.addEventListener('resize',()=>{scaleMiniatures();document.querySelectorAll('.settings-sidebar [role="tablist"]').forEach(el=>el.setAttribute('aria-orientation',window.innerWidth<=560?'horizontal':'vertical'));});document.querySelector('#diagnostics-dialog').addEventListener('click',event=>{if(event.target===event.currentTarget){const r=event.currentTarget.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)event.currentTarget.close()}});
+  const before=[['menu-ko-dark','메뉴 · 자동'],['menu-manual-en-light','Menu · Manual'],['general-ko-dark','잠자기 방지 · 기본'],['general-expanded-en-light','Keep awake · Expanded'],['general-end-en-light','Keep awake · Bottom'],['safety-ko-dark','자동 시작 · 기본'],['safety-expanded-en-light','Automatic start · Expanded'],['safety-end-en-light','Automatic start · Bottom'],['system-ko-dark','앱 설정 · 기본'],['system-expanded-en-light','App settings · Expanded'],['system-end-en-light','App settings · Bottom']];
+  document.querySelector('#previous-gallery').innerHTML=before.map(([file,title])=>`<figure><img src="../assets/before/${file}.png" alt="${esc(title)} — previous static sample" loading="lazy" width="560" height="480"><figcaption>${esc(title)}</figcaption></figure>`).join('');
+  render();
+})();
