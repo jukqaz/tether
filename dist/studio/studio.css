@@ -360,7 +360,13 @@ main { max-width: 1168px; padding: 30px 36px 0; }
 .overview-card > header { font-size: 12px; margin-bottom: 10px; }
 .overview-card > header button { font-size: 11px; min-height: 25px; }
 .mini-container { min-height: 0; }
-.mini-container .settings-window { width: 600px; height: 460px; max-width: none; }
+.mini-container .settings-window { width: 600px; height: auto; max-width: none; }
+.mini-container .settings-window > .settings-content {
+  flex: none;
+  overflow: visible;
+  mask-image: none;
+  -webkit-mask-image: none;
+}
 .overview-note { font-size: 11px; line-height: 1.6; }
 
 /* Gallery cards show the full state, without changing the live preview. */
@@ -525,7 +531,7 @@ dialog { border-radius: 14px; }
   .gallery-note { font-size: 11px; }
   .overview-card > header { font-size: 11px; gap: 10px; }
   .overview-card > header button { font-size: 11px; }
-  .mini-container .settings-window { width: 600px; height: 460px; border-radius: 14px; }
+  .mini-container .settings-window { width: 600px; height: auto; border-radius: 14px; }
   .mini-container .settings-tabs .settings-nav-item { flex-direction: row; min-height: 32px; gap: 7px; padding: 6px 8px; font-size: 13px; }
   .mini-container .settings-tabs { padding: 5px 12px 6px; gap: 4px; }
   .mini-container .settings-window > .settings-content { padding: 16px 20px; }
