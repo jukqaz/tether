@@ -11,34 +11,34 @@ public struct SafetyReadings: Equatable, Sendable {
     /// ProcessInfo.ThermalState raw value: 0 nominal, 1 fair, 2 serious, 3 critical.
     public var thermal: Int
     public var batteryPercent: Int?
+    /// Public OS low-battery warning, separate from the user's Low Power Mode setting.
+    /// Nil means unavailable; the default preserves legacy deterministic fixtures.
+    public var lowPowerWarning: Bool?
     /// Battery current in mA: negative while it drains, even on a charger that can't keep up.
     public var current: Int?
 
-    public init(temperature: Double?, thermal: Int, batteryPercent: Int?, current: Int? = nil) {
-        self.temperature = temperature
+    public var isValid: Bool {
+        // The model-specific Celsius sensor is diagnostic only. Public OS pressure and
+        // charge are required; an unsupported optional sensor must not disable the product.
+        guard let batteryPercent else { return false }
+        return (0...100).contains(batteryPercent) && (0...3).contains(thermal)
+    }
+
+    public init(temperature: Double?, thermal: Int, batteryPercent: Int?, current: Int? = nil,
+                lowPowerWarning: Bool? = false) {
+        self.temperature = temperature?.isFinite == true ? temperature : nil
         self.thermal = thermal
         self.batteryPercent = batteryPercent
         self.current = current
+        self.lowPowerWarning = lowPowerWarning
     }
 }
 
-/// Temperature and thermal limits for one lid state.
-public struct SafetyLimits: Equatable, Sendable {
-    /// Ends the hold once it has held for `sustain` seconds; nil disables the early rule.
-    public var earlyTemperature: Double?
-    public var earlyThermal: Int?
-    /// Ends the hold immediately.
-    public var hardTemperature: Double
-    public var hardThermal: Int
-    public var sustain: TimeInterval
-}
-
-/// Limits the user chose in Settings. Applied only where they are stricter than the defaults,
-/// so neither the app nor a hand-edited control file can loosen a limit.
+/// Explicit user choices. macOS low-battery warnings and thermal protection are
+/// independent; lowering a reserve never disables either OS signal.
 public struct UserLimits: Codable, Equatable, Sendable {
     public var batteryFloor: Int?
-    /// Battery temperature that ends a hold at once with the lid closed; the one-minute early
-    /// limit moves down with it.
+    /// Legacy fields retained for decoding/backups only. New service requests reject them.
     public var closedLidMaxTemperature: Double?
     public var openLidMaxTemperature: Double?
     public var maxHoldHours: Double?
@@ -56,41 +56,20 @@ public struct UserLimits: Codable, Equatable, Sendable {
     }
 }
 
-/// Limits for keeping a Mac awake on battery. A closed lid may mean a bag with no airflow, so
-/// it is held to much stricter limits than an open, in-use Mac, whose own thermal management
-/// is enough. The defaults are the loosest allowed; users can only tighten them.
+/// Public macOS thermal pressure plus a user-selected battery reserve and time allowance.
+/// Celsius readings never determine the active policy. Old fields are decoded only for migration.
 public enum SafetyPolicy {
     public static let maxHold: TimeInterval = 4 * 3600
     public static let batteryFloor = 20
+    public static let resumeBatteryMargin = 5
 
-    public static let closedLid = SafetyLimits(earlyTemperature: 40, earlyThermal: 2,
-                                               hardTemperature: 43, hardThermal: 3, sustain: 60)
-    public static let openLid = SafetyLimits(earlyTemperature: nil, earlyThermal: nil,
-                                             hardTemperature: 45, hardThermal: 3, sustain: 60)
-
-    /// Below this a limit would end every hold at once, which helps nobody.
-    public static let lowestTemperature: Double = 35
     public static let highestFloor = 80
-
-    // What Settings offers, defaults first.
-    public static let floorChoices = [20, 25, 30, 40, 50]
-    public static let closedLidChoices: [Double] = [43, 42, 41, 40, 38]
-    public static let openLidChoices: [Double] = [45, 44, 43, 42, 40]
+    public static let floorChoices = [5, 10, 15, 20, 25, 30, 40, 50]
     public static let maxHoldChoices: [Double] = [4, 3, 2, 1]
 
-    public static func limits(lidClosed: Bool, user: UserLimits? = nil) -> SafetyLimits {
-        var l = lidClosed ? closedLid : openLid
-        guard let requested = lidClosed ? user?.closedLidMaxTemperature : user?.openLidMaxTemperature
-        else { return l }
-        let hard = min(l.hardTemperature, max(lowestTemperature, requested))
-        let shift = l.hardTemperature - hard
-        l.hardTemperature = hard
-        l.earlyTemperature = l.earlyTemperature.map { $0 - shift }
-        return l
-    }
-
     public static func floor(_ user: UserLimits?) -> Int {
-        min(highestFloor, max(batteryFloor, user?.batteryFloor ?? batteryFloor))
+        // Preserve older, stricter reserves above the new selection list.
+        min(highestFloor, max(5, user?.batteryFloor ?? batteryFloor))
     }
 
     public static func maxHold(_ user: UserLimits?) -> TimeInterval {
@@ -98,34 +77,24 @@ public enum SafetyPolicy {
         return min(maxHold, max(1800, hours * 3600))
     }
 
-    /// The early-warning condition, tracked by the caller to know how long it has held.
-    public static func isWarm(_ r: SafetyReadings, lidClosed: Bool, user: UserLimits? = nil) -> Bool {
-        let l = limits(lidClosed: lidClosed, user: user)
-        let warmTemperature = l.earlyTemperature.map { (r.temperature ?? 0) >= $0 } ?? false
-        let warmThermal = l.earlyThermal.map { r.thermal >= $0 } ?? false
-        return warmTemperature || warmThermal
-    }
-
-    /// Returns why the hold must end now, or nil to keep holding. `warmSince` must be reset by
-    /// the caller whenever the lid state changes, so a closing lid starts its own countdown.
+    /// Stop at serious or critical pressure without a temperature-derived grace period.
+    /// Lid/grace arguments remain source-compatible for legacy clients; neither changes
+    /// the OS-pressure policy. A keep-awake tool cannot diagnose chassis or battery health.
     public static func verdict(_ r: SafetyReadings, lidClosed: Bool, now: Date,
                                holdUntil: Date, warmSince: Date?, user: UserLimits? = nil) -> HoldEnd? {
-        guard let temperature = r.temperature else { return .sensor }  // fail safe
-        let l = limits(lidClosed: lidClosed, user: user)
-        if temperature >= l.hardTemperature { return .heat }
-        if r.thermal >= l.hardThermal { return .thermal }
-        if let warmSince, now.timeIntervalSince(warmSince) >= l.sustain,
-           isWarm(r, lidClosed: lidClosed, user: user) {
-            return (l.earlyTemperature.map { temperature >= $0 } ?? false) ? .heat : .thermal
-        }
+        guard r.isValid else { return .sensor }
+        if r.thermal >= 2 { return .thermal }
+        guard let warning = r.lowPowerWarning else { return .sensor }
+        if warning { return .battery }
         if let percent = r.batteryPercent, percent <= floor(user) { return .battery }
         if now >= holdUntil { return .time }
         return nil
     }
 
     /// A hold started at or below the floor would end at once.
-    public static func canStartHold(batteryPercent: Int?, user: UserLimits? = nil) -> Bool {
-        guard let batteryPercent else { return true }
+    public static func canStartHold(batteryPercent: Int?, user: UserLimits? = nil,
+                                    lowPowerWarning: Bool? = false) -> Bool {
+        guard lowPowerWarning == false, let batteryPercent, (0...100).contains(batteryPercent) else { return false }
         return batteryPercent > floor(user)
     }
 

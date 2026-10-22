@@ -6,92 +6,138 @@ import Foundation
 public enum Diagnostics {
     /// Builds the report. `since` limits the logs (e.g. the start of a `--record` session);
     /// otherwise the last `hours` are included. Runs `pmset` and `log`, so it takes a few seconds.
-    public static func report(appVersion: String?, since: Date? = nil, hours: Double = 24) -> String {
+    public static func report(appVersion: String?, since: Date? = nil, hours: Double = 24, includeProcessNames: Bool = false,
+                              userSession: UserSessionReply? = nil, userSessionRequested: Bool = false,
+                              capabilities: MacCapabilities? = nil, remoteContext: RemoteInteropContext? = nil,
+                              commonActivity: UserSessionActivity? = nil) -> String {
+        let hours = DiagnosticRecording.reportHours(hours)
+        let simulated = TetherPaths.serviceSocket != TetherPaths.productionSocket
+        let capabilities = capabilities ?? (simulated ? nil : SystemProbe.capabilities)
+        let directory = simulated ? URL(fileURLWithPath: TetherPaths.serviceSocket).deletingLastPathComponent().path : TetherPaths.supportDirectory
+        let live = try? ServiceClient().perform(ServiceRequest(.snapshot))
+        var status = live?.status ?? JSONFile.read(Status.self, from: directory + "/status.json")
+        if let live { status?.protection = live.protection }
+        let control = live?.control ?? JSONFile.read(Control.self, from: directory + "/control.json")
+        let usage = JSONFile.read(Usage.self, from: directory + "/usage.json")
+        var snapshot = simulated ? Snapshot(power: status?.power ?? .unknown, lidClosed: status?.observedLidClosed,
+                                           sleepDisabled: status?.observedSleepDisabled, fullWake: status?.fullWake,
+                                           externalDisplay: status?.externalDisplay ?? false) : SystemProbe.snapshot()
+        if simulated { snapshot.displayTopology = status?.displayTopology ?? .unknown }
+        let readings = simulated ? SafetyReadings(temperature: status?.batteryTemperature, thermal: status?.thermal ?? 0,
+                                                  batteryPercent: status?.batteryPercent) : SystemProbe.safetyReadings()
+        let lowPower: (battery: Int?, ac: Int?) = simulated ? (nil, nil) : SystemProbe.lowPowerModes()
+        let installed = !simulated && FileManager.default.fileExists(atPath: TetherPaths.helperPlistPath)
+        let responding = live != nil
+        let checks = simulated ? [] : HealthChecks.run(language: .english, userSession: userSession,
+            userSessionRequested: userSessionRequested, capabilities: capabilities)
         let now = Date()
-        let from = since ?? now.addingTimeInterval(-hours * 3600)
-        let status = JSONFile.read(Status.self, from: TetherPaths.statusPath)
-        let control = JSONFile.read(Control.self, from: TetherPaths.controlPath)
-        let usage = JSONFile.read(Usage.self, from: TetherPaths.usagePath)
-        let snapshot = SystemProbe.snapshot()
-        let readings = SystemProbe.safetyReadings()
-        let lowPower = SystemProbe.lowPowerModes()
-        let installed = FileManager.default.fileExists(atPath: TetherPaths.helperPlistPath)
-        let responding = status.map { now.timeIntervalSince1970 - $0.updatedAt < 90 } ?? false
+        let from = min(now, max(now.addingTimeInterval(-72 * 3600), since ?? now.addingTimeInterval(-hours * 3600)))
 
         var out: [String] = []
         out.append("# Tether diagnostic report")
         out.append("")
-        out.append("Generated \(stamp(now)) · app \(appVersion ?? "unknown") · helper \(status?.version ?? "not running")"
+        out.append("Generated \(stamp(now)) · app \(appVersion ?? "unknown") build \(TetherPaths.build) · helper \(status?.version ?? "not running") build \(status?.build.map(String.init) ?? "unknown")"
                    + " · macOS \(osVersion()) · \(model())")
         out.append("Logs from \(stamp(from))\(since == nil ? " (last \(String(format: "%g", hours)) h)" : " (recording)").")
+        out.append("Scope: \(simulated ? "SIMULATED dry-run; no live power/display/other-app evidence" : "live read-only observation"). Logs are bounded by retention and report limits; gaps are possible.")
         out.append("")
         out.append("## Checks")
         out.append("")
-        for check in HealthChecks.run(now: now, language: .english) {
+        for check in checks {
             out.append("- [\(check.result.rawValue.uppercased())] \(check.name): \(check.detail)")
         }
         out.append("")
-        out.append(expectations)
+        out.append(expectations(userSessionRequested: userSessionRequested))
+        if userSessionRequested {
+            out.append(commonSessionReport(userSession, now: now))
+            if let commonActivity { out.append(commonActivity.report(since: from)) }
+            else { out.append("Common activity buffer not supplied by this caller; missing events are not proof of inactivity.\n") }
+        }
+        if let remoteContext {
+            out.append("## Remote observations (separate from power checks)")
+            out.append("")
+            out.append("Captured metadata and per-metric availability; no current remote connection, unlocked screen, frame delivery or input success is implied.")
+            out.append(contentsOf: remoteContext.reportLines().map { "- " + $0 })
+            out.append("")
+        }
 
-        out.append("## State now")
+        out.append(userSessionRequested ? "## Helper and OS evidence (separate from common work)" : "## State now")
         out.append("")
         out.append("| | |")
         out.append("|---|---|")
         let rows: [(String, String)] = [
-            ("supported Mac (battery and lid)", yes(SystemProbe.isSupportedMac)),
+            ("supported Apple Silicon / macOS platform", simulated ? "simulated" : yes(SystemProbe.isSupportedMac)),
             ("helper installed / responding", "\(yes(installed)) / \(yes(responding))"),
-            ("Tether enabled", control.map { yes($0.enabled) } ?? "? (no control file)"),
+            ("state source", live == nil ? "saved file only; live connection unverified" : "authenticated service reply"),
+            ("observations fresh", yes(HealthChecks.fresh(status?.updatedAt, now: now))),
+            (userSessionRequested ? "legacy helper enabled (not the common choice)" : "Tether enabled", control.map { yes($0.enabled) } ?? "? (no control file)"),
             ("power", snapshot.power.rawValue),
-            ("lid", snapshot.lidClosed ? "closed" : "open"),
-            ("SleepDisabled (clamshell)", yes(snapshot.sleepDisabled)),
-            ("full wake", yes(snapshot.fullWake)),
-            ("external display keeps a closed Mac awake", yes(snapshot.externalDisplay)),
             ("battery", readings.batteryPercent.map { "\($0)%" } ?? "?"),
             ("battery temperature", readings.temperature.map { String(format: "%.1f °C", $0) } ?? "unreadable"),
             ("thermal pressure", "\(readings.thermal) (\(thermalName(readings.thermal)))"),
             ("Low Power Mode battery / AC", "\(lowPower.battery.map(String.init) ?? "?") / \(lowPower.ac.map(String.init) ?? "?")"),
             ("battery hold until", status?.batteryHoldUntil.map { stamp(Date(timeIntervalSince1970: $0)) } ?? "none"),
-            ("battery hold source", control?.holdSource ?? "-"),
+            ("battery hold source", safeHoldSource(control?.holdSource)),
+            ("display topology", snapshot.displayTopology.rawValue),
+            ("display sleeping (observed)", status?.displaySleeping.map(yes) ?? "unknown"),
+            ("app connected", status?.appConnected.map(yes) ?? "unknown"),
+            ("protection stop", status?.protection?.blockReason ?? "none reported"),
+            ("last apply error", status?.protection?.lastError ?? "none reported"),
+            ("detailed logging", control.map { yes($0.debugLoggingActive) } ?? "unknown"),
             ("heat guard active", yes(status?.heatGuard == true)),
             ("last event", status?.lastEvent.map { "\($0.rawValue) at \(status?.lastEventAt.map { stamp(Date(timeIntervalSince1970: $0)) } ?? "?")" } ?? "-"),
             ("last hold end", status?.lastHoldEnd.map { "\($0.rawValue) at \(status?.lastHoldEndAt.map { stamp(Date(timeIntervalSince1970: $0)) } ?? "?")" } ?? "-"),
-            ("app path reported to the helper", control?.appPath ?? "-"),
         ]
         for (key, value) in rows { out.append("| \(key) | \(value) |") }
+        for (key, value) in osObservationRows(snapshot, capabilities: capabilities, simulated: simulated) {
+            out.append("| \(key) | \(value) |")
+        }
         out.append("")
+
+        if !simulated {
+        let displayReport = DisplayProbe.inspect()
+        out.append("## Display connection evidence")
+        out.append("")
+        out.append(displayReport.summary)
+        out.append(displayReport.guidance)
+        for display in displayReport.displays {
+            out.append("- \(display.name): \(display.detail). \(display.evidence)")
+        }
+        if let issue = displayReport.issue { out.append(issue) }
+        out.append("")
+        }
 
         out.append("## Limits in force")
         out.append("")
-        let limits = control?.limitsInForce(UsageSummary(usage, now: now))
-        let closed = SafetyPolicy.limits(lidClosed: true, user: limits)
-        let open = SafetyPolicy.limits(lidClosed: false, user: limits)
-        let heat = control?.heatGuard ?? .standard
-        out.append("- Battery hold, lid closed: end at \(Int(closed.hardTemperature)) °C at once, or after 60 s at "
-                   + "\(Int(closed.earlyTemperature ?? 0)) °C or thermal ≥ 2; thermal 3 at once.")
-        out.append("- Battery hold, lid open: end at \(Int(open.hardTemperature)) °C or thermal 3.")
-        out.append("- Battery floor \(SafetyPolicy.floor(limits))%, longest hold \(SafetyPolicy.maxHold(limits) / 3600) h.")
-        out.append("- Auto-adjust to this Mac's measurements (temperature limits and longest hold, never looser than the defaults): "
-                   + "\(control?.autoLimits == true ? "on" : "off").")
-        out.append("- Low Power Mode during battery holds: \(control?.holdLowPower == false ? "off" : "on").")
-        out.append("- Heat guard: \(heat.enabled ? "on, Low Power Mode from thermal \(heat.threshold)" : "off"); "
-                   + "overheat sleep (no external display, critical 2 min or battery ≥ \(Int(ACThermalPolicy.hotBattery)) °C 1 min) is always on.")
+        out.append("- Stop Tether's hold at macOS serious or critical thermal pressure. Explicit resume after nominal/fair and sufficient reserve.")
+        out.append("- " + batteryLimitSummary(userSession: userSession, userSessionRequested: userSessionRequested,
+            capabilities: capabilities, legacyLimits: control?.limits, now: now))
+        out.append("- Battery Celsius is diagnostic only. Energy modes, fans and native external-display clamshell are managed by macOS.")
+        if let recovery = status?.displayRecovery {
+            out.append("- Display recovery: \(recovery.phase.rawValue), \(recovery.requests)/\(recovery.maximumRequests) requests. OS sleep observations do not measure panel power.")
+        }
         out.append("")
 
         out.append("## Settings (control.json)")
         out.append("")
         out.append("```json")
-        out.append(control.flatMap(prettyJSON) ?? "(missing)")
+        var reportControl = control
+        reportControl?.appPath = nil
+        if let source = reportControl?.holdSource { reportControl?.holdSource = safeHoldSource(source) }
+        out.append(reportControl.flatMap(prettyJSON) ?? "(missing)")
         out.append("```")
         out.append("")
 
-        let blockers = SystemProbe.sleepBlockers()
+        let activity = simulated ? nil : SystemProbe.powerActivitySnapshot()
+        let blockers = activity?.blockers
         out.append("## Power assertions (who keeps the Mac or display awake)")
         out.append("")
-        if blockers.isEmpty {
-            out.append("None besides powerd.")
-        } else {
-            for b in blockers { out.append("- \(b.process) (pid \(b.pid)): \(b.kind.rawValue) · \(b.reason)") }
-        }
+        out.append(simulated ? "Not collected in dry-run." : assertionSummary(blockers, includeProcessNames: includeProcessNames))
+        out.append("")
+        out.append("## macOS idle settings and user activity (read only)")
+        out.append("")
+        out.append(simulated ? "Not collected in dry-run." : powerInfluenceSummary(
+            preferences: PowerSleepPreferences.read(), signals: activity?.signals, includeProcessNames: includeProcessNames))
         out.append("")
 
         if let usage {
@@ -108,7 +154,7 @@ public enum Diagnostics {
                     + (r.onBatteryBefore && r.onBatteryAfter == true ? "" : " (power)")
                 out.append("| \(stamp(Date(timeIntervalSince1970: r.sleptAt))) | \(Int((r.duration ?? 0) / 60)) min | \(charge) | "
                            + "\(r.drainPerHour.map { String(format: "%.1f%%", $0) } ?? "-") | \(r.sleepReason ?? "?") | \(yes(r.byTether)) | "
-                           + "\(r.wakeType ?? "?") / \(r.wakeReason ?? "?") | \(r.darkWakes) |")
+                           + "\(r.wakeType ?? "?") / \(r.wakeReason ?? "?") | \(r.darkWakeSummary) |")
             }
             out.append("")
             out.append("## Recent lid sessions")
@@ -123,81 +169,175 @@ public enum Diagnostics {
             out.append("")
             out.append("## Last 7 days")
             out.append("")
-            out.append("| day | lid closed awake | forced sleeps | holds | heat guards | closed peak / usual °C | open peak °C |")
+            out.append("| day | lid closed awake | sleep request attempts | holds | heat guards | closed peak / usual °C | open peak °C |")
             out.append("|---|---|---|---|---|---|---|")
             for d in usage.stats.week(now: now) {
-                out.append("| \(d.day) | \(Int(d.lidClosedSeconds / 60)) min | \(d.forcedSleeps) | \(d.batteryHolds) | \(d.heatGuards) | "
+                out.append("| \(d.day) | \(Int(d.lidClosedSeconds / 60)) min | \(d.sleepRequestAttempts) | \(d.batteryHolds) | \(d.heatGuards) | "
                            + "\(d.closedTemps?.max.map { String(format: "%.1f", $0) } ?? "-") / \(d.closedTemps?.percentile(0.5).map { String(format: "%.0f", $0) } ?? "-") | "
                            + "\(d.openTemps?.max.map { String(format: "%.1f", $0) } ?? "-") |")
             }
+            out.append("")
+            out.append("Sleep-request attempts include refused calls and do not establish completed physical sleep. Legacy totals stored as forcedSleeps are retained.")
             out.append("")
         }
 
         out.append("## Helper log")
         out.append("")
         out.append("```")
-        out.append(helperLog(since: from).joined(separator: "\n"))
+        out.append(helperLog(since: from, path: simulated ? directory + "/helper.log" : TetherPaths.helperLog).joined(separator: "\n"))
         out.append("```")
         out.append("")
-        out.append("## macOS power log (sleep, wake and Tether assertions)")
+        out.append("## macOS power log (sleep, wake and display events)")
         out.append("")
         out.append("```")
-        out.append(powerLog(since: from).joined(separator: "\n"))
+        out.append(simulated ? "Not collected in dry-run." : powerLog(since: from).joined(separator: "\n"))
         out.append("```")
         out.append("")
         out.append("## App log")
         out.append("")
         out.append("```")
-        out.append(appLog(since: from))
+        out.append(simulated ? "Not collected in dry-run." : appLog(since: from))
         out.append("```")
         return redact(out.joined(separator: "\n"))
     }
 
     // MARK: Pieces
 
-    static let expectations = """
+    static func osObservationRows(_ snapshot: Snapshot, capabilities: MacCapabilities?, simulated: Bool) -> [(String, String)] {
+        [
+            ("lid", capabilities?.hardware == .desktop ? "not applicable (desktop)"
+                : snapshot.observedLidClosed.map { $0 ? "closed" : "open" } ?? "unknown"),
+            ("SleepDisabled (clamshell)", snapshot.observedSleepDisabled.map(yes) ?? "unknown"),
+            ("full wake", snapshot.observedFullWake.map(yes) ?? (simulated ? "unknown (not captured in dry-run status)" : "unknown")),
+            ("additional display observed", snapshot.displayTopology == .unknown ? "unknown" : yes(snapshot.externalDisplay))
+        ]
+    }
+
+    static func batteryLimitSummary(userSession: UserSessionReply?, userSessionRequested: Bool,
+                                   capabilities: MacCapabilities?, legacyLimits: UserLimits?, now: Date) -> String {
+        if userSessionRequested {
+            guard capabilities?.internalBattery != false else { return "Battery limits: not applicable (no internal battery)." }
+            guard capabilities?.internalBattery == true else { return "Battery limits: battery capability unverified; no applied-limit verdict." }
+            guard let status = HealthChecks.currentCommonStatus(userSession, now: now) else {
+                return "Common battery limits unavailable; helper settings and defaults do not substitute for a current common reply."
+            }
+            return batteryLimitSummary(status.limits)
+        }
+        return batteryLimitSummary(legacyLimits)
+    }
+
+    private static func batteryLimitSummary(_ limits: UserLimits?) -> String {
+        "Battery floor \(SafetyPolicy.floor(limits))%, longest hold \(SafetyPolicy.maxHold(limits) / 3600) h. These are usage allowances, not hardware damage thresholds."
+    }
+
+    static func expectations(userSessionRequested: Bool) -> String {
+        let display = userSessionRequested
+            ? "The display-keeping choice defaults to off. When selected, the app holds an idle display-sleep request for all displays only during a valid work session, releasing it at session end or protection stop. Choice, active request and request error are reported separately. It does not change manual lock or macOS password requirements; closed-lid and screen-saver locking need separate verification."
+            : "The helper requests native display sleep under a closed lid with no external display. Request success is not proof that the display or system slept; compare observed state and power logs."
+        return """
     ## How Tether should behave (compare the logs against this)
 
-    - On power: the helper sets `SleepDisabled` (log: "on power: clamshell on"). The Mac stays awake with the lid closed and the app keeps the display from sleeping, so nothing locks; with no external display it dims the built-in screen instead.
-    - Unplugged: the helper clears `SleepDisabled` ("power disconnected: clamshell off"). If the lid is already closed it asks for sleep ("lid already closed: sleeping"; powerd then waits about 5 s, `darkwakelinger`).
-    - Battery hold: clamshell stays on on battery until the time is up or a safety limit ends it ("battery hold ended: …"), then a closed Mac sleeps. Holds never survive a helper restart. With auto-adjust on (control.json "autoLimits": true) the temperature limits and the longest hold follow this Mac's measurements, never looser than the defaults; the helper logs the limits in force whenever they change ("limits (auto-adjusted): …").
-    - Heat guard: on power with the lid closed, thermal pressure at the threshold turns AC Low Power Mode on; it is restored after 2 cool minutes or when the lid opens.
-    - Safety net on power with the lid closed and no external display: critical heat for 2 min, a battery at 45 °C for 1 min, or a battery at the floor still draining for 1 min (a charger that can't keep up) puts the Mac to sleep ("putting the Mac to sleep").
-    - Dark wakes: clamshell mode is only turned on in a full wake, so a Mac put to sleep on power goes back to sleep after Power Nap wakes.
-    - The switch: off (control.json "enabled": false) lasts until power is connected again, when the helper turns it back on ("clamshell mode switched back on").
-    - "Sleep now" is cancelled by any input during powerd's pre-sleep window; the app waits for input to settle first.
-    - Idle-sleep assertions from other apps (see "Power assertions") do not stop lid-close sleep or Tether's own sleep, but keep an open Mac awake on battery.
-    - Desktop Macs (no battery or lid): Tether changes nothing.
-    - Sleep log: "per hour" above 3% means something kept waking the Mac; see wake reasons and dark wakes.
+    - Power condition: AC only (default), battery only, or both. Manual off remains off.
+    - Common work: the app coordinator owns general idle-sleep requests; a desktop does not require a lid helper. Automatic power conditions, direct battery reservations and manual sessions have separate user intent.
+    - Battery: use a bounded timer and shared continuous-time budget with OS thermal and charge protection. The optional manual session is unlimited only on AC and at most 2 hours on battery. Temporary sessions are not replayed after restart.
+    - Protection: a safety stop persists until explicit resume with safe readings. The watchdog clears a stale override on AC or battery.
+    - Display: \(display)
+    - New sessions never change energy modes. A legacy saved mode is restored only when its journal and current value agree; intervening user changes are retained.
 
     """
+    }
 
-    /// The helper's log lines from `since` on (at most the last 400), plus the line before, so
-    /// the state going in is visible.
-    static func helperLog(since: Date) -> [String] {
-        guard let text = try? String(contentsOfFile: TetherPaths.helperLog, encoding: .utf8) else {
-            return ["(no helper log at \(TetherPaths.helperLog))"]
+    static func commonSessionReport(_ reply: UserSessionReply?, now: Date) -> String {
+        var out = ["## Common work session", "", "Source: app coordinator snapshot; no saved helper setting substitutes for this state."]
+        guard let status = HealthChecks.currentCommonStatus(reply, now: now), let reply else {
+            out.append("Current common state unavailable: missing, failed, incompatible or stale reply. Actual work, Sleep/Wake and remote readiness are unverified.")
+            return out.joined(separator: "\n") + "\n"
         }
-        let lines = linesSince(text, since: since, format: "yyyy-MM-dd HH:mm:ss", width: 19).suffix(400)
-        return lines.isEmpty ? ["(nothing logged in this window)"] : Array(lines)
+        out.append("Captured \(stamp(Date(timeIntervalSince1970: reply.observedAt))) · epoch \(reply.epoch) · revision \(reply.revision)")
+        out += ["", "| | |", "|---|---|"]
+        let rows: [(String, String)] = [
+            ("user enabled", yes(status.enabled)), ("automatic setting / active reason", "\(yes(status.automaticEnabled)) / \(yes(status.automaticActive))"),
+            ("automatic power condition", status.powerCondition.rawValue), ("manual active", yes(status.manualActive)),
+            ("own idle request active (app observation)", yes(status.holding)), ("power", status.power.rawValue),
+            ("display keeping selected", status.keepDisplayAwake.map(yes) ?? "unknown (not reported)"),
+            ("own display request active (app observation)", status.displayHolding.map(yes) ?? "unknown (not reported)"),
+            ("display request error", status.displayError ?? "none reported"),
+            ("battery reservation minutes", status.pendingBatteryMinutes.map(String.init) ?? "none"),
+            ("battery continuation deadline", status.batteryHoldUntil.map(stamp) ?? "none"),
+            ("effective deadline", status.until.map(stamp) ?? "none"), ("protection stop", status.blockReason ?? "none reported"),
+            ("native request error", status.error ?? "none reported"), ("lid support (app observation)", reply.lidSupport.rawValue),
+            ("helper connected", reply.helperConnected.map(yes) ?? "not required or unverified")
+        ]
+        for (key, value) in rows { out.append("| \(key) | \(value) |") }
+        out.append("Display choice and native request activation are separate. Unknown display fields are not a confirmed off state. Request activation does not prove physical lid retention, display sleep, panel power, absence of locking, or remote frames/input.")
+        return out.joined(separator: "\n") + "\n"
+    }
+
+    /// Includes rotated files. Markers remain searchable; truncation is disclosed explicitly.
+    static func helperLog(since: Date, path: String = TetherPaths.helperLog) -> [String] {
+        let text = LogArchive.read(path: path)
+        guard !text.isEmpty else { return ["(helper logs missing, empty or unreadable)"] }
+        let lines = linesSince(text, since: since, format: "yyyy-MM-dd HH:mm:ss", width: 19)
+        let markers = lines.filter { $0.contains("diagnostic marker ") }.suffix(30)
+        let header = ["(current + up to 3 archives; showing latest \(min(lines.count, 1200)) of \(lines.count) matching lines)"]
+        return header + (markers.isEmpty ? [] : ["Markers in this window:"] + Array(markers))
+            + (lines.isEmpty ? ["(nothing retained in this window)"] : Array(lines.suffix(1200)))
+    }
+
+    public static func assertionSummary(_ blockers: [SleepBlocker]?, includeProcessNames: Bool) -> String {
+        guard let blockers else { return "Request query failed; this does not mean there are no active requests." }
+        guard !blockers.isEmpty else { return "None besides powerd at collection time." }
+        let pids = Array(Set(blockers.map(\.pid))).sorted()
+        return blockers.map { blocker in
+            let label = includeProcessNames ? blocker.process.replacingOccurrences(of: "\n", with: " ") : "Process \((pids.firstIndex(of: blocker.pid) ?? 0) + 1)"
+            let purpose = blocker.purpose.map { " · \($0.rawValue) request" } ?? ""
+            return "- \(label) (pid \(blocker.pid)): \(blocker.kind.rawValue)\(purpose)"
+        }.joined(separator: "\n") + "\nAssertion names/payloads omitted."
+    }
+
+    public static func powerInfluenceSummary(preferences: PowerSleepPreferences, signals: [PowerActivitySignal]?,
+                                             includeProcessNames: Bool) -> String {
+        func minutes(_ value: Int?) -> String { value.map { $0 == 0 ? "disabled (0)" : "\($0) min" } ?? "unavailable" }
+        var lines: [String] = []
+        for (name, setting) in [("AC", preferences.ac), ("Battery", preferences.battery)] {
+            lines.append("- \(name): idle system sleep \(minutes(setting?.systemMinutes)); display sleep \(minutes(setting?.displayMinutes)); terminal keep-awake \(setting?.terminalKeepsAwake.map(yes) ?? "unavailable").")
+        }
+        if let signals {
+            if signals.isEmpty { lines.append("No user-activity or internal display-delay request observed at collection time.") }
+            for signal in signals {
+                let owner = includeProcessNames ? signal.process.replacingOccurrences(of: "\n", with: " ") : "pid \(signal.pid)"
+                let input = signal.sourcePID.map { " · OS input-process hint pid \($0)" } ?? ""
+                lines.append("- \(owner): \(signal.kind.rawValue)\(input).")
+            }
+        } else { lines.append("User-activity query unavailable; absence of input is not established.") }
+        lines.append("Saved idle settings and reported activity do not establish actual Sleep, remote authentication, or the writer of a shared setting. They do not extend Tether's lid permission or battery deadline. Raw assertion payloads omitted.")
+        return lines.joined(separator: "\n")
+    }
+
+    private static func safeHoldSource(_ source: String?) -> String {
+        guard let source else { return "-" }
+        return ["app", "cli", "url", "automatic"].contains(source) ? source : "legacy/custom (omitted)"
     }
 
     static func powerLog(since: Date) -> [String] {
-        let text = Shell.run("/usr/bin/pmset", ["-g", "log"]).output
+        let result = Shell.run("/usr/bin/pmset", ["-g", "log"])
+        guard result.status == 0 else { return ["(power log query failed: \(result.status))"] }
+        let text = result.output
         let keep = linesSince(text, since: since, format: "yyyy-MM-dd HH:mm:ss Z", width: 25)
             .filter(isInterestingPowerLine)
             .map { $0.replacingOccurrences(of: "\t", with: "  ").trimmingCharacters(in: .whitespaces) }
-        return keep.isEmpty ? ["(no sleep, wake or Tether entries in this window)"] : Array(keep.suffix(300))
+        return keep.isEmpty ? ["(no retained sleep, wake or display entries in this window)"] : Array(keep.suffix(300))
     }
 
-    /// `pmset -g log` lines are "<25-char timestamp> <kind, padded>\t<message>". Keep sleep and
-    /// wake events and Tether's own entries; drop other apps' assertion churn and the periodic
-    /// "Summary" repeats of assertions already listed.
+    /// Keep sleep/wake/display evidence. Current assertions are summarized separately
+    /// without exporting their free-form names or payloads.
     public static func isInterestingPowerLine(_ line: String) -> Bool {
         let head = line.split(separator: "\t", maxSplits: 1).first.map(String.init) ?? ""
         let kind = head.count > 26 ? String(head.dropFirst(26)).trimmingCharacters(in: .whitespaces) : ""
         if ["Sleep", "Wake", "DarkWake", "Failure", "Wake Requests", "Kernel Client Acks"].contains(kind) { return true }
-        if kind == "Assertions" && line.contains(") Summary ") { return false }
+        // Assertion descriptions may contain document names or LLM task text, even when
+        // they mention Tether. Current requests are exported separately without payloads.
+        if kind == "Assertions" { return false }
         return line.contains("Tether") || line.contains("local.tether") || line.contains("Display is turned")
     }
 
@@ -205,6 +345,7 @@ public enum Diagnostics {
         let minutes = max(1, Int(Date().timeIntervalSince(since) / 60) + 1)
         let result = Shell.run("/usr/bin/log", ["show", "--style", "compact", "--last", "\(minutes)m",
                                                 "--predicate", "subsystem == \"\(TetherPaths.logSubsystem)\""])
+        guard result.status == 0 else { return "(app log query failed: \(result.status))" }
         let lines = result.output.split(separator: "\n").filter { !$0.hasPrefix("Timestamp") }.suffix(300)
         return lines.isEmpty ? "(no app log entries)" : lines.joined(separator: "\n")
     }
@@ -229,7 +370,9 @@ public enum Diagnostics {
     /// Masks the user's name, home folder and the Mac's name.
     public static func redact(_ text: String, home: String = NSHomeDirectory(), user: String = NSUserName(),
                               fullName: String = NSFullUserName(), host: String = ProcessInfo.processInfo.hostName) -> String {
-        var s = text.replacingOccurrences(of: home, with: "~")
+        // Older apps logged complete deep links. Drop their arguments from exported history.
+        var s = text.replacingOccurrences(of: #"tether://[^\s]+"#, with: "tether://<command omitted>", options: .regularExpression)
+        s = s.replacingOccurrences(of: home, with: "~")
         s = s.replacingOccurrences(of: "/Users/\(user)", with: "/Users/<user>")
         let hostShort = host.components(separatedBy: ".").first ?? host
         for (value, mask) in [(fullName, "<name>"), (hostShort, "<host>"), (user, "<user>")] where value.count >= 3 {

@@ -12,49 +12,58 @@ final class SafetyPolicyTests: XCTestCase {
                              warmSince: warmFor.map { now.addingTimeInterval(-$0) })
     }
 
-    // Closed lid (maybe in a bag): strict.
-    func testClosedLidHardTemperatureEndsImmediately() {
-        XCTAssertEqual(verdict(43.0), .heat)
+    func testSeriousAndCriticalStopWithEitherLidState() {
+        for closed in [true, false] {
+            for thermal in [2, 3] { XCTAssertEqual(verdict(nil, thermal: thermal, closed: closed), .thermal) }
+        }
     }
 
-    func testClosedLidWarmButNotYetSustainedKeepsHolding() {
-        XCTAssertNil(verdict(41.0, warmFor: 30))
+    func testCelsiusReadingsAreNotSafetyThresholds() {
+        for value in [nil, 30.0, 43.0, 80.0, Double.nan, Double.infinity] {
+            XCTAssertNil(verdict(value))
+            XCTAssertNil(verdict(value, closed: false))
+        }
     }
 
-    func testClosedLidWarmForAMinuteEnds() {
-        XCTAssertEqual(verdict(41.0, warmFor: 61), .heat)
-    }
-
-    func testClosedLidCriticalThermalEndsImmediately() {
-        XCTAssertEqual(verdict(30.0, thermal: 3), .thermal)
-    }
-
-    func testClosedLidSeriousThermalForAMinuteEnds() {
-        XCTAssertEqual(verdict(30.0, thermal: 2, warmFor: 61), .thermal)
-    }
-
-    // Open lid (in use, normal airflow): only the hard limits.
-    func testOpenLidToleratesWhatClosedLidWouldNot() {
-        XCTAssertNil(verdict(44.0, closed: false))
-        XCTAssertNil(verdict(41.0, thermal: 2, closed: false, warmFor: 600))
-        XCTAssertFalse(SafetyPolicy.isWarm(SafetyReadings(temperature: 44, thermal: 2, batteryPercent: 80),
-                                           lidClosed: false))
-    }
-
-    func testOpenLidHardLimitsStillEnd() {
-        XCTAssertEqual(verdict(45.0, closed: false), .heat)
-        XCTAssertEqual(verdict(30.0, thermal: 3, closed: false), .thermal)
-    }
-
-    // Common limits.
-    func testUnreadableTemperatureFailsSafe() {
-        XCTAssertEqual(verdict(nil), .sensor)
-        XCTAssertEqual(verdict(nil, closed: false), .sensor)
+    func testMissingChargeOrInvalidThermalFailsSafe() {
+        XCTAssertEqual(verdict(nil, battery: nil), .sensor)
+        XCTAssertEqual(verdict(30, thermal: -1), .sensor)
+        XCTAssertEqual(verdict(30, thermal: 4), .sensor)
     }
 
     func testBatteryFloor() {
         XCTAssertEqual(verdict(30.0, battery: 20), .battery)
         XCTAssertNil(verdict(30.0, battery: 21))
+    }
+
+    func testExplicitReserveCanBeLowerThanDefaultWithoutDisablingOSWarning() {
+        XCTAssertEqual(SafetyPolicy.floor(nil), 20)
+        for floor in SafetyPolicy.floorChoices {
+            XCTAssertEqual(SafetyPolicy.floor(UserLimits(batteryFloor: floor)), floor)
+        }
+        let lowReserve = UserLimits(batteryFloor: 5)
+        XCTAssertTrue(SafetyPolicy.canStartHold(batteryPercent: 10, user: lowReserve))
+        XCTAssertFalse(SafetyPolicy.canStartHold(batteryPercent: 10, user: lowReserve, lowPowerWarning: true))
+        XCTAssertFalse(SafetyPolicy.canStartHold(batteryPercent: 5, user: lowReserve))
+        XCTAssertEqual(SafetyPolicy.floor(UserLimits(batteryFloor: 80)), 80, "Do not weaken an old stricter reserve")
+    }
+
+    func testOSBatteryWarningEndsBatteryHoldAboveTheReserveAndUnknownFailsClosed() {
+        for warning in [Bool?.some(true), nil] {
+            let readings = SafetyReadings(temperature: nil, thermal: 0, batteryPercent: 80, lowPowerWarning: warning)
+            XCTAssertEqual(SafetyPolicy.verdict(readings, lidClosed: true, now: now,
+                holdUntil: later, warmSince: nil), warning == true ? .battery : .sensor)
+            XCTAssertFalse(SafetyPolicy.canStartHold(batteryPercent: 80, lowPowerWarning: warning))
+        }
+        XCTAssertTrue(SafetyPolicy.canStartHold(batteryPercent: 80, lowPowerWarning: false))
+        XCTAssertEqual(SafetyReadings(temperature: nil, thermal: 0, batteryPercent: 80).lowPowerWarning, false)
+    }
+
+    func testPublicBatteryWarningValuesPreserveNoneEarlyFinalAndUnknown() {
+        XCTAssertEqual(SystemProbe.lowBatteryWarning(level: 1), false)
+        XCTAssertEqual(SystemProbe.lowBatteryWarning(level: 2), true)
+        XCTAssertEqual(SystemProbe.lowBatteryWarning(level: 3), true)
+        for value in [Int.min, -1, 0, 4, Int.max] { XCTAssertNil(SystemProbe.lowBatteryWarning(level: value)) }
     }
 
     func testTimeIsUp() {

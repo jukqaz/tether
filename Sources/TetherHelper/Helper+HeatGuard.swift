@@ -1,41 +1,49 @@
 import Foundation
 import TetherCore
 
-/// Heat with the lid closed on power: Low Power Mode. The critical-heat alert and the
-/// last-resort sleep are in `Helper+SafetyNet`.
+/// Recovery only: new sessions never change macOS energy modes. Keep this journal reader
+/// until every older helper can be upgraded/uninstalled without leaving its changes behind.
 extension Helper {
-    /// Lid closed on AC blocks the hinge vent: cool the Mac with Low Power Mode.
-    func updateHeatGuard(_ s: Snapshot, clamshellOn: Bool, readings r: SafetyReadings) {
-        let now = Date()
-        let settings = control.heatGuard ?? .standard
-        if r.thermal < settings.threshold {
-            if coolSince == nil { coolSince = now }
-        } else {
-            coolSince = nil
-        }
-        let want = ACThermalPolicy.wantsLowPower(clamshellOn: clamshellOn, onAC: s.power == .ac,
-                                                 lidClosed: s.lidClosed, thermal: r.thermal,
-                                                 lowPowerOn: state.savedACLowPower != nil,
-                                                 coolSince: coolSince, now: now, settings: settings)
-        manageACLowPower(on: want, readings: r)
+    func restoreLegacyPowerModes() {
+        _ = withRecoveryLock { restoreLegacyPowerModesLocked() }
     }
 
-    func manageACLowPower(on: Bool, readings: SafetyReadings) {
-        if on, state.savedACLowPower == nil {
-            let current = SystemProbe.lowPowerMode(section: "AC Power") ?? 0
-            state.savedACLowPower = current
-            saveState()
-            note(.heatGuardOn)
-            logReadings(readings)
-            usage.stats.recordHeatGuard(now: Date())
-            if current != 1 { pmset(["-c", "lowpowermode", "1"]) }
-        } else if !on, let saved = state.savedACLowPower {
-            if LowPowerPolicy.shouldRestore(current: SystemProbe.lowPowerMode(section: "AC Power"), saved: saved) {
-                pmset(["-c", "lowpowermode", String(saved)])
+    private func restoreLegacyPowerModesLocked() {
+        for onBattery in [true, false] {
+            guard let saved = onBattery ? state.savedBatteryLowPower : state.savedACLowPower else { continue }
+            guard let setting = currentPowerMode(onBattery: onBattery) else {
+                lastApplyError = "lowPowerUnreadable"; continue
             }
-            state.savedACLowPower = nil
-            saveState()
-            note(.heatGuardOff)
+            let signature = "\(setting.key.rawValue)|\(setting.value)|\(saved)"
+                + (dryRun ? "|\(String(describing: fake["commandFailure"]))|\(String(describing: fake["commandNoEffect"]))" : "")
+            if let failed = legacyRestoreFailures[onBattery], failed.key == signature {
+                lastApplyError = failed.error; continue
+            }
+            if LowPowerPolicy.shouldRestore(current: setting.value, saved: saved),
+               !restorePowerMode(setting, saved: saved, onBattery: onBattery) {
+                legacyRestoreFailures[onBattery] = (signature, lastApplyError ?? "powerVerificationFailed")
+                continue
+            }
+            // A successful setter or earlier read is not the last verification.
+            // Keep the recovery entry if this final query is unavailable or the
+            // original Tether value still needs restoration.
+            guard let verified = currentPowerMode(onBattery: onBattery),
+                  !LowPowerPolicy.shouldRestore(current: verified.value, saved: saved) else {
+                lastApplyError = "powerVerificationFailed"
+                legacyRestoreFailures[onBattery] = (signature, "powerVerificationFailed")
+                continue
+            }
+            // A different current value belongs to the user/another tool. Do not overwrite it.
+            if onBattery { state.savedBatteryLowPower = nil } else { state.savedACLowPower = nil }
+            if !saveState() {
+                if onBattery { state.savedBatteryLowPower = saved } else { state.savedACLowPower = saved }
+                continue
+            }
+            log("legacy \(onBattery ? "battery" : "AC") energy mode recovery completed; prior/user mode retained")
+            legacyRestoreFailures.removeValue(forKey: onBattery)
+        }
+        if state.savedBatteryLowPower != nil || state.savedACLowPower != nil {
+            protection.block("powerModeRestoreFailed")
         }
     }
 }
