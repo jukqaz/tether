@@ -1,36 +1,28 @@
 import SwiftUI
 import TetherCore
 
-/// Power, lid and battery temperature, one row each.
 struct StatusModule: View {
     @ObservedObject var model: AppModel
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            row(model.powerSymbol, model.powerValue, model.percentText)
-            row("laptopcomputer", model.snapshot.lidClosed ? L("Closed", "닫힘") : L("Open", "열림"), model.lidDetail)
-            row("thermometer.medium", model.temperatureValue, model.thermalShort, tint: model.thermalColor)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                metric(L("Power", "전원"), model.powerValue, model.powerSymbol)
+                if model.hasInternalBattery { metric(L("Battery", "배터리"), model.percentText, "battery.75percent") }
+                metric(model.usesUserSession ? L("Thermal pressure", "시스템 발열") : L("Temperature", "온도"), model.temperatureValue, "thermometer.medium")
+            }
+            Divider()
+            Label(model.lidDetail, systemImage: model.deviceStatusSymbol)
+                .font(.caption).foregroundStyle(Color.tetherSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(Metrics.padding)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .surface(radius: Metrics.radius)
+        .padding(.horizontal, Metrics.padding).padding(.vertical, 10)
     }
-
-    private func row(_ symbol: String, _ value: String, _ detail: String, tint: Color = .secondary) -> some View {
-        HStack(spacing: 7) {
-            Image(systemName: symbol)
-                .font(.caption)
-                .foregroundStyle(tint)
-                .frame(width: 16)
-            Text(value)
-                .font(.callout.weight(.semibold))
-                .monospacedDigit()
-                .contentTransition(.numericText())
-            Spacer(minLength: 2)
-            Text(detail)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+    private func metric(_ title: String, _ value: String, _ symbol: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label(title, systemImage: symbol).font(.system(size: 12)).foregroundStyle(Color.tetherSecondary)
+            Text(value).font(.system(size: 16, weight: .medium)).monospacedDigit()
         }
-        .lineLimit(1)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
     }
 }

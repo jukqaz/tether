@@ -1,7 +1,7 @@
 import Foundation
 import TetherCore
 
-/// The latest release on GitHub. Only the release is asked for; nothing about this Mac is sent.
+/// Public documentation links. AppUpdater owns all update checks.
 enum UpdateChecker {
     static let repository = "jukqaz/tether"
     static let releasesURL = URL(string: "https://github.com/\(repository)/releases")!
@@ -12,14 +12,4 @@ enum UpdateChecker {
         Localization.current == .korean ? projectURL.appendingPathComponent("blob/main/README.ko.md") : projectURL
     }
 
-    /// The newest release's version, e.g. "2.0.1", or nil when it can't be read.
-    static func latestVersion() async -> String? {
-        var request = URLRequest(url: URL(string: "https://api.github.com/repos/\(repository)/releases/latest")!)
-        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        guard let (data, response) = try? await URLSession.shared.data(for: request),
-              (response as? HTTPURLResponse)?.statusCode == 200,
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let tag = json["tag_name"] as? String else { return nil }
-        return tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
-    }
 }

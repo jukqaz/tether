@@ -1,23 +1,26 @@
 import AppKit
 import SwiftUI
 
-/// The Tether mark: a closed laptop lid with a crescent, and its power cable while it runs on
-/// power. The app icon (Resources/AppIcon.icon) uses the same shapes.
+/// A folded plane matching the chosen Icon Composer artwork.
+/// State indicators share the mark and a padded grid; the menu bar keeps a fixed canvas.
 enum TetherGlyph {
     enum Style: Hashable {
-        /// Clamshell mode on power: solid lid, cable attached.
         case on
-        /// A battery hold keeps clamshell mode on: solid lid, no cable.
         case held
-        /// Tether is on but clamshell is not (battery): outlined lid, no cable.
         case off
-        /// Tether is switched off: outlined and struck through.
         case disabled
+    }
+
+    enum Indicator {
+        case timer
+        case protection
+        case review
+        case pending
+        case display
     }
 
     private static var cache: [String: NSImage] = [:]
 
-    /// The mark alone, as a template image.
     @MainActor
     static func image(_ style: Style, size: CGFloat = 18) -> NSImage {
         let key = "\(style)|\(size)"
@@ -31,78 +34,102 @@ enum TetherGlyph {
         return image
     }
 
-    /// Draws the mark in black into a square of a flipped (y-down) context, on an 18-unit grid.
-    /// With the cable, the lid moves left to make room for it on the right, where a laptop's
-    /// port is; a cable from the bottom reads as a speech bubble at menu bar size.
-    static func draw(_ style: Style, in rect: CGRect) {
+    /// An 18pt grid with clear space on every edge, including at 1x menu bar resolution.
+    static func draw(_ style: Style, in rect: CGRect, indicator: Indicator? = nil) {
         let u = rect.width / 18
         func point(_ x: CGFloat, _ y: CGFloat) -> NSPoint { NSPoint(x: rect.minX + x * u, y: rect.minY + y * u) }
-        let left: CGFloat = style == .on ? 1.2 : 2.3
-        let lidRect = NSRect(x: rect.minX + left * u, y: rect.minY + 3.2 * u, width: 13.4 * u, height: 9.6 * u)
-        let moon = crescent(center: point(left + 6.3, 8.1), radius: 2.9 * u, cut: point(left + 7.75, 7.0), cutRadius: 2.3 * u)
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
         NSColor.black.set()
-        switch style {
-        case .on, .held:
-            let lid = NSBezierPath(roundedRect: lidRect, xRadius: 2.0 * u, yRadius: 2.0 * u)
-            lid.append(moon)
-            lid.windingRule = .evenOdd
-            lid.fill()
-            if style == .on {
-                let cable = NSBezierPath()
-                cable.move(to: point(14.0, 9.6))
-                cable.curve(to: point(17.1, 12.8), controlPoint1: point(16.3, 9.6), controlPoint2: point(17.1, 10.6))
-                cable.line(to: point(17.1, 16.8))
-                cable.lineWidth = 1.5 * u
-                cable.lineCapStyle = .round
-                cable.lineJoinStyle = .round
-                cable.stroke()
-            }
-        case .off, .disabled:
-            let outline = NSBezierPath(roundedRect: lidRect.insetBy(dx: 0.65 * u, dy: 0.65 * u),
-                                       xRadius: 1.4 * u, yRadius: 1.4 * u)
-            outline.lineWidth = 1.3 * u
-            outline.stroke()
-            moon.fill()
-            if style == .disabled {
-                let slash = NSBezierPath()
-                slash.move(to: point(2.8, 1.8))
-                slash.line(to: point(15.6, 15.6))
-                slash.lineCapStyle = .round
-                // Clear a gap along the slash first, as SF Symbols do.
-                let context = NSGraphicsContext.current
-                context?.compositingOperation = .clear
-                slash.lineWidth = 3.4 * u
-                slash.stroke()
-                context?.compositingOperation = .sourceOver
-                slash.lineWidth = 1.4 * u
-                slash.stroke()
-            }
+        func box(_ x: CGFloat, _ y: CGFloat, _ width: CGFloat, _ height: CGFloat) -> NSRect {
+            NSRect(x: rect.minX + x * u, y: rect.minY + y * u, width: width * u, height: height * u)
         }
-    }
+        func stroke(_ path: NSBezierPath, width: CGFloat) {
+            path.lineWidth = width * u
+            path.lineCapStyle = .round
+            path.lineJoinStyle = .round
+            path.stroke()
+        }
+        let inactive = style == .off || style == .disabled
+        func plane(_ vertices: [(CGFloat, CGFloat)], outlineWidth: CGFloat) {
+            let path = NSBezierPath()
+            path.move(to: point(vertices[0].0, vertices[0].1))
+            for vertex in vertices.dropFirst() { path.line(to: point(vertex.0, vertex.1)) }
+            path.close()
+            if inactive { stroke(path, width: outlineWidth) } else { path.fill() }
+        }
+        // Fill means a confirmed keep-awake request; an outline means no active request.
+        // The hinge gap distinguishes the folded planes without colour or extra width.
+        plane([(9, 2.2), (13.7, 6.9), (6.9, 13.7), (2.2, 9)], outlineWidth: 1.15)
+        plane([(14.6, 7.8), (15.8, 9), (12.2, 12.6), (10.1, 10.6)], outlineWidth: 1)
+        plane([(7.8, 14.6), (9, 15.8), (11.2, 13.6), (9.2, 11.5)], outlineWidth: 1)
 
-    /// The part of one circle outside another: the arc of the first circle away from the cut,
-    /// then back along the cut circle.
-    private static func crescent(center a: NSPoint, radius ra: CGFloat, cut b: NSPoint, cutRadius rb: CGFloat) -> NSBezierPath {
-        let dx = b.x - a.x, dy = b.y - a.y, d = hypot(dx, dy)
-        let along = (ra * ra - rb * rb + d * d) / (2 * d)
-        let h = sqrt(max(0, ra * ra - along * along))
-        let mid = NSPoint(x: a.x + along * dx / d, y: a.y + along * dy / d)
-        let i1 = NSPoint(x: mid.x - h * dy / d, y: mid.y + h * dx / d)
-        let i2 = NSPoint(x: mid.x + h * dy / d, y: mid.y - h * dx / d)
-        func angle(_ p: NSPoint, _ c: NSPoint) -> CGFloat { atan2(p.y - c.y, p.x - c.x) * 180 / .pi }
-        let path = NSBezierPath()
-        path.appendArc(withCenter: a, radius: ra, startAngle: angle(i1, a), endAngle: angle(i2, a), clockwise: false)
-        path.appendArc(withCenter: b, radius: rb, startAngle: angle(i2, b), endAngle: angle(i1, b), clockwise: true)
-        path.close()
-        return path
+        guard let indicator = indicator ?? (style == .held ? .timer : nil) else { return }
+        // Reserve a small, transparent knockout so the indicator reads on either bar theme.
+        NSGraphicsContext.current?.compositingOperation = .clear
+        NSBezierPath(ovalIn: box(8.8, 8.8, 8.4, 8.4)).fill()
+        NSGraphicsContext.current?.compositingOperation = .sourceOver
+        switch indicator {
+        case .timer:
+            stroke(NSBezierPath(ovalIn: box(9.9, 9.9, 6.2, 6.2)), width: 1.15)
+            let detail = NSBezierPath()
+            detail.move(to: point(13, 11)); detail.line(to: point(13, 13)); detail.line(to: point(14.8, 13))
+            stroke(detail, width: 1.1)
+        case .review:
+            let warning = NSBezierPath()
+            warning.move(to: point(13, 10)); warning.line(to: point(16.1, 15.7))
+            warning.line(to: point(9.9, 15.7)); warning.close()
+            stroke(warning, width: 1.1)
+            let detail = NSBezierPath()
+            detail.move(to: point(13, 12)); detail.line(to: point(13, 13.5))
+            stroke(detail, width: 1.15)
+            NSBezierPath(ovalIn: box(12.5, 14.25, 1, 1)).fill()
+        case .protection:
+            let shield = NSBezierPath()
+            shield.move(to: point(10, 10.4)); shield.line(to: point(16, 10.4)); shield.line(to: point(16, 12.5))
+            shield.curve(to: point(13, 16), controlPoint1: point(16, 14.2), controlPoint2: point(14.8, 15.3))
+            shield.curve(to: point(10, 12.5), controlPoint1: point(11.2, 15.3), controlPoint2: point(10, 14.2))
+            shield.close()
+            stroke(shield, width: 1.15)
+            let centre = NSBezierPath()
+            centre.move(to: point(13, 11.5)); centre.line(to: point(13, 14.2))
+            stroke(centre, width: 1)
+        case .pending:
+            for x: CGFloat in [10.4, 13, 15.6] {
+                NSBezierPath(ovalIn: box(x - 0.8, 12.2, 1.6, 1.6)).fill()
+            }
+        case .display:
+            stroke(NSBezierPath(roundedRect: box(10, 10.4, 6, 4.4),
+                               xRadius: 0.6 * u, yRadius: 0.6 * u), width: 1.1)
+            let stand = NSBezierPath()
+            stand.move(to: point(13, 14.8)); stand.line(to: point(13, 15.8))
+            stand.move(to: point(11.4, 15.8)); stand.line(to: point(14.6, 15.8))
+            stroke(stand, width: 1.1)
+        }
     }
 }
 
-/// The mark as a SwiftUI view that takes the foreground style.
+/// Use the packaged icon in the settings rail; preserve the monochrome glyph for status.
+struct TetherAppIcon: View {
+    var size: CGFloat = 40
+    private static let image: NSImage? = Bundle.main.url(forResource: "AppIcon", withExtension: "icns")
+        .flatMap { NSImage(contentsOf: $0) }
+    var body: some View {
+        Group {
+            if let image = Self.image {
+                Image(nsImage: image).resizable().interpolation(.high)
+            } else {
+                TetherMark(style: .on, size: size).foregroundStyle(Color.tetherAccent)
+            }
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+}
+
 struct TetherMark: View {
     let style: TetherGlyph.Style
     var size: CGFloat = 18
-
     var body: some View {
         Image(nsImage: TetherGlyph.image(style, size: size))
             .renderingMode(.template)
