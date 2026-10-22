@@ -18,6 +18,10 @@ The helper, `/Library/PrivilegedHelperTools/local.tether.helper`
   app path it watches must end in `.app/Contents/MacOS/Tether`, so a hand-edited control file
   can't aim this clean-up elsewhere.
 
+Per-user cleanup opens each parent directory without following symbolic links, checks the
+fixed CLI or login-item leaf, and unlinks only that entry without recursive deletion.
+Unrelated files and paths with symbolic-link parents are left untouched.
+
 It makes no network connections and runs no program other than `pmset` and, when removing
 itself, `launchctl bootout`.
 

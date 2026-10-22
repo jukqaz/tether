@@ -32,11 +32,11 @@ extension Helper {
             links.append("/Users/\(user)/.local/bin/tether")
             agents.append("/Users/\(user)/Library/LaunchAgents/local.tether.app.plist")
         }
-        for link in links where (try? fm.destinationOfSymbolicLink(atPath: link))?.hasSuffix("Tether.app/Contents/Helpers/tether") == true {
-            try? fm.removeItem(atPath: link)
+        for link in links {
+            AppResidueCleanup.removeCLI(at: link)
         }
-        for agent in agents where (NSDictionary(contentsOfFile: agent)?["ProgramArguments"] as? [String])?.first == path {
-            try? fm.removeItem(atPath: agent)
+        for agent in agents {
+            AppResidueCleanup.removeLoginItem(at: agent, appPath: path)
         }
         log("helper removed")
         // launchd stops this job (SIGTERM, handled by `stop`); exit in case it has not yet.
