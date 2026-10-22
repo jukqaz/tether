@@ -1232,8 +1232,8 @@ final class AppModel: ObservableObject {
         if let error = validateBatteryAction() {
             errorText = UserSessionFailure(error).localizedDescription; return
         }
+        if userSession != nil { extendManualSession(by: minutes); return }
         guard canExtendHold(minutes: minutes) else { return }
-        if userSession != nil { _ = extendCommonBatteryHold(minutes: minutes); return }
         save { ControlStore.extendHold(minutes: minutes) }
     }
 

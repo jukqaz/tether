@@ -77,6 +77,7 @@ private final class CommonServiceFixture {
     var missingGrantError = "invalidWorkLease"
     var preparationFailure: String?
     var systemPowerObservationAvailable: Bool? = true
+    var acknowledgesManualExtensions = false
 
     // Only consume the helper grant. Receipt validation belongs to the controller
     // and IPC tests; the app connection intentionally remains alive here.
@@ -145,6 +146,11 @@ private final class CommonServiceFixture {
         value.status = status
         value.workSessionBridge = WorkSessionBridge(coordinated: coordinated, automaticBudget: protection,
             manualBudget: nil, stopRequested: stopRequested)
+        if acknowledgesManualExtensions, let lease = gate.current, let preparation = lease.extensionPreparation {
+            value.workSessionBridge?.extensionPreparationReceipt = WorkSessionExtensionPreparationReceipt(
+                sessionID: lease.sessionID, sequence: lease.sequence, observedAt: ContinuousTime.now,
+                preparation: preparation)
+        }
         if !sendsBridge {
             // Actual build 49 lacks the optional common/observation fields.
             value.workSessionBridge = nil; value.status?.fullWake = nil
@@ -1579,6 +1585,160 @@ final class CommonSessionRoutingTests: XCTestCase {
         let completed = await first.value
         XCTAssertTrue(completed); XCTAssertTrue(removal.terminated)
         XCTAssertTrue((defaults.persistentDomain(forName: name) ?? [:]).isEmpty)
+    }
+
+    @MainActor
+    private func urlHoldFixture(helper: Bool = false, power: PowerSource = .battery,
+                                capabilityProbe: (() -> MacCapabilities)? = nil)
+        -> (UserSessionController, CommonServiceFixture, AppModel) {
+        let defaults = CommonMemoryDefaults()
+        let controller = UserSessionController(defaults: defaults, backend: CommonAssertionFixture(),
+            displayBackend: CommonAssertionFixture(), guiProbe: nil, environmentProbe: nil)
+        controller.setAllowClosedLid(helper)
+        controller.update(power: power, thermal: 0, fullWake: true, controllingUser: true,
+            now: ContinuousTime.now, batteryPercent: 80)
+        let service = CommonServiceFixture()
+        service.power = power
+        service.acknowledgesManualExtensions = true
+        let model: AppModel
+        if helper {
+            model = AppModel(preview: true, capabilities: Self.portable, previewSession: controller,
+                previewWorkService: { try service.perform($0) }, previewHelperReply: service.reply(),
+                previewDefaults: defaults, previewCapabilitiesProbe: capabilityProbe)
+        } else {
+            model = AppModel(preview: true, capabilities: Self.portable, previewSession: controller,
+                previewWorkService: { try service.perform($0) }, previewDefaults: defaults,
+                previewCapabilitiesProbe: capabilityProbe)
+        }
+        return (controller, service, model)
+    }
+
+    @MainActor
+    private func waitForURLHoldExtension(_ condition: () -> Bool,
+                                         file: StaticString = #filePath, line: UInt = #line) async {
+        let deadline = ContinuousTime.now + 2
+        while !condition(), ContinuousTime.now < deadline {
+            try? await Task.sleep(nanoseconds: 1_000_000)
+        }
+        XCTAssertTrue(condition(), "URL extension acknowledgement did not arrive", file: file, line: line)
+    }
+
+    @MainActor
+    func testURLHoldAliasesUseTheManualExtensionDeadlineWithoutHelper() async throws {
+        for minutes in [15, 30] {
+            let (controller, service, model) = urlHoldFixture()
+            defer { _ = controller.end() }
+            model.startManualSession(minutes: 30)
+            let before = try XCTUnwrap(controller.status.manualContinuousDeadline)
+            let wallBefore = try XCTUnwrap(model.manualSessionUntil)
+            let requestID = controller.manualRequestID
+            XCTAssertFalse(model.canExtendHold(minutes: minutes), "The retired battery-hold policy is not the manual policy")
+            XCTAssertTrue(model.canExtendManual(by: minutes))
+
+            model.handle(url: try XCTUnwrap(URL(string: "tether://hold/+\(minutes)m")))
+            await waitForURLHoldExtension { controller.status.manualContinuousDeadline == before + Double(minutes * 60) }
+
+            XCTAssertEqual(controller.manualRequestID, requestID)
+            XCTAssertNotNil(controller.manualExtensionID)
+            XCTAssertEqual(try XCTUnwrap(model.manualSessionUntil).timeIntervalSince(wallBefore), Double(minutes * 60), accuracy: 0.01)
+            XCTAssertTrue(controller.status.holding)
+            XCTAssertTrue(service.requests.isEmpty)
+        }
+    }
+
+    @MainActor
+    func testURLHoldAliasesRequireHelperPreparationBeforeCommittingTheManualExtension() async throws {
+        for minutes in [15, 30] {
+            let (controller, service, model) = urlHoldFixture(helper: true)
+            defer { _ = controller.end() }
+            await waitForURLHoldExtension { service.gate.current != nil && !model.lidCommandPending }
+            model.startManualSession(minutes: 30)
+            await waitForURLHoldExtension { model.clamshellActive && !model.v4ManualApprovalPending && !model.lidCommandPending }
+            let before = try XCTUnwrap(controller.status.manualContinuousDeadline)
+            let requestID = controller.manualRequestID
+            let firstRequest = service.requests.count
+
+            model.handle(url: try XCTUnwrap(URL(string: "tether://hold/+\(minutes)m")))
+            await waitForURLHoldExtension {
+                controller.status.manualContinuousDeadline == before + Double(minutes * 60)
+                    && !model.v4ManualApprovalPending && !controller.manualExtensionPending && !model.lidCommandPending
+            }
+
+            let requests = Array(service.requests.dropFirst(firstRequest))
+            let preparation = try XCTUnwrap(requests.first { $0.workSession?.extensionPreparation != nil }?.workSession)
+            let extensionID = try XCTUnwrap(controller.manualExtensionID)
+            XCTAssertEqual(preparation.manualDeadline, before)
+            XCTAssertEqual(preparation.extensionPreparation?.currentDeadline, before)
+            XCTAssertEqual(preparation.extensionPreparation?.proposedDeadline, before + Double(minutes * 60))
+            XCTAssertEqual(preparation.extensionPreparation?.id, extensionID)
+            XCTAssertEqual(controller.manualRequestID, requestID)
+            XCTAssertEqual(service.gate.current?.manualDeadline, before + Double(minutes * 60))
+            XCTAssertEqual(service.gate.current?.manualExtensionID, extensionID)
+            XCTAssertTrue(model.clamshellActive)
+        }
+    }
+
+    @MainActor
+    func testURLHoldAliasPreservesTheManualDeadlineWhenHelperPreparationFails() async throws {
+        let (controller, service, model) = urlHoldFixture(helper: true)
+        defer { _ = controller.end() }
+        await waitForURLHoldExtension { service.gate.current != nil && !model.lidCommandPending }
+        model.startManualSession(minutes: 30)
+        await waitForURLHoldExtension { model.clamshellActive && !model.v4ManualApprovalPending && !model.lidCommandPending }
+        let before = try XCTUnwrap(controller.status.manualContinuousDeadline)
+        let requestID = controller.manualRequestID
+        service.rejected = true
+
+        model.handle(url: try XCTUnwrap(URL(string: "tether://hold/+15m")))
+        await waitForURLHoldExtension { model.errorText != nil && !model.v4ManualApprovalPending && !controller.manualExtensionPending }
+
+        XCTAssertTrue(service.requests.contains { $0.workSession?.extensionPreparation != nil })
+        XCTAssertEqual(controller.status.manualContinuousDeadline, before)
+        XCTAssertEqual(controller.manualRequestID, requestID)
+        XCTAssertNil(controller.manualExtensionID)
+        XCTAssertEqual(service.gate.current?.manualDeadline, before)
+    }
+
+    @MainActor
+    func testURLHoldAliasesRejectCapsProtectionAndUnconfirmedInputsWithoutRevivingWork() async throws {
+        for scenario in ["cap", "thermal", "unknownPower", "lostAuthority", "batteryCapability", "powerDisconnected", "invalidDuration"] {
+            var observed = Self.portable
+            let initialPower: PowerSource = scenario == "powerDisconnected" ? .ac : .battery
+            let (controller, _, model) = urlHoldFixture(power: initialPower, capabilityProbe: { observed })
+            defer { _ = controller.end() }
+            model.startManualSession(minutes: scenario == "cap" ? 120 : 30)
+            XCTAssertTrue(controller.status.manualActive, scenario)
+            switch scenario {
+            case "thermal":
+                controller.update(power: .battery, thermal: 2, fullWake: true, controllingUser: true,
+                    now: ContinuousTime.now, batteryPercent: 80)
+            case "unknownPower":
+                controller.update(power: .unknown, thermal: 0, fullWake: true, controllingUser: true,
+                    now: ContinuousTime.now, batteryPercent: 80)
+            case "lostAuthority":
+                controller.update(power: .battery, thermal: 0, fullWake: true, controllingUser: false,
+                    now: ContinuousTime.now, batteryPercent: 80)
+            case "batteryCapability": observed = Self.unreadable
+            case "powerDisconnected":
+                controller.update(power: .battery, thermal: 0, fullWake: true, controllingUser: true,
+                    now: ContinuousTime.now, batteryPercent: 80)
+                XCTAssertFalse(controller.status.manualActive)
+            default: break
+            }
+            let before = controller.status.manualContinuousDeadline
+            let requestID = controller.manualRequestID
+            let holding = controller.status.holding
+
+            model.handle(url: try XCTUnwrap(URL(string: "tether://hold/+\(scenario == "invalidDuration" ? 5 : 15)m")))
+            for _ in 0..<10 { await Task.yield() }
+
+            XCTAssertEqual(controller.status.manualContinuousDeadline, before, scenario)
+            XCTAssertEqual(controller.manualRequestID, requestID, scenario)
+            XCTAssertEqual(controller.status.holding, holding, scenario)
+            XCTAssertNil(controller.manualExtensionID, scenario)
+            XCTAssertFalse(controller.manualExtensionPending, scenario)
+            if scenario == "batteryCapability" { XCTAssertNotNil(model.errorText) }
+        }
     }
 
     @MainActor
