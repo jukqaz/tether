@@ -1,46 +1,46 @@
 import SwiftUI
 import TetherCore
 
-/// The main module: what Tether is doing, and the switch for clamshell mode. On by default, so
-/// connecting power turns clamshell mode on by itself; off gives the lid back to macOS until power
-/// is connected again.
+/// The current state and persistent master switch for the selected power condition.
 struct StateModule: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject var model: AppModel
     let compact: Bool
 
     var body: some View {
         let p = model.presentation
-        HStack(spacing: compact ? 10 : 12) {
-            StateIcon(icon: p.icon, size: compact ? 14 : 17)
-                .foregroundStyle(.white)
-                .frame(width: compact ? 34 : 42, height: compact ? 34 : 42)
-                .modifier(Orb(color: p.color, active: model.enabled && model.helperInstalled))
-                .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                StateIcon(icon: p.icon, size: compact ? 14 : 16)
+                    .foregroundStyle(p.color)
+                    .frame(width: 24, height: 20)
+                    .accessibilityHidden(true)
                 Text(p.title)
-                    .font(.system(compact ? .subheadline : .headline, design: .rounded).weight(.semibold))
-                Text(p.subtitle)
-                    .font(compact ? .caption2 : .caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                    .font(.system(size: 14, weight: .semibold))
                     .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 4)
+                if model.helperInstalled || model.usesUserSession {
+                    Toggle("Tether", isOn: Binding(
+                        get: { model.tetherEnabled }, set: { model.setEnabled($0) }))
+                        .disabled(model.commandPending || !model.sessionAvailable)
+                        .toggleStyle(.switch).labelsHidden().controlSize(.small)
+                        .tint(Color.tetherAccent)
+                        .help(L("Keep work running under the selected power condition. Turning this off stays off until you turn it on again.",
+                                "선택한 전원 조건에서 잠자기를 방지합니다. 끄면 다시 켤 때까지 적용하지 않습니다."))
+                }
             }
-            Spacer(minLength: 4)
-            // Without the helper there's nothing to switch; the banner above offers the install.
-            if model.helperInstalled {
-                Toggle(L("Clamshell mode", "클램쉘 모드"),
-                       isOn: Binding(get: { model.enabled }, set: { model.setEnabled($0) }))
-                    .toggleStyle(.switch)
-                    .labelsHidden()
-                    .controlSize(compact ? .mini : .small)
-                    .tint(Color.tetherMint)
-                    .help(L("On power, closing the lid doesn't sleep the Mac. Off: the lid sleeps it as usual until power is connected again.",
-                            "전원이 연결되면 덮개를 닫아도 잠들지 않아요. 끄면 전원을 다시 연결할 때까지 평소처럼 덮개를 닫으면 잠들어요."))
-            }
+            Text(p.subtitle)
+                .font(.system(size: 12)).lineSpacing(2)
+                .foregroundStyle(Color.tetherSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.leading, 32)
+            DisplaySleepNotice(model: model)
+                .padding(.leading, 32)
+            ClamshellLockNotice(model: model)
+                .padding(.leading, 32)
         }
         .padding(compact ? Metrics.compactPadding : Metrics.padding)
-        .surface(radius: compact ? Metrics.compactRadius : Metrics.radius)
-        .animation(.snappy, value: p.title)
+        .surface(tint: p.color, strength: 0.12, radius: compact ? Metrics.compactRadius : Metrics.radius)
+        .animation(reduceMotion ? nil : .snappy, value: p.title)
     }
 }

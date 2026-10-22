@@ -4,42 +4,6 @@ import XCTest
 /// Sleep as a last resort when a closed Mac overheats on power with nothing showing it is at a
 /// desk, such as in a bag with a power bank.
 final class OverheatSleepTests: XCTestCase {
-    private let now = Date(timeIntervalSince1970: 1_800_000_000)
-
-    private func sleeps(on: Bool = true, ac: Bool = true, lid: Bool = true, external: Bool = false,
-                        criticalFor: TimeInterval? = nil, hotFor: TimeInterval? = nil) -> Bool {
-        ACThermalPolicy.shouldSleep(clamshellOn: on, onAC: ac, lidClosed: lid, externalDisplay: external,
-                                    criticalSince: criticalFor.map { now.addingTimeInterval(-$0) },
-                                    hotSince: hotFor.map { now.addingTimeInterval(-$0) }, now: now)
-    }
-
-    func testTwoMinutesOfCriticalPressure() {
-        XCTAssertFalse(sleeps(criticalFor: 119))
-        XCTAssertTrue(sleeps(criticalFor: 120))
-    }
-
-    func testAMinuteOfAHotBattery() {
-        XCTAssertFalse(sleeps(hotFor: 59))
-        XCTAssertTrue(sleeps(hotFor: 60))
-    }
-
-    func testNotAtADeskWithADisplayOrWithTheLidOpen() {
-        XCTAssertFalse(sleeps(external: true, criticalFor: 600))
-        XCTAssertFalse(sleeps(lid: false, criticalFor: 600))
-    }
-
-    func testOnlyInClamshellModeOnPower() {
-        // On battery the battery hold's own, stricter limits apply.
-        XCTAssertFalse(sleeps(ac: false, criticalFor: 600))
-        XCTAssertFalse(sleeps(on: false, criticalFor: 600))
-        XCTAssertFalse(sleeps())
-    }
-
-    func testHotterThanEveryBatteryHoldLimit() {
-        XCTAssertGreaterThan(ACThermalPolicy.hotBattery, SafetyPolicy.openLid.hardTemperature - 0.1)
-        XCTAssertGreaterThan(ACThermalPolicy.hotBattery, SafetyPolicy.closedLid.hardTemperature)
-    }
-
     func testReportedAfterWake() throws {
         var status = Status(updatedAt: 1, version: "2.0.0", enabled: true, power: .ac, lidClosed: true,
                             sleepDisabled: true, lastEvent: .overheatSleep, lastEventAt: 1)
@@ -57,7 +21,7 @@ final class OverheatSleepTests: XCTestCase {
         Localization.current = .english
         XCTAssertTrue(EventKind.overheatSleep.displayText.contains("sleep"))
         Localization.current = .korean
-        XCTAssertTrue(EventKind.overheatSleep.displayText.contains("잠재움"))
+        XCTAssertTrue(EventKind.overheatSleep.displayText.contains("잠자기 요청"))
         XCTAssertFalse(EventKind.overheatSleep.logText.isEmpty)
     }
 }
@@ -93,13 +57,6 @@ final class TetherStateTests: XCTestCase {
 }
 
 final class LowPowerPolicyTests: XCTestCase {
-    func testOnlyDuringAHoldOnBatteryAndOnlyIfAllowed() {
-        XCTAssertTrue(LowPowerPolicy.wantsOnBattery(holdingOnBattery: true, allowed: nil), "on by default")
-        XCTAssertTrue(LowPowerPolicy.wantsOnBattery(holdingOnBattery: true, allowed: true))
-        XCTAssertFalse(LowPowerPolicy.wantsOnBattery(holdingOnBattery: true, allowed: false))
-        XCTAssertFalse(LowPowerPolicy.wantsOnBattery(holdingOnBattery: false, allowed: true))
-    }
-
     func testRestoresOnlyWhatTetherChanged() {
         XCTAssertTrue(LowPowerPolicy.shouldRestore(current: 1, saved: 0))
         // The user switched it off meanwhile, or it was already on before Tether: leave it.
@@ -108,12 +65,7 @@ final class LowPowerPolicyTests: XCTestCase {
         XCTAssertFalse(LowPowerPolicy.shouldRestore(current: nil, saved: 0))
     }
 
-    func testOlderControlFilesKeepLowPowerModeOn() throws {
-        let old = #"{"enabled": true, "batteryHoldUntil": 1800000000}"#
-        let control = try JSONDecoder().decode(Control.self, from: Data(old.utf8))
-        XCTAssertNil(control.holdLowPower)
-        XCTAssertTrue(LowPowerPolicy.wantsOnBattery(holdingOnBattery: true, allowed: control.holdLowPower))
-    }
+
 }
 
 /// A charger that can't keep up counts as AC; the battery must not run flat with the lid closed.
@@ -141,7 +93,7 @@ final class WeakChargerTests: XCTestCase {
     func testSleepsAfterAMinuteWithNoDisplay() {
         XCTAssertFalse(WeakChargerPolicy.shouldSleep(externalDisplay: false, drainingSince: now.addingTimeInterval(-59), now: now))
         XCTAssertTrue(WeakChargerPolicy.shouldSleep(externalDisplay: false, drainingSince: now.addingTimeInterval(-60), now: now))
-        XCTAssertFalse(WeakChargerPolicy.shouldSleep(externalDisplay: true, drainingSince: now.addingTimeInterval(-600), now: now))
+        XCTAssertTrue(WeakChargerPolicy.shouldSleep(externalDisplay: true, drainingSince: now.addingTimeInterval(-600), now: now))
         XCTAssertFalse(WeakChargerPolicy.shouldSleep(externalDisplay: false, drainingSince: nil, now: now))
     }
 
@@ -159,7 +111,7 @@ final class HoldStartTests: XCTestCase {
         XCTAssertTrue(SafetyPolicy.canStartHold(batteryPercent: 21))
         XCTAssertFalse(SafetyPolicy.canStartHold(batteryPercent: 20))
         XCTAssertFalse(SafetyPolicy.canStartHold(batteryPercent: 35, user: UserLimits(batteryFloor: 40)))
-        XCTAssertTrue(SafetyPolicy.canStartHold(batteryPercent: nil), "no reading: the helper's own check still applies")
+        XCTAssertFalse(SafetyPolicy.canStartHold(batteryPercent: nil))
     }
 }
 
@@ -176,28 +128,25 @@ final class SafetyNetTrackerTests: XCTestCase {
         tracker.update(s, clamshellOn: true, readings: r, floor: 20, now: start.addingTimeInterval(seconds))
     }
 
-    func testCriticalForTwoMinutesSleeps() {
+    func testCriticalStopsAtFirstObservationEvenWithACoolBattery() {
         var t = SafetyNetTracker()
-        XCTAssertNil(run(&t, closedOnPower, readings(thermal: 3), at: 0))
-        XCTAssertTrue(t.isWatching)
-        XCTAssertNil(run(&t, closedOnPower, readings(thermal: 3), at: 119))
-        XCTAssertEqual(run(&t, closedOnPower, readings(thermal: 3), at: 120), .overheatSleep)
-        XCTAssertFalse(t.isWatching, "starts over after a sleep")
+        XCTAssertEqual(run(&t, closedOnPower, readings(thermal: 3, temperature: 30), at: 0), .overheatSleep)
+        XCTAssertFalse(t.isWatching)
     }
 
-    func testCoolingDownStartsTheCountAgain() {
+    func testCelsiusChangesRemainDiagnosticOnly() {
         var t = SafetyNetTracker()
-        _ = run(&t, closedOnPower, readings(thermal: 3), at: 0)
-        _ = run(&t, closedOnPower, readings(thermal: 1), at: 60)
-        XCTAssertNil(run(&t, closedOnPower, readings(thermal: 3), at: 100))
-        XCTAssertNil(run(&t, closedOnPower, readings(thermal: 3), at: 219))
-        XCTAssertEqual(run(&t, closedOnPower, readings(thermal: 3), at: 220), .overheatSleep)
+        XCTAssertNil(run(&t, closedOnPower, readings(temperature: 45), at: 0))
+        XCTAssertNil(run(&t, closedOnPower, readings(temperature: 30), at: 59))
+        XCTAssertNil(run(&t, closedOnPower, readings(temperature: 45), at: 100))
+        XCTAssertNil(run(&t, closedOnPower, readings(temperature: 45), at: 159))
+        XCTAssertNil(run(&t, closedOnPower, readings(temperature: 45), at: 160))
     }
 
-    func testHotBatteryForAMinuteSleeps() {
+    func testHotCelsiusWithoutOSPressureDoesNotRequestSleep() {
         var t = SafetyNetTracker()
         XCTAssertNil(run(&t, closedOnPower, readings(temperature: 45.5), at: 0))
-        XCTAssertEqual(run(&t, closedOnPower, readings(temperature: 45.5), at: 60), .overheatSleep)
+        XCTAssertNil(run(&t, closedOnPower, readings(temperature: 45.5), at: 60))
     }
 
     func testWeakChargerAtTheFloorSleeps() {
@@ -206,12 +155,12 @@ final class SafetyNetTrackerTests: XCTestCase {
         XCTAssertEqual(run(&t, closedOnPower, readings(percent: 19, current: -900), at: 60), .weakChargerSleep)
     }
 
-    func testAnExternalDisplayMeansADeskButStillTimesTheAlert() {
+    func testNativeClamshellThermalManagementBelongsToMacOS() {
         var t = SafetyNetTracker()
-        let desk = Snapshot(power: .ac, lidClosed: true, sleepDisabled: true, externalDisplay: true)
+        var desk = Snapshot(power: .ac, lidClosed: true, sleepDisabled: true, externalDisplay: true)
+        desk.nativeDisplayVerified = true
         XCTAssertNil(run(&t, desk, readings(thermal: 3), at: 0))
-        XCTAssertNil(run(&t, desk, readings(thermal: 3), at: 600))
-        XCTAssertEqual(t.criticalSince, start, "the critical-heat alert still counts")
+        XCTAssertNil(t.criticalSince, "native clamshell is not a Tether hold")
     }
 
     func testNothingWithTheLidOpenOrOnBattery() {
@@ -225,9 +174,11 @@ final class SafetyNetTrackerTests: XCTestCase {
 }
 
 final class HoldExtensionTests: XCTestCase {
-    func testPlusMinutesExtends() {
+    func testOnlyExplicit15And30MinuteExtensionsAreParsed() {
         XCTAssertEqual(TetherCommand.parse(["hold", "+30m"]), .extendHold(minutes: 30))
-        XCTAssertEqual(TetherCommand.parse(url: URL(string: "tether://hold/+1h")!), .extendHold(minutes: 60))
+        XCTAssertEqual(TetherCommand.parse(["hold", "+15m"]), .extendHold(minutes: 15))
+        XCTAssertNil(TetherCommand.parse(["hold", "+20m"]))
+        XCTAssertNil(TetherCommand.parse(url: URL(string: "tether://hold/+1h")!))
         XCTAssertNil(TetherCommand.parse(["hold", "+5h"]), "beyond the cap")
     }
 

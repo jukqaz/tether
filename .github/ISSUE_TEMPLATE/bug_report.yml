@@ -1,0 +1,25 @@
+name: 오류 보고
+description: 실행 조건과 로그 근거로 문제를 재현합니다.
+labels: [bug]
+body:
+  - type: textarea
+    id: behavior
+    attributes:
+      label: 기대 동작과 실제 동작
+      description: 화면 꺼짐, 화면 잠금, Mac 잠자기는 구분해 적어 주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 실행 환경
+      description: Tether 버전·빌드, macOS 버전, Mac 모델, 전원·덮개·외장 화면·원격 앱 조건
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 재현 순서와 근거
+      description: 조작 순서와 관련 진단 로그를 첨부해 주세요. 암호·토큰·개인 경로 등은 제거해 주세요.
+    validations:
+      required: true

@@ -2,10 +2,31 @@ import Foundation
 import TetherCore
 
 let wantsJSON = arguments.contains("--json")
-if arguments.first == "run" {
-    run(Array(arguments.dropFirst()))
+if arguments.first == "run" { performRunCommand(arguments) }
+if arguments.first == "displays", !arguments.contains("--help") {
+    let report = DisplayProbe.inspect()
+    if wantsJSON {
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        do { print(String(decoding: try encoder.encode(report), as: UTF8.self)) }
+        catch { fail("Could not encode display observations") }
+    }
+    else {
+        print(report.summary)
+        print(report.guidance)
+        for display in report.displays {
+            print("\(display.name): \(display.detail)\n  \(display.evidence)")
+        }
+        if let issue = report.issue { print(issue) }
+    }
+    exit(report.graphicsAvailable ? 0 : 1)
 }
 if arguments.first == "diagnose" {
+    if arguments.contains("--snapshot-json") {
+        guard arguments == ["diagnose", "--snapshot-json"] else {
+            fail("Usage: tether diagnose --snapshot-json", code: 2)
+        }
+        printPhysicalEvidence()
+    }
     diagnose(Array(arguments.dropFirst()))
 }
 if arguments.first == "doctor" {
@@ -19,11 +40,30 @@ if arguments.contains("--help") || arguments.contains("-h") || words.first == "h
     exit(0)
 }
 
+if arguments.first == "task" { performTaskCommand(arguments) }
+if arguments.first == "manual", arguments.contains("--pid") { performManualPIDCommand(arguments) }
+
 guard let command = TetherCommand.parse(words) else {
     if words.first == "hold" {
-        fail(L("Give a time between 1 minute and 4 hours, e.g. tether hold 1h30m", "시간을 1분에서 4시간 사이로 적어 주세요. 예: tether hold 1h30m"), code: 2)
+        fail(L("Give a time between 1 and 120 minutes, e.g. tether hold 1h30m", "시간을 1분에서 120분 사이로 적어 주세요. 예: tether hold 1h30m"), code: 2)
     }
     fail(L("Unknown command: \(words.joined(separator: " "))\n\n\(usageText)", "알 수 없는 명령입니다: \(words.joined(separator: " "))\n\n\(usageText)"), code: 2)
+}
+
+// Legacy helper fixtures remain isolated to an explicitly private helper socket.
+// Production commands go through the running app and never become a second writer.
+let legacyFixture = TetherPaths.serviceSocket != TetherPaths.productionSocket
+if !legacyFixture {
+    guard arguments.filter({ $0.hasPrefix("-") }).allSatisfy({ $0 == "--json" }) else {
+        fail(L("Unsupported command option.", "지원하지 않는 명령 옵션입니다."), code: 2)
+    }
+    do {
+        let reply = try userSessionClient().perform(command)
+        printUserSession(reply, command: command, json: wantsJSON)
+        exit(0)
+    } catch let error as UserSessionFailure where command == .status && error.code == "appUnavailable" {
+        // Read-only legacy diagnostics can still explain why the app is unavailable.
+    } catch { fail(error.localizedDescription) }
 }
 
 let state = State()
@@ -37,11 +77,10 @@ case .on, .off, .toggle:
     let after = change { ControlStore.setEnabled(on) }
     if on {
         print(after.clamshell ? L("Tether is on. Closing the lid won't sleep the Mac.", "Tether를 켰습니다. 덮개를 닫아도 잠들지 않습니다.")
-                              : L("Tether is on. Clamshell mode starts when power is connected.", "Tether를 켰습니다. 전원을 연결하면 클램쉘 모드가 켜집니다."))
+                              : L("Tether is on. The selected power condition controls clamshell mode.", "Tether를 켰습니다. 선택한 전원 조건에 따라 클램쉘 모드가 작동합니다."))
     } else {
-        print(after.snapshot.lidClosed ? L("Tether is off. The lid is closed, so the Mac is going to sleep.", "Tether를 껐습니다. 덮개가 닫혀 있어 Mac이 잠듭니다.")
-                                       : L("Tether is off until power is connected again. Closing the lid will sleep the Mac.",
-                                           "전원을 다시 연결할 때까지 Tether를 껐습니다. 이제 덮개를 닫으면 잠듭니다."))
+        print(L("Tether is off until you turn it on again. macOS and other apps still control their own sleep behavior.",
+                "다시 켤 때까지 Tether를 껐습니다. macOS와 다른 앱의 잠자기 동작은 계속 적용됩니다."))
     }
 
 case .sleep:
@@ -51,7 +90,7 @@ case .sleep:
     let settleBy = Date().addingTimeInterval(3)
     while !UserInput.settled(), Date() < settleBy { usleep(100_000) }
     guard ControlStore.sleepNow() else { fail(cannotWrite) }
-    print(L("Putting the Mac to sleep.", "Mac을 잠재웁니다."))
+    print(L("Sleep requested. macOS determines when sleep completes.", "잠자기를 요청했습니다. 실제 절전 완료는 macOS에서 결정합니다."))
 
 case .hold(let minutes):
     requireHelper(state)
@@ -63,6 +102,10 @@ case .hold(let minutes):
                "배터리가 \(percent ?? 0)%로 하한선 \(floor)% 이하라 유지해도 바로 끝납니다."))
     }
     let after = change { ControlStore.startHold(minutes: minutes, source: "cli") }
+    if let minutes = after.control.pendingHoldMinutes {
+        print(L("Waiting to unplug: \(minutes) minutes. Cancel with tether hold off.", "전원 분리 후 \(minutes)분 유지 예약. 취소: tether hold off"))
+        exit(0)
+    }
     guard let until = after.status?.batteryHoldUntil else {
         fail(L("The helper didn't take the battery hold. Check 'tether status'.", "도우미가 배터리 유지를 받지 않았습니다. 'tether status'로 상태를 확인해 주세요."))
     }
@@ -76,6 +119,10 @@ case .extendHold(let minutes):
         fail(L("No battery hold is running. Start one with 'tether hold 1h'.", "배터리 유지가 켜져 있지 않습니다. 'tether hold 1h'로 먼저 켜 주세요."))
     }
     let after = change { ControlStore.extendHold(minutes: minutes) }
+    if let minutes = after.control.pendingHoldMinutes {
+        print(L("Waiting to unplug: \(minutes) minutes. Cancel with tether hold off.", "전원 분리 후 \(minutes)분 유지 예약. 취소: tether hold off"))
+        exit(0)
+    }
     guard let until = after.status?.batteryHoldUntil else { fail(cannotWrite) }
     print(L("Battery hold extended until \(time(until)) (at most 4 h from when it started).",
             "배터리 유지를 \(time(until))까지 늘렸습니다 (시작부터 최대 4시간)."))
@@ -86,4 +133,6 @@ case .cancelHold:
     let sleeping = after.snapshot.power == .battery && after.snapshot.lidClosed
     print(sleeping ? L("Battery hold ended. The lid is closed, so the Mac is going to sleep.", "배터리 유지를 껐습니다. 덮개가 닫혀 있어 Mac이 잠듭니다.")
                    : L("Battery hold ended.", "배터리 유지를 껐습니다."))
+case .manual, .extendManual, .endManual, .automatic, .condition:
+    fail(UserSessionFailure("coordinatorUnavailable").localizedDescription)
 }

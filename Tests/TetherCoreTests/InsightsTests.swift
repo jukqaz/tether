@@ -1,52 +1,6 @@
 import XCTest
 @testable import TetherCore
 
-final class ACThermalPolicyTests: XCTestCase {
-    private let now = Date(timeIntervalSince1970: 1_800_000_000)
-
-    private func wants(on: Bool = true, ac: Bool = true, lid: Bool = true, thermal: Int,
-                       lowPowerOn: Bool = false, coolFor: TimeInterval? = nil) -> Bool {
-        ACThermalPolicy.wantsLowPower(clamshellOn: on, onAC: ac, lidClosed: lid, thermal: thermal,
-                                      lowPowerOn: lowPowerOn, coolSince: coolFor.map { now.addingTimeInterval(-$0) },
-                                      now: now)
-    }
-
-    func testSeriousPressureWithLidClosedOnACTurnsLowPowerOn() {
-        XCTAssertTrue(wants(thermal: 2))
-        XCTAssertTrue(wants(thermal: 3))
-    }
-
-    func testNominalOrFairLeavesItOff() {
-        XCTAssertFalse(wants(thermal: 0, coolFor: 600))
-        XCTAssertFalse(wants(thermal: 1, coolFor: 600))
-    }
-
-    func testOnlyWithLidClosedOnACInClamshell() {
-        XCTAssertFalse(wants(lid: false, thermal: 3))
-        XCTAssertFalse(wants(ac: false, thermal: 3))
-        XCTAssertFalse(wants(on: false, thermal: 3))
-    }
-
-    func testStaysOnUntilCoolForTwoMinutes() {
-        XCTAssertTrue(wants(thermal: 1, lowPowerOn: true, coolFor: 30))
-        XCTAssertTrue(wants(thermal: 0, lowPowerOn: true, coolFor: 119))
-        XCTAssertFalse(wants(thermal: 0, lowPowerOn: true, coolFor: 120))
-    }
-
-    func testOpeningTheLidReleasesAtOnce() {
-        XCTAssertFalse(wants(lid: false, thermal: 2, lowPowerOn: true))
-    }
-
-    func testAlertAfterThreeMinutesOfCriticalOnlyOnce() {
-        let started = now.addingTimeInterval(-179)
-        XCTAssertFalse(ACThermalPolicy.shouldAlert(criticalSince: started, alreadyAlerted: false, now: now))
-        let longer = now.addingTimeInterval(-180)
-        XCTAssertTrue(ACThermalPolicy.shouldAlert(criticalSince: longer, alreadyAlerted: false, now: now))
-        XCTAssertFalse(ACThermalPolicy.shouldAlert(criticalSince: longer, alreadyAlerted: true, now: now))
-        XCTAssertFalse(ACThermalPolicy.shouldAlert(criticalSince: nil, alreadyAlerted: false, now: now))
-    }
-}
-
 final class SessionTrackerTests: XCTestCase {
     private let t0 = Date(timeIntervalSince1970: 1_800_000_000)
 
@@ -166,7 +120,7 @@ final class StatsTrackerTests: XCTestCase {
 
     func testCountsAndDayRollover() {
         var stats = StatsTracker()
-        stats.recordForcedSleep(now: noon, calendar: calendar)
+        stats.recordSleepRequestAttempt(now: noon, calendar: calendar)
         stats.recordForcedSleep(now: noon, calendar: calendar)
         stats.recordBatteryHold(now: noon, calendar: calendar)
         let tomorrow = noon.addingTimeInterval(86_400)
@@ -175,6 +129,25 @@ final class StatsTrackerTests: XCTestCase {
         XCTAssertEqual(stats.today(now: noon, calendar: calendar).batteryHolds, 1)
         XCTAssertEqual(stats.today(now: tomorrow, calendar: calendar).heatGuards, 1)
         XCTAssertEqual(stats.today(now: tomorrow, calendar: calendar).forcedSleeps, 0)
+    }
+
+    func testSleepRequestAttemptsPreserveLegacyStorageAndTotals() throws {
+        let old = #"{"day":"2027-01-15","lidClosedSeconds":0,"forcedSleeps":5,"batteryHolds":0,"heatGuards":0}"#
+        let day = try JSONDecoder().decode(DayStats.self, from: Data(old.utf8))
+        XCTAssertEqual(day.sleepRequestAttempts, 5)
+        var stats = StatsTracker(days: [day])
+        stats.recordSleepRequestAttempt(now: noon, calendar: calendar)
+        stats.recordForcedSleep(now: noon, calendar: calendar)
+        let current = stats.today(now: noon, calendar: calendar)
+        XCTAssertEqual(current.sleepRequestAttempts, 7)
+        XCTAssertEqual(current.forcedSleeps, 7)
+        let data = try JSONEncoder().encode(stats)
+        let wire = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let stored = try XCTUnwrap((wire["days"] as? [[String: Any]])?.first)
+        XCTAssertEqual(stored["forcedSleeps"] as? Int, 7)
+        XCTAssertNil(stored["sleepRequestAttempts"], "usage.json retains its legacy storage schema")
+        let restored = try JSONDecoder().decode(StatsTracker.self, from: data)
+        XCTAssertEqual(restored.today(now: noon, calendar: calendar).sleepRequestAttempts, 7)
     }
 
     func testKeepsSevenDaysAndFillsTheWeek() {
@@ -214,7 +187,8 @@ final class CommandTests: XCTestCase {
         XCTAssertEqual(HoldDuration.minutes("1h"), 60)
         XCTAssertEqual(HoldDuration.minutes("1h30m"), 90)
         XCTAssertEqual(HoldDuration.minutes("1.5h"), 90)
-        XCTAssertEqual(HoldDuration.minutes("4H"), 240)
+        XCTAssertEqual(HoldDuration.minutes("2H"), 120)
+        XCTAssertNil(HoldDuration.minutes("4H"))
         XCTAssertEqual(HoldDuration.minutes("1시간 30분"), 90)
         XCTAssertEqual(HoldDuration.minutes("30분"), 30)
     }
@@ -242,6 +216,39 @@ final class CommandTests: XCTestCase {
         XCTAssertNil(TetherCommand.parse(["hold"]))
         XCTAssertNil(TetherCommand.parse(["hold", "9h"]))
         XCTAssertNil(TetherCommand.parse(["reboot"]))
+    }
+
+    func testHoldDurationRoundingBoundaries() {
+        XCTAssertNil(HoldDuration.minutes("0.49m"))
+        XCTAssertEqual(HoldDuration.minutes("0.5m"), 1)
+        XCTAssertEqual(HoldDuration.minutes("1.5m"), 2)
+        XCTAssertEqual(HoldDuration.minutes("120.49m"), 120)
+        XCTAssertNil(HoldDuration.minutes("120.5m"))
+        XCTAssertEqual(HoldDuration.minutes("0.25m0.25m"), 1)
+        XCTAssertNil(HoldDuration.minutes("1.5"))
+    }
+
+    func testOversizedHoldDurationsAreRejectedAcrossEntryPoints() throws {
+        let large = String(repeating: "9", count: 308)
+        let inputs = [
+            "9223372036854775808m",                    // Finite, but outside Int's range.
+            String(repeating: "9", count: 400) + "m", // Double parsing overflow.
+            large + "h",                             // Hour-to-minute overflow.
+            large + "m" + large + "m",                // Accumulation overflow.
+            "999999999999999999999시간",
+            String(repeating: "9", count: 400) + "분",
+        ]
+        for input in inputs {
+            XCTAssertNil(HoldDuration.minutes(input))
+            XCTAssertNil(TetherCommand.parse(["hold", input]))
+            XCTAssertNil(TetherCommand.parse(["hold", "+" + input]))
+            for prefix in ["tether://hold/", "tether://hold/+", "tether://hold?minutes=", "tether://hold?minutes=+"] {
+                let url = try XCTUnwrap(URL(string: prefix + input))
+                XCTAssertNil(TetherCommand.parse(url: url))
+            }
+        }
+        XCTAssertNil(TetherCommand.parse(["hold", "+1시간", "30분"]))
+        XCTAssertEqual(TetherCommand.parse(url: try XCTUnwrap(URL(string: "tether://hold?minutes=1%EC%8B%9C%EA%B0%84%2030%EB%B6%84"))), .hold(minutes: 90))
     }
 
     func testURLs() {

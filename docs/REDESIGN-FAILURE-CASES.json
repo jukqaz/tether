@@ -1,0 +1,5385 @@
+{
+  "documentSchemaVersion": 3,
+  "designVersion": 3,
+  "updatedAt": "2026-10-07",
+  "purpose": "Version 3 acceptance contracts with dated automatic evidence. Each required physical, remote or installation layer remains independently unqualified.",
+  "minimumMacOS": "26",
+  "platform": "Apple Silicon",
+  "status": "implementedAutomaticEvidencePendingPhysicalAcceptance",
+  "supersedes": "Version 2 product policy. Retained legacy compatibility fixtures are identified separately and are not version 3 physical acceptance.",
+  "contracts": "ARCHITECTURE-REDESIGN.ko.md",
+  "specification": "PRODUCT-SPEC.ko.md",
+  "research": "COMPETITOR-DEEP-RESEARCH.ko.md",
+  "requirements": [
+    "F-01",
+    "F-02",
+    "F-03",
+    "F-04",
+    "F-05",
+    "F-06",
+    "F-07",
+    "F-08",
+    "F-09",
+    "F-10",
+    "F-11",
+    "F-12"
+  ],
+  "invariants": {
+    "I-01": "사용자 프로세스 한 곳이 제품 정책을 결정한다.",
+    "I-02": "자체 assertion/기록된 시스템 변경만 해제하며 전역 배타 소유권을 주장하지 않는다.",
+    "I-03": "사용자 중지/보호/만료와 수동 마감은 재연결/업데이트로 부활하거나 연장되지 않는다.",
+    "I-04": "조회 실패를 정상 전원/열/잠금/원복 상태로 변환하지 않는다.",
+    "I-05": "전역 변경 전에 baseline을 durable하게 기록하고 실제 원복 전 자료를 삭제하지 않는다.",
+    "I-06": "화면 절전/밝기/잠금/실제 Sleep/원격 인증·입력의 증거를 구별한다.",
+    "I-07": "전원 분리 Sleep은 최신 확인 조건에서 한 번 요청하며 유효한 배터리 작업이 있으면 요청하지 않는다.",
+    "I-08": "설치 전체 수명 직렬화와 짧은 원복 lock의 수명/순서는 다르다.",
+    "I-09": "macOS26 실기기와 최신OS/패키지/소스의 증거를 구분한다.",
+    "I-10": "원격 공급자 감지나 화면 오류는 작업 수명이나 메뉴 아이콘 폭을 임의 변경하지 않는다.",
+    "I-11": "닫힌 AC 분리 시 도우미는 허가 전원 범위를 직접 집행하며 앱 응답·원격 연결 때문에 AC 전용 덮개 유지를 연장하지 않는다.",
+    "I-12": "열 보호는 AC/배터리·자동/수동·배터리 예외보다 우선하며 냉각/ON/OFF/전원 왕복/재실행으로 해제되지 않는다."
+  },
+  "sources": {
+    "A-01": {
+      "kind": "officialDocumentationAndHeader",
+      "url": "https://github.com/apple-oss-distributions/IOKitUser/blob/323ead896d04424f87184d8f6ff0cce811aab106/pwr_mgt.subproj/IOPMLib.h#L275-L292"
+    },
+    "A-02": {
+      "kind": "officialSource",
+      "url": "https://github.com/apple-oss-distributions/PowerManagement/blob/d415e45501842834a280930c3eed9186544a67f0/pmconfigd/PMAssertions.c#L2559-L2578"
+    },
+    "A-03": {
+      "kind": "officialDocumentation",
+      "url": "https://support.apple.com/en-is/guide/mac-help/mh11784/26/mac/26"
+    },
+    "A-04": {
+      "kind": "officialDocumentation",
+      "url": "https://support.apple.com/guide/mac-help/put-your-mac-to-sleep-or-wake-it-mh10330/26/mac/26"
+    },
+    "A-05": {
+      "kind": "officialDocumentation",
+      "url": "https://developer.apple.com/documentation/foundation/processinfo/thermalstate-swift.enum"
+    },
+    "A-06": {
+      "kind": "officialSource",
+      "url": "https://github.com/apple-oss-distributions/IOKitUser/blob/323ead896d04424f87184d8f6ff0cce811aab106/pwr_mgt.subproj/IOPMLibPrivate.h#L1980-L2000"
+    },
+    "A-07": {
+      "kind": "officialDocumentation",
+      "url": "https://developer.apple.com/documentation/servicemanagement/smappservice"
+    },
+    "C-01": {
+      "kind": "competitorPublicCode",
+      "url": "https://github.com/x74353/Amphetamine/blob/f8b3fe1d9363726d6dcbb718df6d8bdb9c041e42/Files/powerProtect.scpt#L8-L54"
+    },
+    "C-02": {
+      "kind": "competitorPublicCode",
+      "url": "https://github.com/newmarcel/KeepingYouAwake/blob/cca86d604835ad4fda1acab4b4807d4c7a1db856/Packages/KYASleepWakeTimer/Sources/KYASleepWakeTimer/KYASleepWakeTimer.m#L95-L125"
+    },
+    "C-03": {
+      "kind": "competitorPublicCode",
+      "url": "https://github.com/gyorgysh/keepresso/blob/e114f3230e3501005ec285839f874911d24fe024/Sources/KeepressoCore/SessionController.swift#L801-L840"
+    },
+    "C-04": {
+      "kind": "competitorPublicCode",
+      "url": "https://github.com/gyorgysh/keepresso/blob/e114f3230e3501005ec285839f874911d24fe024/Sources/KeepressoCore/HelperEngine.swift#L621-L667"
+    },
+    "C-05": {
+      "kind": "competitorPublicCode",
+      "url": "https://github.com/openlid/openlid/blob/ea5c9b9acc60239bb1bad178a02246fd7cc7fa96/crates/helper/src/xpc_listener.rs#L126-L136"
+    },
+    "C-06": {
+      "kind": "competitorPublicCode",
+      "url": "https://github.com/bygelo/liddy/blob/b010439631b0b68f58cefbe564cf7877ea2f6c98/Sources/LiddyKit/Runtime/ClamshellGuard.swift#L83-L106"
+    },
+    "C-07": {
+      "kind": "maintainerIssueReportNotTargetValidation",
+      "url": "https://github.com/gyorgysh/keepresso/issues/18#issuecomment-5577297630"
+    },
+    "U-01": {
+      "kind": "userRequirement",
+      "reference": "PRODUCT-SPEC.ko.md#3-전원세션-계약",
+      "description": "AC 자동 유지/닫힌 분리 종료/선택 수동 배터리 최대120분"
+    },
+    "D-01": {
+      "kind": "productDesignChoiceNotAppleGuarantee",
+      "reference": "PRODUCT-SPEC.ko.md",
+      "description": "자동 배터리 활성 구간도 유한; 추천 분리 종료는 명시적 Sleep 요청; lease 수치는 실험 뒤 확정"
+    },
+    "A-08": {
+      "kind": "officialSource",
+      "url": "https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOPMrootDomain.cpp#L7660-L7695",
+      "description": "SleepDisabled is checked for idle and demand system sleep in the public kernel snapshot; target macOS26 behavior needs physical qualification."
+    },
+    "A-09": {
+      "kind": "officialDocumentationAndSource",
+      "url": "https://github.com/apple-oss-distributions/IOKitUser/blob/323ead896d04424f87184d8f6ff0cce811aab106/ps.subproj/IOPowerSources.h#L307-L342",
+      "description": "Power-source notifications are RunLoop based and AC supply is separate from charging; closed-awake handling is an API/source conclusion, not physical qualification."
+    },
+    "A-10": {
+      "kind": "officialDocumentation",
+      "url": "https://developer.apple.com/library/archive/documentation/Performance/Conceptual/power_efficiency_guidelines_osx/RespondToThermalStateChanges.html"
+    }
+  },
+  "evidenceContract": {
+    "observationDate": "2026-10-06",
+    "sourceSnapshots": "Public code is pinned; published source is not assumed identical to every macOS26 shipping binary.",
+    "notRun": "An unexecuted required level stays notRun. A passed policy/adapter/bitmap or legacy fixture never proves actual Sleep, authenticated remote input, live installation or the minimum OS runtime.",
+    "sleep": "Successful read-only OS Sleep/Wake query matched to the interval is required. Command success or sample gaps are insufficient.",
+    "screen": "Display sleep, brightness, actual lock and authenticated remote frame/input need separate dated observations. Screen sleep is not panel-power-zero evidence.",
+    "timing": "120/1800-second physical test intervals are test choices, not Apple safety thresholds. Runtime lease timing requires measured qualification before shipping.",
+    "scope": "OS, model/capabilities, displays, remote provider/version, source/package/installed identity are part of each executed result."
+  },
+  "cases": [
+    {
+      "id": "R3-001",
+      "title": "macOS26 지원 바닥과 능력 기반 기능",
+      "requirements": [
+        "F-01",
+        "F-04",
+        "F-12"
+      ],
+      "invariants": [
+        "I-09"
+      ],
+      "initial": {
+        "platforms": [
+          "arm64/macOS26",
+          "arm64/latest",
+          "arm64/macOS25",
+          "x86_64/macOS26"
+        ],
+        "hardware": [
+          "laptop",
+          "desktop"
+        ]
+      },
+      "events": [
+        {
+          "kind": "inspectCapabilities"
+        }
+      ],
+      "expected": [
+        "26+ arm64에서 일반 기능 제공",
+        "덮개/배터리 capability에 따라 UI 분기",
+        "최소OS/architecture 밖은 새 실행 거부"
+      ],
+      "forbidden": [
+        "모델명 허용 목록",
+        "latest 빌드 성공을26 실증으로 표시"
+      ],
+      "validationLevels": [
+        "policy",
+        "package",
+        "physical"
+      ],
+      "sourceReferences": [
+        "U-01",
+        "D-01"
+      ],
+      "result": "partiallyVerified",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "MacCapabilitiesTests.testDesktopAndUPSUseUserSessionAssertions",
+            "MacCapabilitiesTests.testMissingLidObservationDoesNotRemoveGeneralIdleSupport",
+            "MacCapabilitiesTests.testOnlyVerifiedBatteryAndLidRequireHelper",
+            "MacCapabilitiesTests.testUnsupportedPlatformCannotInstallAnyHelper"
+          ],
+          "scope": "current source contract subset; unit/controller observations are controlled, not physical device input"
+        },
+        {
+          "level": "package",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/verification-summary.json",
+          "checks": [
+            "release compilation",
+            "arm64 / minimum 26 Info",
+            "ad-hoc deep signature",
+            "177 unchanged build input hashes"
+          ],
+          "scope": "build 51 package; no macOS26 installation or published release"
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "package": "passed",
+        "physical": "notRun"
+      },
+      "pendingValidation": [
+        "physical"
+      ]
+    },
+    {
+      "id": "R3-002",
+      "title": "일반 실행기와 기종별 필수 준비 분리",
+      "requirements": [
+        "F-01",
+        "F-11"
+      ],
+      "invariants": [
+        "I-01"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "open",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "helper": "absent",
+        "legacyRecoveryDebt": "none"
+      },
+      "events": [
+        {
+          "kind": "startManual",
+          "durationSeconds": 180
+        }
+      ],
+      "expected": [
+        "사용자 controller와 자체 public idle assertion 생성",
+        "MacBook은 현재 도우미가 확인되어야 시작 안내 완료",
+        "데스크톱은 도우미 설치 없이 준비 완료"
+      ],
+      "forbidden": [
+        "일반 유지를 helper readiness로 차단",
+        "root 설치 반복 프롬프트"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter"
+      ],
+      "sourceReferences": [
+        "A-01",
+        "C-02"
+      ],
+      "result": "verifiedAtListedLevels",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "testR3_002GeneralManualDecisionDoesNotRequireRoot"
+          ],
+          "scope": "pure v3 policy with controlled power, monotonic time and observations"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "CommonSessionRoutingTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 53
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/supporting-features/verification-summary.json",
+          "checks": [
+            "7 notebook/desktop setup regression methods",
+            "saved flag, old/stale protocol, cancellation and incomplete initial observation"
+          ],
+          "scope": "AppModel/controller with injected installer and observations; mandatory onboarding is independent of idle execution, actual administrator UI not proven"
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "adapter": "passed"
+      },
+      "pendingValidation": []
+    },
+    {
+      "id": "R3-003",
+      "title": "새 설치는 전역 덮개 변경을 자동 실행하지 않음",
+      "requirements": [
+        "F-02",
+        "F-04"
+      ],
+      "invariants": [
+        "I-02"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "open",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "freshInstall": true,
+        "userActivated": false
+      },
+      "events": [
+        {
+          "kind": "launch"
+        },
+        {
+          "kind": "observePower",
+          "value": "AC"
+        }
+      ],
+      "expected": [
+        "추천 프로필 안내",
+        "사용자 켜기 전 전역 변경 없음"
+      ],
+      "forbidden": [
+        "누락 설정을 자동켜짐으로 처리"
+      ],
+      "validationLevels": [
+        "policy",
+        "ui"
+      ],
+      "sourceReferences": [
+        "U-01",
+        "D-01"
+      ],
+      "result": "verifiedAtListedLevels",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "testR3_003FreshSettingsDoNotActivateEitherExecutor"
+          ],
+          "scope": "pure v3 policy with controlled power, monotonic time and observations"
+        },
+        {
+          "level": "ui",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "LiveUIBindingTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 9
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-07",
+          "path": "../.build/verification/completion-20261007T151509Z/automated/packaged-v3-helper.log",
+          "checks": [
+            "fresh helper ignores old enabled control and grants lid maintenance only for an authenticated finite v3 lease"
+          ],
+          "scope": "current build 51 isolated helper and IPC; fake OS observations and dry-run writes; helper hash unchanged by final UI-only accessibility change"
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "ui": "passed"
+      },
+      "pendingValidation": []
+    },
+    {
+      "id": "R3-004",
+      "title": "100%·충전중 아님도 AC 조건",
+      "requirements": [
+        "F-02"
+      ],
+      "invariants": [
+        "I-01"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "open",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "batteryPercent": 100,
+        "isCharging": false
+      },
+      "events": [
+        {
+          "kind": "activateAutomatic"
+        },
+        {
+          "kind": "observePower",
+          "value": "AC"
+        }
+      ],
+      "expected": [
+        "어댑터 연결을 기준으로 자동 유지",
+        "충전률/충전 여부로 배터리로 오인하지 않음"
+      ],
+      "forbidden": [
+        "isCharging=false로 종료"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter"
+      ],
+      "sourceReferences": [
+        "U-01"
+      ],
+      "result": "verifiedAtListedLevels",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "testR3_004ACSupplyDoesNotDependOnChargingOrPercent"
+          ],
+          "scope": "pure v3 policy with controlled power, monotonic time and observations"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "WorkbenchSessionTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 11
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "adapter": "passed"
+      },
+      "pendingValidation": []
+    },
+    {
+      "id": "R3-005",
+      "title": "열린 AC에서 덮개 실행을 미리 준비",
+      "requirements": [
+        "F-02",
+        "F-04"
+      ],
+      "invariants": [
+        "I-01",
+        "I-09"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "open",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "allowClosedLid": true,
+        "lidBackend": "qualified"
+      },
+      "events": [
+        {
+          "kind": "activateAutomatic"
+        },
+        {
+          "kind": "confirmLidEffect"
+        },
+        {
+          "kind": "physicalClose"
+        },
+        {
+          "kind": "observeFor",
+          "seconds": 120
+        }
+      ],
+      "expected": [
+        "닫기 전에 실행 준비/실제 변경 확인",
+        "연속 관측과OS로그에 해당 유지 구간 Sleep 없음"
+      ],
+      "forbidden": [
+        "닫힌 뒤 인증 대기",
+        "SleepDisabled만으로 물리 통과"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter",
+        "physical"
+      ],
+      "sourceReferences": [
+        "A-01",
+        "A-06",
+        "U-01"
+      ],
+      "result": "partiallyVerified",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "IdleSessionTests"
+          ],
+          "scope": "current source contract subset; unit/controller observations are controlled, not physical device input",
+          "passedMethodsInReferencedClass": 44
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "CommonSessionRoutingTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 53
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "adapter": "passed",
+        "physical": "notRun"
+      },
+      "pendingValidation": [
+        "physical"
+      ]
+    },
+    {
+      "id": "R3-006",
+      "title": "깨어 있고 이미 닫힌 Mac의 AC 연결",
+      "requirements": [
+        "F-02",
+        "F-04"
+      ],
+      "invariants": [
+        "I-01",
+        "I-09"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "battery",
+        "lid": "closed",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "wake": "FullWake",
+        "automaticActive": false,
+        "lidBackend": "qualified"
+      },
+      "events": [
+        {
+          "kind": "physicalPlug"
+        },
+        {
+          "kind": "observePower",
+          "value": "AC"
+        }
+      ],
+      "expected": [
+        "실제 AC 사건에서 자동 조건 재평가",
+        "최신 사용자 선택에 따라 유지 시작"
+      ],
+      "forbidden": [
+        "덮개가 열려야만 트리거 평가"
+      ],
+      "validationLevels": [
+        "policy",
+        "physical"
+      ],
+      "sourceReferences": [
+        "U-01",
+        "A-09"
+      ],
+      "result": "partiallyVerified",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "IdleSessionTests"
+          ],
+          "scope": "current source contract subset; unit/controller observations are controlled, not physical device input",
+          "passedMethodsInReferencedClass": 44
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "physical": "notRun"
+      },
+      "pendingValidation": [
+        "physical"
+      ]
+    },
+    {
+      "id": "R3-007",
+      "title": "수면 중 AC 재연결 자동 깨움은 요구에서 제외",
+      "requirements": [
+        "F-02",
+        "F-09"
+      ],
+      "invariants": [
+        "I-06",
+        "I-09"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "battery",
+        "lid": "closed",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "wake": "sleep"
+      },
+      "events": [
+        {
+          "kind": "physicalPlug"
+        },
+        {
+          "kind": "noWakeObserved"
+        },
+        {
+          "kind": "wakeObserved",
+          "value": "DarkWake"
+        },
+        {
+          "kind": "userWake"
+        },
+        {
+          "kind": "wakeObserved",
+          "value": "FullWake"
+        }
+      ],
+      "expected": [
+        "케이블 연결로 깨지 않아도 필수 기능 실패로 판정하지 않음",
+        "수면/DarkWake에서 새 무한 작업·화면 깨우기를 시작하지 않음",
+        "사용자 조작 등으로 실제 FullWake가 관측되면 현재 전원을 재조회"
+      ],
+      "forbidden": [
+        "app trigger가 수면기기를 항상 깨운다는 표시",
+        "전원 재연결 자동 깨움을 출시 필수 조건으로 취급"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter"
+      ],
+      "sourceReferences": [
+        "A-01",
+        "A-04",
+        "A-09"
+      ],
+      "result": "verifiedAtListedLevels",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "testR3_007DarkWakeCannotStartOrRenewWork"
+          ],
+          "scope": "pure v3 policy with controlled power, monotonic time and observations"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "CommonSessionRoutingTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 53
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "adapter": "passed"
+      },
+      "pendingValidation": []
+    },
+    {
+      "id": "R3-008",
+      "title": "닫힌 AC분리에서 자체해제 뒤 한 번 Sleep",
+      "requirements": [
+        "F-05",
+        "F-09"
+      ],
+      "invariants": [
+        "I-02",
+        "I-06",
+        "I-07",
+        "I-11"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "closed",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "ownOverride": true,
+        "manual": "none",
+        "disconnectAction": "sleepIfClosed",
+        "foreignSleepDisabled": false
+      },
+      "events": [
+        {
+          "kind": "physicalUnplug"
+        },
+        {
+          "kind": "restoreObserved",
+          "sleepDisabled": false
+        },
+        {
+          "kind": "releaseOwnAssertion"
+        },
+        {
+          "kind": "finalSnapshot",
+          "power": "battery",
+          "lid": "closed",
+          "workRequested": false
+        },
+        {
+          "kind": "observeOSSleepWake"
+        }
+      ],
+      "expected": [
+        "단일 종료 사건",
+        "자체 원복 확인뒤 Sleep1회 요청",
+        "실제Sleep 로그로 종료 검증"
+      ],
+      "forbidden": [
+        "실행 성공만으로Sleep통과",
+        "다중 EndIntent/retryloop"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter",
+        "physical"
+      ],
+      "sourceReferences": [
+        "A-04",
+        "A-06",
+        "C-03",
+        "U-01",
+        "A-09"
+      ],
+      "result": "partiallyVerified",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "LidExecutionTests"
+          ],
+          "scope": "current source contract subset; unit/controller observations are controlled, not physical device input",
+          "passedMethodsInReferencedClass": 6
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "stalled GUI, remote connection and foreign idle work cannot delay one approved disconnect Sleep"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "rejected Sleep remains one consumed attempt without retry TTL or pmset fallback"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-07",
+          "path": "../.build/verification/completion-20261007T151509Z/automated/packaged-v3-helper.log",
+          "checks": [
+            "stalled GUI, remote connection and foreign idle work cannot delay one approved disconnect Sleep",
+            "rejected Sleep remains one consumed attempt without retry TTL or pmset fallback"
+          ],
+          "scope": "current build 51 isolated helper and IPC; fake OS observations and dry-run writes; helper hash unchanged by final UI-only accessibility change"
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "adapter": "passed",
+        "physical": "notRun"
+      },
+      "pendingValidation": [
+        "physical"
+      ]
+    },
+    {
+      "id": "R3-009",
+      "title": "열린 전원 분리는 Sleep 요청 없음",
+      "requirements": [
+        "F-05"
+      ],
+      "invariants": [
+        "I-07"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "open",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "disconnectAction": "sleepIfClosed"
+      },
+      "events": [
+        {
+          "kind": "physicalUnplug"
+        }
+      ],
+      "expected": [
+        "Tether의 AC 요청 종료",
+        "열린덮개에서는 Sleep 명령 없음"
+      ],
+      "forbidden": [
+        "전원분리만으로 열린 Mac Sleep"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter",
+        "physical"
+      ],
+      "sourceReferences": [
+        "U-01"
+      ],
+      "result": "partiallyVerified",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "LidExecutionTests"
+          ],
+          "scope": "current source contract subset; unit/controller observations are controlled, not physical device input",
+          "passedMethodsInReferencedClass": 6
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "open/sleepIfClosed restores only own override without a Sleep call"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-07",
+          "path": "../.build/verification/completion-20261007T151509Z/automated/packaged-v3-helper.log",
+          "checks": [
+            "open/sleepIfClosed restores only own override without a Sleep call"
+          ],
+          "scope": "current build 51 isolated helper and IPC; fake OS observations and dry-run writes; helper hash unchanged by final UI-only accessibility change"
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "adapter": "passed",
+        "physical": "notRun"
+      },
+      "pendingValidation": [
+        "physical"
+      ]
+    },
+    {
+      "id": "R3-010",
+      "title": "자동 배터리 구간이 유효하면 분리 Sleep하지 않음",
+      "requirements": [
+        "F-02",
+        "F-05"
+      ],
+      "invariants": [
+        "I-07"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "closed",
+        "thermal": "nominal",
+        "automatic": "both",
+        "globalPause": false,
+        "batteryAutomaticDurationSeconds": 1800,
+        "manual": "none"
+      },
+      "events": [
+        {
+          "kind": "physicalUnplug"
+        }
+      ],
+      "expected": [
+        "자동배터리 활성 구간으로 유지",
+        "단일 battery 마감 생성",
+        "Sleep 요청 없음"
+      ],
+      "forbidden": [
+        "수동요청이 없다는 이유만으로Sleep"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter"
+      ],
+      "sourceReferences": [
+        "D-01",
+        "U-01"
+      ],
+      "result": "verifiedAtListedLevels",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "testR3_010AutomaticBatteryIsAnIndependentKeepReason"
+          ],
+          "scope": "pure v3 policy with controlled power, monotonic time and observations"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "the earlier app deadline wins and a late refresh cannot reauthorize an expired ID"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-07",
+          "path": "../.build/verification/completion-20261007T151509Z/automated/packaged-v3-helper.log",
+          "checks": [
+            "the earlier app deadline wins and a late refresh cannot reauthorize an expired ID"
+          ],
+          "scope": "current build 51 isolated helper and IPC; fake OS observations and dry-run writes; helper hash unchanged by final UI-only accessibility change"
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "adapter": "passed"
+      },
+      "pendingValidation": []
+    },
+    {
+      "id": "R3-011",
+      "title": "macOS에 맡기기에서는 자체해제와 실제수면을 구별",
+      "requirements": [
+        "F-05",
+        "F-09"
+      ],
+      "invariants": [
+        "I-02",
+        "I-06"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "closed",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "disconnectAction": "followSystem",
+        "foreignIdleAssertion": true
+      },
+      "events": [
+        {
+          "kind": "physicalUnplug"
+        },
+        {
+          "kind": "ownReleaseObserved"
+        }
+      ],
+      "expected": [
+        "자체 요청만 해제",
+        "타사 유지 원인 표시",
+        "Sleep실제관측 없으면 미확인"
+      ],
+      "forbidden": [
+        "foreign assertion 제거",
+        "무조건즉시잠자기 표시"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter",
+        "physical"
+      ],
+      "sourceReferences": [
+        "C-02",
+        "C-03",
+        "D-01"
+      ],
+      "result": "partiallyVerified",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "LidExecutionTests"
+          ],
+          "scope": "current source contract subset; unit/controller observations are controlled, not physical device input",
+          "passedMethodsInReferencedClass": 6
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "closed/followOS restores only own override without a Sleep call"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-07",
+          "path": "../.build/verification/completion-20261007T151509Z/automated/packaged-v3-helper.log",
+          "checks": [
+            "closed/followOS restores only own override without a Sleep call"
+          ],
+          "scope": "current build 51 isolated helper and IPC; fake OS observations and dry-run writes; helper hash unchanged by final UI-only accessibility change"
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "adapter": "passed",
+        "physical": "notRun"
+      },
+      "pendingValidation": [
+        "physical"
+      ]
+    },
+    {
+      "id": "R3-012",
+      "title": "추천 Sleep의 타사 작업 영향은 명시하며 원격을 예외로 삼지 않음",
+      "requirements": [
+        "F-05",
+        "F-09"
+      ],
+      "invariants": [
+        "I-02",
+        "I-07",
+        "I-10"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "closed",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "disconnectAction": "sleepIfClosed",
+        "foreignIdleAssertion": true,
+        "authenticatedRemote": true
+      },
+      "events": [
+        {
+          "kind": "physicalUnplug"
+        }
+      ],
+      "expected": [
+        "타사idle assertion을 해제하지 않음",
+        "유효Tether배터리요청 없으면 명시된Sleep요청",
+        "원격단절 원인이Sleep이면로그로설명"
+      ],
+      "forbidden": [
+        "remote감지 때문에분리종료 무시",
+        "타사작업무영향 보장"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter",
+        "physical",
+        "remote"
+      ],
+      "sourceReferences": [
+        "C-03",
+        "D-01",
+        "U-01"
+      ],
+      "result": "partiallyVerified",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "LidExecutionTests"
+          ],
+          "scope": "current source contract subset; unit/controller observations are controlled, not physical device input",
+          "passedMethodsInReferencedClass": 6
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "stalled GUI, remote connection and foreign idle work cannot delay one approved disconnect Sleep"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-07",
+          "path": "../.build/verification/completion-20261007T151509Z/automated/packaged-v3-helper.log",
+          "checks": [
+            "stalled GUI, remote connection and foreign idle work cannot delay one approved disconnect Sleep"
+          ],
+          "scope": "current build 51 isolated helper and IPC; fake OS observations and dry-run writes; helper hash unchanged by final UI-only accessibility change"
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "adapter": "passed",
+        "physical": "notRun",
+        "remote": "notRun"
+      },
+      "pendingValidation": [
+        "physical",
+        "remote"
+      ]
+    },
+    {
+      "id": "R3-013",
+      "title": "AC 수동 기본범위는 전원 분리에서 종료",
+      "requirements": [
+        "F-03",
+        "F-05"
+      ],
+      "invariants": [
+        "I-03",
+        "I-07"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "closed",
+        "thermal": "nominal",
+        "automatic": "off",
+        "globalPause": false,
+        "manual": "unlimitedACOnly"
+      },
+      "events": [
+        {
+          "kind": "physicalUnplug"
+        }
+      ],
+      "expected": [
+        "수동AC요청 종료",
+        "배터리무제한 변환 없음",
+        "자체해제후 조건부종료"
+      ],
+      "forbidden": [
+        "자동으로2시간 세션생성"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter"
+      ],
+      "sourceReferences": [
+        "U-01"
+      ],
+      "result": "verifiedAtListedLevels",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "testR3_013DefaultACManualEndsOnUnplug"
+          ],
+          "scope": "pure v3 policy with controlled power, monotonic time and observations"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "WorkbenchSessionTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 11
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "adapter": "passed"
+      },
+      "pendingValidation": []
+    },
+    {
+      "id": "R3-014",
+      "title": "AC에서 선택한 분리 후30분은 최초 실제전환부터 시작",
+      "requirements": [
+        "F-03",
+        "F-04"
+      ],
+      "invariants": [
+        "I-03",
+        "I-05"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "open",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "manual": "unlimitedWithBatteryCarry",
+        "batteryCarrySeconds": 1800,
+        "batteryPermitID": "P1"
+      },
+      "events": [
+        {
+          "kind": "acquireLidPermit",
+          "id": "P1"
+        },
+        {
+          "kind": "physicalUnplug",
+          "continuousSeconds": 100
+        },
+        {
+          "kind": "helperFixesDeadline",
+          "id": "P1",
+          "deadline": 1900
+        },
+        {
+          "kind": "appAcknowledges"
+        },
+        {
+          "kind": "leaseRefresh",
+          "id": "P1",
+          "continuousSeconds": 120
+        }
+      ],
+      "expected": [
+        "일회permit 소비시각·1900마감 journal에기록",
+        "앱/ACK중이른마감사용",
+        "갱신으로 마감연장없음"
+      ],
+      "forbidden": [
+        "최종마감없는무제한배터리grant",
+        "앱ACK지연만큼시간추가"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter"
+      ],
+      "sourceReferences": [
+        "U-01",
+        "D-01"
+      ],
+      "result": "verifiedAtListedLevels",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "testR3_014FirstBatteryACKFixesEarlierDeadline"
+          ],
+          "scope": "pure v3 policy with controlled power, monotonic time and observations"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "first manual battery permit receipt survives refresh, AC round trip and helper restart without renewing or restoring work"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "the earlier app deadline wins and a late refresh cannot reauthorize an expired ID"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-07",
+          "path": "../.build/verification/completion-20261007T151509Z/automated/packaged-v3-helper.log",
+          "checks": [
+            "first manual battery permit receipt survives refresh, AC round trip and helper restart without renewing or restoring work",
+            "late manual first-battery receipt remains visible after an AC automatic-ID swap; the GUI-supplied earlier automatic cap wins",
+            "lost fallback ACK cannot hide an older first-battery record after a newer current-ID record is created",
+            "systemSleep preserves late battery evidence without granting work; a new authenticated preparation excludes the old session",
+            "lidEnd preserves late battery evidence without granting work; a new authenticated preparation excludes the old session",
+            "the newest consumed end selects its own session's evidence over an older system Sleep receipt",
+            "terminal receipt metadata excludes mismatched sessionID",
+            "terminal receipt metadata excludes mismatched bootID",
+            "response receipt fallback/batch excludes mismatched sessionID",
+            "response receipt fallback/batch excludes mismatched bootID",
+            "the earlier app deadline wins and a late refresh cannot reauthorize an expired ID"
+          ],
+          "scope": "current build 51 isolated helper and IPC; fake OS observations and dry-run writes; helper hash unchanged by final UI-only accessibility change"
+        },
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-07",
+          "path": "../.build/verification/completion-20261007T151509Z/accessibility-followup/source-tests.log",
+          "checks": [
+            "testV3LateManualPermitACKKeepsTheSurvivingAutomaticFirstBatteryDeadline",
+            "testV3RetainedBatteryReceiptsKeepTheFirstCapWhenAnEarlierACKWasLost"
+          ],
+          "scope": "controlled monotonic time, late/lost ACK and terminal ordering; no physical Sleep proof"
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "adapter": "passed"
+      },
+      "pendingValidation": []
+    },
+    {
+      "id": "R3-015",
+      "title": "배터리수동2시간 상한과 실행중기본값변경",
+      "requirements": [
+        "F-03"
+      ],
+      "invariants": [
+        "I-03"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "battery",
+        "lid": "open",
+        "thermal": "nominal",
+        "automatic": "off",
+        "globalPause": false
+      },
+      "events": [
+        {
+          "kind": "startManual",
+          "durationSeconds": 10800
+        },
+        {
+          "kind": "startManual",
+          "durationSeconds": 7200
+        },
+        {
+          "kind": "changeManualDefaults",
+          "durationSeconds": 10800,
+          "carryOnBattery": true
+        }
+      ],
+      "expected": [
+        "7200초초과 입력거부·유효한명시적start만요청생성",
+        "기본값변경이기존요청·배터리허가·마감을바꾸지않음",
+        "새세션은명시적start만"
+      ],
+      "forbidden": [
+        "3시간값 그대로 실행",
+        "제조사안전시간이라고설명"
+      ],
+      "validationLevels": [
+        "policy",
+        "ui"
+      ],
+      "sourceReferences": [
+        "U-01"
+      ],
+      "result": "verifiedAtListedLevels",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "testR3_015BatteryManualRejectsOverTwoHoursAndFreezesDefaults"
+          ],
+          "scope": "pure v3 policy with controlled power, monotonic time and observations"
+        },
+        {
+          "level": "ui",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "LiveUIBindingTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 9
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-07",
+          "path": "../.build/verification/completion-20261007T151509Z/automated/packaged-v3-helper.log",
+          "checks": [
+            "first manual battery permit receipt survives refresh, AC round trip and helper restart without renewing or restoring work",
+            "late manual first-battery receipt remains visible after an AC automatic-ID swap; the GUI-supplied earlier automatic cap wins",
+            "lost fallback ACK cannot hide an older first-battery record after a newer current-ID record is created"
+          ],
+          "scope": "current build 51 isolated helper and IPC; fake OS observations and dry-run writes; helper hash unchanged by final UI-only accessibility change"
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "ui": "passed"
+      },
+      "pendingValidation": []
+    },
+    {
+      "id": "R3-016",
+      "title": "수동3분 만료는 AC자동유지까지 끝내지 않음",
+      "requirements": [
+        "F-02",
+        "F-03",
+        "F-05"
+      ],
+      "invariants": [
+        "I-03",
+        "I-07"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "battery",
+        "lid": "open",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "manual": "180seconds"
+      },
+      "events": [
+        {
+          "kind": "startManual",
+          "durationSeconds": 180
+        },
+        {
+          "kind": "physicalClose",
+          "continuousSeconds": 10
+        },
+        {
+          "kind": "physicalPlug",
+          "continuousSeconds": 30
+        },
+        {
+          "kind": "advanceContinuousClock",
+          "seconds": 210
+        },
+        {
+          "kind": "physicalUnplug"
+        },
+        {
+          "kind": "physicalOpenAfterOSSleep"
+        }
+      ],
+      "expected": [
+        "manual원래마감에만료",
+        "AC자동요청이독립적으로유지",
+        "마지막분리에수동부활없이자체해제·실제Sleep검증"
+      ],
+      "forbidden": [
+        "AC자동도함께종료",
+        "분리때만료수동재개"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter",
+        "physical"
+      ],
+      "sourceReferences": [
+        "C-03",
+        "U-01"
+      ],
+      "result": "partiallyVerified",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "testR3_016ManualExpiryKeepsSeparateACAutomaticReason"
+          ],
+          "scope": "pure v3 policy with controlled power, monotonic time and observations"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "CommonSessionRoutingTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 53
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "WorkbenchSessionTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 11
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "adapter": "passed",
+        "physical": "notRun"
+      },
+      "pendingValidation": [
+        "physical"
+      ]
+    },
+    {
+      "id": "R3-017",
+      "title": "수동배터리마감은 AC왕복·IPC재연결에 불변",
+      "requirements": [
+        "F-03"
+      ],
+      "invariants": [
+        "I-03"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "battery",
+        "lid": "open",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "manualDeadline": 7200
+      },
+      "events": [
+        {
+          "kind": "physicalPlug",
+          "continuousSeconds": 100
+        },
+        {
+          "kind": "reconnectIPC"
+        },
+        {
+          "kind": "physicalUnplug",
+          "continuousSeconds": 500
+        }
+      ],
+      "expected": [
+        "원래7200마감유지",
+        "AC경과시간도포함"
+      ],
+      "forbidden": [
+        "매분리시7200초새마감"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter"
+      ],
+      "sourceReferences": [
+        "U-01"
+      ],
+      "result": "verifiedAtListedLevels",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "testR3_017BatteryDeadlineSurvivesACRoundTripAndDuplicateObservation"
+          ],
+          "scope": "pure v3 policy with controlled power, monotonic time and observations"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "first manual battery permit receipt survives refresh, AC round trip and helper restart without renewing or restoring work"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "CommonSessionRoutingTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 53
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-07",
+          "path": "../.build/verification/completion-20261007T151509Z/automated/packaged-v3-helper.log",
+          "checks": [
+            "first manual battery permit receipt survives refresh, AC round trip and helper restart without renewing or restoring work"
+          ],
+          "scope": "current build 51 isolated helper and IPC; fake OS observations and dry-run writes; helper hash unchanged by final UI-only accessibility change"
+        },
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-07",
+          "path": "../.build/verification/completion-20261007T151509Z/accessibility-followup/source-tests.log",
+          "checks": [
+            "testLateManualPermitCapsOnlyItsSurvivingAutomaticActivation",
+            "testV3RetainedBatteryReceiptsKeepTheFirstCapWhenAnEarlierACKWasLost"
+          ],
+          "scope": "controlled monotonic time, late/lost ACK and terminal ordering; no physical Sleep proof"
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "adapter": "passed"
+      },
+      "pendingValidation": []
+    },
+    {
+      "id": "R3-018",
+      "title": "자동 배터리 만료가 같은조건에서 즉시재시작하지 않음",
+      "requirements": [
+        "F-02"
+      ],
+      "invariants": [
+        "I-03"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "battery",
+        "lid": "open",
+        "thermal": "nominal",
+        "automatic": "battery",
+        "globalPause": false,
+        "automaticDeadline": 1800,
+        "activationID": "A1"
+      },
+      "events": [
+        {
+          "kind": "advanceContinuousClock",
+          "seconds": 1801
+        },
+        {
+          "kind": "duplicatePowerObservation",
+          "value": "battery"
+        },
+        {
+          "kind": "restartApp"
+        }
+      ],
+      "expected": [
+        "A1만료marker보존",
+        "새요청자동생성없음",
+        "명시적다시시작또는실제새조건구간에서만재개"
+      ],
+      "forbidden": [
+        "poll/launch를새전원사건으로처리"
+      ],
+      "validationLevels": [
+        "policy",
+        "migration"
+      ],
+      "sourceReferences": [
+        "D-01"
+      ],
+      "result": "verifiedAtListedLevels",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "testR3_018ExpiredAutomaticDoesNotReplayOnSameSourceOrRestart"
+          ],
+          "scope": "pure v3 policy with controlled power, monotonic time and observations"
+        },
+        {
+          "level": "migration",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "CommonSessionRoutingTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 53
+        },
+        {
+          "level": "migration",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "UserSessionControllerTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 70
+        },
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-07",
+          "path": "../.build/verification/completion-20261007T151509Z/accessibility-followup/source-tests.log",
+          "checks": [
+            "testV3FirstBatteryACKAndTerminalReceiptsConsumeTheOldAutomaticRequest"
+          ],
+          "scope": "controlled monotonic time, late/lost ACK and terminal ordering; no physical Sleep proof"
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "migration": "passed"
+      },
+      "pendingValidation": []
+    },
+    {
+      "id": "R3-019",
+      "title": "둘다 모드 AC를 거쳐도 만료된 자동배터리시간이 부활하지 않음",
+      "requirements": [
+        "F-02"
+      ],
+      "invariants": [
+        "I-03"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "battery",
+        "lid": "open",
+        "thermal": "nominal",
+        "automatic": "both",
+        "globalPause": false,
+        "automaticDeadline": 1800,
+        "activationID": "A1"
+      },
+      "events": [
+        {
+          "kind": "advanceContinuousClock",
+          "seconds": 1801
+        },
+        {
+          "kind": "physicalPlug"
+        },
+        {
+          "kind": "physicalUnplug"
+        }
+      ],
+      "expected": [
+        "AC자동유지는가능",
+        "같은A1배터리는만료유지",
+        "원인과제한을표시"
+      ],
+      "forbidden": [
+        "AC왕복으로기한reset"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter"
+      ],
+      "sourceReferences": [
+        "D-01"
+      ],
+      "result": "verifiedAtListedLevels",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "testR3_019BothModeACVisitCannotReviveExpiredBattery"
+          ],
+          "scope": "pure v3 policy with controlled power, monotonic time and observations"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "CommonSessionRoutingTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 53
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "WorkbenchSessionTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 11
+        },
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-07",
+          "path": "../.build/verification/completion-20261007T151509Z/accessibility-followup/source-tests.log",
+          "checks": [
+            "testAnEarlierBatteryACKRemainsConsumedAfterATerminalBoundary",
+            "testV3LateTerminalAndBatteryReceiptsPreserveNewerUserIntent"
+          ],
+          "scope": "controlled monotonic time, late/lost ACK and terminal ordering; no physical Sleep proof"
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "adapter": "passed"
+      },
+      "pendingValidation": []
+    },
+    {
+      "id": "R3-020",
+      "title": "수동만 종료·자동만 끄기의 범위",
+      "requirements": [
+        "F-02",
+        "F-03",
+        "F-10"
+      ],
+      "invariants": [
+        "I-01",
+        "I-03"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "open",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "manual": "active",
+        "automaticActive": true
+      },
+      "events": [
+        {
+          "kind": "endManualOnly"
+        },
+        {
+          "kind": "startManual",
+          "durationSeconds": 180
+        },
+        {
+          "kind": "disableAutomaticOnly"
+        }
+      ],
+      "expected": [
+        "첫명령은자동유지남김",
+        "둘째종료는수동유지남김"
+      ],
+      "forbidden": [
+        "한버튼으로모든원인동시삭제"
+      ],
+      "validationLevels": [
+        "policy",
+        "ui"
+      ],
+      "sourceReferences": [
+        "C-03",
+        "U-01"
+      ],
+      "result": "verifiedAtListedLevels",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "testR3_020EndingOneReasonPreservesTheOther"
+          ],
+          "scope": "pure v3 policy with controlled power, monotonic time and observations"
+        },
+        {
+          "level": "ui",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "LiveUIBindingTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 9
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "ui": "passed"
+      },
+      "pendingValidation": []
+    },
+    {
+      "id": "R3-021",
+      "title": "전체 일시중지는 재시작·Wake·업데이트로 부활하지 않음",
+      "requirements": [
+        "F-10",
+        "F-11"
+      ],
+      "invariants": [
+        "I-03"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "open",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "manual": "active"
+      },
+      "events": [
+        {
+          "kind": "pauseAll"
+        },
+        {
+          "kind": "restartApp"
+        },
+        {
+          "kind": "wakeObserved",
+          "value": "FullWake"
+        },
+        {
+          "kind": "upgradeBinary"
+        },
+        {
+          "kind": "physicalUnplug"
+        },
+        {
+          "kind": "physicalPlug"
+        }
+      ],
+      "expected": [
+        "durable전체pause유지",
+        "수동요청복원없음",
+        "명시적다시시작전새획득없음"
+      ],
+      "forbidden": [
+        "앱실행·AC조건으로일시중지삭제"
+      ],
+      "validationLevels": [
+        "policy",
+        "migration"
+      ],
+      "sourceReferences": [
+        "U-01",
+        "D-01"
+      ],
+      "result": "verifiedAtListedLevels",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "testR3_021GlobalPauseIsDurableAcrossEventsAndRestart"
+          ],
+          "scope": "pure v3 policy with controlled power, monotonic time and observations"
+        },
+        {
+          "level": "migration",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "CommonSessionRoutingTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 53
+        },
+        {
+          "level": "migration",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "UserSessionControllerTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 70
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "migration": "passed"
+      },
+      "pendingValidation": []
+    },
+    {
+      "id": "R3-022",
+      "title": "시계변경과 수면은 기간을 연장하지 않음",
+      "requirements": [
+        "F-03",
+        "F-10"
+      ],
+      "invariants": [
+        "I-03"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "open",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "manualDeadlineContinuous": 180
+      },
+      "events": [
+        {
+          "kind": "changeWallClock",
+          "deltaSeconds": -3600
+        },
+        {
+          "kind": "osWillSleep"
+        },
+        {
+          "kind": "advanceContinuousClock",
+          "seconds": 3600
+        },
+        {
+          "kind": "wakeObserved",
+          "value": "FullWake"
+        }
+      ],
+      "expected": [
+        "벽시계로기간연장없음",
+        "OSsleep은수동요청소모",
+        "Wake에서옛수동타이머부활없음"
+      ],
+      "forbidden": [
+        "Date차이만으로잔여시간복구"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter",
+        "physical"
+      ],
+      "sourceReferences": [
+        "A-04",
+        "U-01"
+      ],
+      "result": "partiallyVerified",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "testR3_022SleepConsumesManualInsteadOfPausingItsClock"
+          ],
+          "scope": "pure v3 policy with controlled power, monotonic time and observations"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "CommonSessionRoutingTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 53
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "WorkbenchSessionTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 11
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "adapter": "passed",
+        "physical": "notRun"
+      },
+      "pendingValidation": [
+        "physical"
+      ]
+    },
+    {
+      "id": "R3-023",
+      "title": "명시적 잠금과 실제 OS 수면 통지는 다르게 처리",
+      "requirements": [
+        "F-07",
+        "F-10"
+      ],
+      "invariants": [
+        "I-03",
+        "I-06"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "open",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "manual": "active"
+      },
+      "events": [
+        {
+          "kind": "userLock"
+        },
+        {
+          "kind": "osWillSleep"
+        },
+        {
+          "kind": "wakeObserved",
+          "value": "FullWake"
+        }
+      ],
+      "expected": [
+        "잠금 자체로 일반 유지를 종료하지 않음",
+        "실제 osWillSleep 통지에서 수동 요청을 정리",
+        "자동 unlock·반복 Wake 없음",
+        "native 잠자기 메뉴 선택만으로 OS 수면을 추정하지 않음"
+      ],
+      "forbidden": [
+        "잠김을로그아웃으로처리"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter",
+        "physical"
+      ],
+      "sourceReferences": [
+        "A-03",
+        "A-04",
+        "A-08"
+      ],
+      "result": "partiallyVerified",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "testR3_023LockIsNotAnInputThatConsumesManualWork"
+          ],
+          "scope": "pure v3 policy with controlled power, monotonic time and observations"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "CommonSessionRoutingTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 53
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "WorkbenchSessionTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 11
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "adapter": "passed",
+        "physical": "notRun"
+      },
+      "pendingValidation": [
+        "physical"
+      ]
+    },
+    {
+      "id": "R3-024",
+      "title": "fair와 serious/critical 보호를 구별",
+      "requirements": [
+        "F-08",
+        "F-10"
+      ],
+      "invariants": [
+        "I-03",
+        "I-04"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "open",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "manual": "unlimitedAC",
+        "ownOverride": true
+      },
+      "events": [
+        {
+          "kind": "observeThermal",
+          "value": "fair"
+        },
+        {
+          "kind": "observeThermal",
+          "value": "serious"
+        },
+        {
+          "kind": "observeThermal",
+          "value": "nominal"
+        },
+        {
+          "kind": "restartApp"
+        }
+      ],
+      "expected": [
+        "fair만으로작업중지않음",
+        "serious에서자체요청정리·보호marker보존",
+        "냉각/재실행만으로재시작않음"
+      ],
+      "forbidden": [
+        "제조사온도값허위환산",
+        "무제한수동이보호우회"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter"
+      ],
+      "sourceReferences": [
+        "A-05",
+        "D-01"
+      ],
+      "result": "verifiedAtListedLevels",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "testR3_024FairSurvivesAndSeriousLatchesUntilSafeResume"
+          ],
+          "scope": "pure v3 policy with controlled power, monotonic time and observations"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "CommonSessionRoutingTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 53
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "WorkbenchSessionTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 11
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "adapter": "passed"
+      },
+      "pendingValidation": []
+    },
+    {
+      "id": "R3-025",
+      "title": "잔량하한·OS저전력 경고는 수동배터리예외에도 적용",
+      "requirements": [
+        "F-03",
+        "F-08"
+      ],
+      "invariants": [
+        "I-04"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "battery",
+        "lid": "open",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "manual": "active",
+        "batteryFloor": 20,
+        "batteryPercent": 25
+      },
+      "events": [
+        {
+          "kind": "observeBattery",
+          "percent": 19
+        },
+        {
+          "kind": "observeLowPowerWarning",
+          "value": true
+        }
+      ],
+      "expected": [
+        "자체배터리작업·덮개요청정리",
+        "중지원인표시"
+      ],
+      "forbidden": [
+        "남은2시간때문에보호무시"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter"
+      ],
+      "sourceReferences": [
+        "U-01",
+        "D-01"
+      ],
+      "result": "verifiedAtListedLevels",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "testR3_025BatteryReserveAndOSWarningConsumeManualException"
+          ],
+          "scope": "pure v3 policy with controlled power, monotonic time and observations"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "CommonSessionRoutingTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 53
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "WorkbenchSessionTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 11
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-07",
+          "path": "../.build/verification/completion-20261007T151509Z/automated/packaged-v3-helper.log",
+          "checks": [
+            "closed: direct OS battery warning above floor ends stalled-GUI work, consumes Sleep once and requires explicit warning-clear Resume",
+            "open: direct OS battery warning above floor ends stalled-GUI work, consumes Sleep once and requires explicit warning-clear Resume",
+            "new battery permit rejects warning=True without treating unknown as healthy",
+            "new battery permit rejects warning=None without treating unknown as healthy",
+            "unavailable direct warning releases owned battery work, retains observation protection and cannot authorize Sleep or Resume",
+            "AC work ignores the battery warning value True",
+            "AC work ignores the battery warning value None",
+            "final battery warning False cancels protective Sleep while keeping the latch",
+            "final battery warning None cancels protective Sleep while keeping the latch"
+          ],
+          "scope": "current build 51 isolated helper and IPC; fake OS observations and dry-run writes; helper hash unchanged by final UI-only accessibility change"
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "adapter": "passed"
+      },
+      "pendingValidation": []
+    },
+    {
+      "id": "R3-026",
+      "title": "전원·열·잔량 조회 실패는 정상으로 위조하지 않음",
+      "requirements": [
+        "F-02",
+        "F-04",
+        "F-08"
+      ],
+      "invariants": [
+        "I-04"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "closed",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "finiteLidLease": "active"
+      },
+      "events": [
+        {
+          "kind": "probeFailed",
+          "metric": "power"
+        },
+        {
+          "kind": "probeFailed",
+          "metric": "thermal"
+        },
+        {
+          "kind": "probeFailed",
+          "metric": "battery"
+        }
+      ],
+      "expected": [
+        "새덮개획득/위험갱신거부",
+        "기존허가도유한마감이내만유지",
+        "unknown하나로전체정상/영구무한유지표시않음"
+      ],
+      "forbidden": [
+        "조회실패를AC/nominal/100%로대체"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter"
+      ],
+      "sourceReferences": [
+        "A-01",
+        "D-01"
+      ],
+      "result": "verifiedAtListedLevels",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "testR3_026UnknownObservationsNeverBecomeHealthyValues"
+          ],
+          "scope": "pure v3 policy with controlled power, monotonic time and observations"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "CommonSessionRoutingTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 53
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "WorkbenchSessionTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 11
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "adapter": "passed"
+      },
+      "pendingValidation": []
+    },
+    {
+      "id": "R3-027",
+      "title": "OS즉시암호 정책과 앱잠금OFF의 의미를구분",
+      "requirements": [
+        "F-06",
+        "F-07"
+      ],
+      "invariants": [
+        "I-04",
+        "I-06"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "open",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "lockOnClose": false,
+        "screenLockPolicy": "immediate"
+      },
+      "events": [
+        {
+          "kind": "physicalClose"
+        },
+        {
+          "kind": "observeDisplaySleep"
+        },
+        {
+          "kind": "observeActualLock"
+        }
+      ],
+      "expected": [
+        "앱잠금OFF·OS암호요구·실제관측을따로표시",
+        "시스템설정연결·변경범위안내",
+        "앱이암호요구를낮추지않음"
+      ],
+      "forbidden": [
+        "lockOnClose=false를무잠금성공으로표시",
+        "fakeHID/자동unlock"
+      ],
+      "validationLevels": [
+        "policy",
+        "physical",
+        "ui"
+      ],
+      "sourceReferences": [
+        "A-03",
+        "C-07"
+      ],
+      "result": "partiallyVerified",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "LiveUIBindingTests"
+          ],
+          "scope": "current source contract subset; unit/controller observations are controlled, not physical device input",
+          "passedMethodsInReferencedClass": 9
+        },
+        {
+          "level": "ui",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "LiveUIBindingTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 9
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "physical": "notRun",
+        "ui": "passed"
+      },
+      "pendingValidation": [
+        "physical"
+      ]
+    },
+    {
+      "id": "R3-028",
+      "title": "OS잠금관측 unknown은 unlocked가 아님",
+      "requirements": [
+        "F-07",
+        "F-09"
+      ],
+      "invariants": [
+        "I-04",
+        "I-06"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "open",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "actualLock": "unavailable",
+        "guiLoginDone": true,
+        "screenLockPolicy": "off"
+      },
+      "events": [
+        {
+          "kind": "inspectSessionDictionary"
+        },
+        {
+          "kind": "observeAuthenticatedRemoteFrame"
+        }
+      ],
+      "expected": [
+        "policy/GUI/remote관측과actualLock을분리",
+        "actualLock미확인보존"
+      ],
+      "forbidden": [
+        "GUI로그인/원격프레임으로unlocked추정"
+      ],
+      "validationLevels": [
+        "adapter",
+        "remote"
+      ],
+      "sourceReferences": [
+        "A-03"
+      ],
+      "result": "partiallyVerified",
+      "evidence": [
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "GUISessionAuthorityTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 15
+        }
+      ],
+      "validationResults": {
+        "adapter": "passed",
+        "remote": "notRun"
+      },
+      "pendingValidation": [
+        "remote"
+      ]
+    },
+    {
+      "id": "R3-029",
+      "title": "실제화면절전·무잠금·원격입력은 동시 별도실증",
+      "requirements": [
+        "F-06",
+        "F-07",
+        "F-09"
+      ],
+      "invariants": [
+        "I-06",
+        "I-09"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "open",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "screenLockPolicy": "userConfiguredOff",
+        "lockOnClose": false,
+        "remoteProvider": "testProvider"
+      },
+      "events": [
+        {
+          "kind": "observeIdleFor",
+          "seconds": 1800
+        },
+        {
+          "kind": "observeDisplaySleep"
+        },
+        {
+          "kind": "checkActualLock"
+        },
+        {
+          "kind": "performAuthenticatedRemoteInput"
+        },
+        {
+          "kind": "reconnectRemote"
+        }
+      ],
+      "expected": [
+        "OS26해당기기/provider의각결과를별도기록",
+        "명령만성공하면미확인",
+        "잠금정책미변경증거"
+      ],
+      "forbidden": [
+        "검은화면/brightness0로실제sleep대체",
+        "다른provider까지합격확대"
+      ],
+      "validationLevels": [
+        "physical",
+        "remote"
+      ],
+      "sourceReferences": [
+        "A-03",
+        "C-07",
+        "U-01"
+      ],
+      "result": "notRun",
+      "evidence": [],
+      "validationResults": {
+        "physical": "notRun",
+        "remote": "notRun"
+      },
+      "pendingValidation": [
+        "physical",
+        "remote"
+      ]
+    },
+    {
+      "id": "R3-030",
+      "title": "전체 displaySleep 명령을 내장전용으로 자동사용하지 않음",
+      "requirements": [
+        "F-06",
+        "F-09"
+      ],
+      "invariants": [
+        "I-06",
+        "I-10"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "open",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "displays": [
+          "builtin",
+          "physicalExternal",
+          "virtualRemote"
+        ]
+      },
+      "events": [
+        {
+          "kind": "physicalClose"
+        },
+        {
+          "kind": "remoteDisplayAdded"
+        }
+      ],
+      "expected": [
+        "내장상태와외장/가상영향분리",
+        "지원범위안에서만화면효과",
+        "화면제한은작업유지종료가아님"
+      ],
+      "forbidden": [
+        "전체displaysleepnow를내장전용으로설명",
+        "반복화면강제sleep루프"
+      ],
+      "validationLevels": [
+        "policy",
+        "physical",
+        "remote"
+      ],
+      "sourceReferences": [
+        "C-07",
+        "A-01"
+      ],
+      "result": "partiallyVerified",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "WorkbenchSessionTests"
+          ],
+          "scope": "current source contract subset; unit/controller observations are controlled, not physical device input",
+          "passedMethodsInReferencedClass": 11
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "physical": "notRun",
+        "remote": "notRun"
+      },
+      "pendingValidation": [
+        "physical",
+        "remote"
+      ]
+    },
+    {
+      "id": "R3-031",
+      "title": "원격 감지는 작업 수명·아이콘 폭을 바꾸지 않음",
+      "requirements": [
+        "F-09",
+        "F-12"
+      ],
+      "invariants": [
+        "I-10"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "open",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "manualDeadline": 180,
+        "menuIcon": "fixedWidthTemplate"
+      },
+      "events": [
+        {
+          "kind": "providerProcessDetected"
+        },
+        {
+          "kind": "remoteConnect"
+        },
+        {
+          "kind": "remoteDisconnect"
+        },
+        {
+          "kind": "screenProbeFailed"
+        }
+      ],
+      "expected": [
+        "수동마감·전원트리거불변",
+        "고정폭아이콘유지",
+        "설치/실행/인증/입력증거구별"
+      ],
+      "forbidden": [
+        "원격용배지로아이콘폭증가",
+        "remote연결만으로기간reset"
+      ],
+      "validationLevels": [
+        "policy",
+        "ui",
+        "remote"
+      ],
+      "sourceReferences": [
+        "U-01",
+        "C-07"
+      ],
+      "result": "partiallyVerified",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "testR3_031RepeatedUnrelatedObservationsDoNotChangeRequestDeadline"
+          ],
+          "scope": "pure v3 policy with controlled power, monotonic time and observations"
+        },
+        {
+          "level": "ui",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "MenuBarIconTests.testFixedTemplateIgnoresStateTextCountdownAndProgressAtBothScales"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established"
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "ui": "passed",
+        "remote": "notRun"
+      },
+      "pendingValidation": [
+        "remote"
+      ]
+    },
+    {
+      "id": "R3-032",
+      "title": "외장 화면과 virtual 화면으로 자체 종료를 조기위임하지 않음",
+      "requirements": [
+        "F-04",
+        "F-05",
+        "F-09"
+      ],
+      "invariants": [
+        "I-02",
+        "I-07"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "closed",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "ownOverride": true,
+        "displays": [
+          "physicalExternal",
+          "virtualRemote"
+        ]
+      },
+      "events": [
+        {
+          "kind": "reclassifyDisplays"
+        },
+        {
+          "kind": "physicalUnplug"
+        }
+      ],
+      "expected": [
+        "실제전원·자체변경에따라종료판단",
+        "native클램쉘관측은정보",
+        "실제Sleep없으면미확인"
+      ],
+      "forbidden": [
+        "화면존재만으로native책임이전·성공처리"
+      ],
+      "validationLevels": [
+        "policy",
+        "physical",
+        "remote"
+      ],
+      "sourceReferences": [
+        "A-06",
+        "C-03"
+      ],
+      "result": "partiallyVerified",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "WorkbenchSessionTests"
+          ],
+          "scope": "current source contract subset; unit/controller observations are controlled, not physical device input",
+          "passedMethodsInReferencedClass": 11
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "physical": "notRun",
+        "remote": "notRun"
+      },
+      "pendingValidation": [
+        "physical",
+        "remote"
+      ]
+    },
+    {
+      "id": "R3-033",
+      "title": "외부 SleepDisabled를 자기소유로 채택하지 않음",
+      "requirements": [
+        "F-04",
+        "F-05",
+        "F-09"
+      ],
+      "invariants": [
+        "I-02",
+        "I-04"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "open",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "sleepDisabled": true,
+        "ownJournal": "absent",
+        "foreignWriter": "unknown"
+      },
+      "events": [
+        {
+          "kind": "requestLidHold"
+        },
+        {
+          "kind": "physicalUnplug"
+        }
+      ],
+      "expected": [
+        "외부전역차단안내",
+        "새소유기록획득/0쓰기거부",
+        "실제Sleep보장표시없음"
+      ],
+      "forbidden": [
+        "foreignhold자동clear",
+        "baseline없는데0복구"
+      ],
+      "validationLevels": [
+        "adapter",
+        "physical"
+      ],
+      "sourceReferences": [
+        "A-06",
+        "C-01",
+        "C-04"
+      ],
+      "result": "partiallyVerified",
+      "evidence": [
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "ConflictMatrixTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 6
+        }
+      ],
+      "validationResults": {
+        "adapter": "passed",
+        "physical": "notRun"
+      },
+      "pendingValidation": [
+        "physical"
+      ]
+    },
+    {
+      "id": "R3-034",
+      "title": "동일 bool을 타사가 쓰면 완전 소유자 식별은 불가능",
+      "requirements": [
+        "F-09",
+        "F-12"
+      ],
+      "invariants": [
+        "I-02",
+        "I-06"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "open",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "sleepDisabled": true,
+        "ownJournal": "activeBaselineFalse"
+      },
+      "events": [
+        {
+          "kind": "externalSameValueWrite",
+          "value": true
+        },
+        {
+          "kind": "releaseOwnHold"
+        }
+      ],
+      "expected": [
+        "journal은Tether변경증거로만표시",
+        "samevalue외부writer미식별한계기록",
+        "모든도구무충돌보장없음"
+      ],
+      "forbidden": [
+        "bool동일만으로독점소유권증명"
+      ],
+      "validationLevels": [
+        "adapter",
+        "physical"
+      ],
+      "sourceReferences": [
+        "A-06",
+        "D-01"
+      ],
+      "result": "partiallyVerified",
+      "evidence": [
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "ConflictMatrixTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 6
+        }
+      ],
+      "validationResults": {
+        "adapter": "passed",
+        "physical": "notRun"
+      },
+      "pendingValidation": [
+        "physical"
+      ]
+    },
+    {
+      "id": "R3-035",
+      "title": "변경 전 journal과 crash 시점별 복구",
+      "requirements": [
+        "F-04",
+        "F-11"
+      ],
+      "invariants": [
+        "I-05"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "open",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "ownJournal": "none",
+        "baselineSleepDisabled": false
+      },
+      "events": [
+        {
+          "kind": "writeDurableJournal"
+        },
+        {
+          "kind": "crashPoint",
+          "phases": [
+            "beforeOSWrite",
+            "afterOSWriteBeforeVerify",
+            "afterVerify"
+          ]
+        },
+        {
+          "kind": "recover"
+        }
+      ],
+      "expected": [
+        "모든phase동일idempotent복구",
+        "실제OS복구확인후clean",
+        "적용전실패도기록과OS대조"
+      ],
+      "forbidden": [
+        "OS쓰기후에만원본저장",
+        "파일존재를원복성공으로처리"
+      ],
+      "validationLevels": [
+        "adapter",
+        "recovery"
+      ],
+      "sourceReferences": [
+        "A-06",
+        "C-04"
+      ],
+      "result": "verifiedAtListedLevels",
+      "evidence": [
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "a successful restore command without observed effect retains recovery ownership and cannot authorize Sleep"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-recovery-executor.log",
+          "checks": [
+            "integration-recovery-executor.log"
+          ],
+          "scope": "isolated actual process / mock installer and OS writes; actual helper versions 49 and 50 used only where identified"
+        },
+        {
+          "level": "recovery",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-recovery-executor.log",
+          "checks": [
+            "integration-recovery-executor.log"
+          ],
+          "scope": "isolated actual process / mock installer and OS writes; actual helper versions 49 and 50 used only where identified"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-07",
+          "path": "../.build/verification/completion-20261007T151509Z/automated/packaged-v3-helper.log",
+          "checks": [
+            "a successful restore command without observed effect retains recovery ownership and cannot authorize Sleep"
+          ],
+          "scope": "current build 51 isolated helper and IPC; fake OS observations and dry-run writes; helper hash unchanged by final UI-only accessibility change"
+        }
+      ],
+      "validationResults": {
+        "adapter": "passed",
+        "recovery": "passed"
+      },
+      "pendingValidation": []
+    },
+    {
+      "id": "R3-036",
+      "title": "원복 실패·오염된 자료를 삭제하지 않음",
+      "requirements": [
+        "F-11"
+      ],
+      "invariants": [
+        "I-04",
+        "I-05"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "open",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "journal": "active",
+        "sleepDisabled": true
+      },
+      "events": [
+        {
+          "kind": "restoreFailed"
+        },
+        {
+          "kind": "readJournal",
+          "value": "malformed"
+        },
+        {
+          "kind": "relaunchHelper"
+        }
+      ],
+      "expected": [
+        "debt와원본보존",
+        "새전역획득거부",
+        "진단/자체복구/가능한일반기능제공"
+      ],
+      "forbidden": [
+        "startup실패후marker삭제",
+        "clean성공위조"
+      ],
+      "validationLevels": [
+        "adapter",
+        "recovery"
+      ],
+      "sourceReferences": [
+        "C-04",
+        "C-05",
+        "C-06"
+      ],
+      "result": "verifiedAtListedLevels",
+      "evidence": [
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "failed restoration retains journal, suppresses unchanged writer retries and never replays the consumed Sleep"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "pre-existing foreign global override is neither claimed nor cleared during executor migration"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "a successful restore command without observed effect retains recovery ownership and cannot authorize Sleep"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "malformed helper execution journal survives relaunch and rejects fresh grants without replacing the original"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-recovery-executor.log",
+          "checks": [
+            "integration-recovery-executor.log"
+          ],
+          "scope": "isolated actual process / mock installer and OS writes; actual helper versions 49 and 50 used only where identified"
+        },
+        {
+          "level": "recovery",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-recovery-executor.log",
+          "checks": [
+            "integration-recovery-executor.log"
+          ],
+          "scope": "isolated actual process / mock installer and OS writes; actual helper versions 49 and 50 used only where identified"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-07",
+          "path": "../.build/verification/completion-20261007T151509Z/automated/packaged-v3-helper.log",
+          "checks": [
+            "failed restoration retains journal, suppresses unchanged writer retries and never replays the consumed Sleep",
+            "pre-existing foreign global override is neither claimed nor cleared during executor migration",
+            "a successful restore command without observed effect retains recovery ownership and cannot authorize Sleep",
+            "malformed helper execution journal survives relaunch and rejects fresh grants without replacing the original"
+          ],
+          "scope": "current build 51 isolated helper and IPC; fake OS observations and dry-run writes; helper hash unchanged by final UI-only accessibility change"
+        }
+      ],
+      "validationResults": {
+        "adapter": "passed",
+        "recovery": "passed"
+      },
+      "pendingValidation": []
+    },
+    {
+      "id": "R3-037",
+      "title": "앱 정지·helper crash는 종료와 원복을 구별",
+      "requirements": [
+        "F-04",
+        "F-11"
+      ],
+      "invariants": [
+        "I-03",
+        "I-05",
+        "I-06"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "open",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "ownOverride": true,
+        "finiteLease": "active",
+        "healthTiming": "mustBeMeasured"
+      },
+      "events": [
+        {
+          "kind": "stallApp"
+        },
+        {
+          "kind": "expireFiniteLease"
+        },
+        {
+          "kind": "crashHelper"
+        },
+        {
+          "kind": "independentRecovery"
+        },
+        {
+          "kind": "observeActualRestoration"
+        }
+      ],
+      "expected": [
+        "실험한유한수명내갱신정지",
+        "독립원복성공과지연을기록",
+        "crash만으로새Sleep종료의도생성않음"
+      ],
+      "forbidden": [
+        "helperexit를원복완료로표시",
+        "측정없는15/30/90초보장"
+      ],
+      "validationLevels": [
+        "adapter",
+        "recovery",
+        "physical"
+      ],
+      "sourceReferences": [
+        "C-05",
+        "D-01"
+      ],
+      "result": "partiallyVerified",
+      "evidence": [
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "finite lease expiry and restart restore only; neither invents a disconnect event"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "missing native observer refuses new lid work: powerSourceObservationAvailable"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "missing native observer refuses new lid work: lidNotificationAvailable"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "missing native observer refuses new lid work: thermalObservationAvailable"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "recovery",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-recovery-executor.log",
+          "checks": [
+            "integration-recovery-executor.log"
+          ],
+          "scope": "isolated actual process / mock installer and OS writes; actual helper versions 49 and 50 used only where identified"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-07",
+          "path": "../.build/verification/completion-20261007T151509Z/automated/packaged-v3-helper.log",
+          "checks": [
+            "finite lease expiry and restart restore only; neither invents a disconnect event",
+            "missing native observer refuses new lid work: powerSourceObservationAvailable",
+            "missing native observer refuses new lid work: lidNotificationAvailable",
+            "missing native observer refuses new lid work: thermalObservationAvailable"
+          ],
+          "scope": "current build 51 isolated helper and IPC; fake OS observations and dry-run writes; helper hash unchanged by final UI-only accessibility change"
+        }
+      ],
+      "validationResults": {
+        "adapter": "passed",
+        "recovery": "passed",
+        "physical": "notRun"
+      },
+      "pendingValidation": [
+        "physical"
+      ]
+    },
+    {
+      "id": "R3-038",
+      "title": "분리 종료 마지막 검사 전 상태 변경·late response",
+      "requirements": [
+        "F-05",
+        "F-10"
+      ],
+      "invariants": [
+        "I-03",
+        "I-07"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "closed",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "disconnectAction": "sleepIfClosed"
+      },
+      "events": [
+        {
+          "kind": "physicalUnplug"
+        },
+        {
+          "kind": "beginOwnRelease"
+        },
+        {
+          "kind": "interleavings",
+          "options": [
+            "ACReconnected",
+            "lidOpened",
+            "newManualBatteryRequest",
+            "GUIExited",
+            "snapshotUnknown"
+          ]
+        },
+        {
+          "kind": "receiveLateReply"
+        }
+      ],
+      "expected": [
+        "최신revision/상태에따라Sleep취소",
+        "oldreply가새요청을덮어쓰지않음",
+        "cancel검사뒤OS호출경합한계별도실증"
+      ],
+      "forbidden": [
+        "oldstate로Sleep반복",
+        "OS조건/명령원자성허위보장"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter",
+        "physical"
+      ],
+      "sourceReferences": [
+        "U-01",
+        "D-01"
+      ],
+      "result": "partiallyVerified",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "testR3_038LateOldPermitCannotReviveAStoppedOrNewRequest"
+          ],
+          "scope": "pure v3 policy with controlled power, monotonic time and observations"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "final requery cancels once on {'finalSnapshot': {'power': 'ac'}}"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "final requery cancels once on {'finalSnapshot': {'lid': 'open'}}"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "final requery cancels once on {'finalSnapshot': {'power': 'unknown'}}"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "final requery cancels once on {'finalSnapshot': {'lid': None}}"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "final requery cancels once on {'finalSnapshot': {'sleepDisabled': True}}"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "final requery cancels once on {'finalSnapshot': {'sleepDisabled': None}}"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "final requery cancels once on {'finalOwnerUnavailable': True}"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "final requery cancels once on {'finalBatteryPermitValid': True}"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-07",
+          "path": "../.build/verification/completion-20261007T151509Z/automated/packaged-v3-helper.log",
+          "checks": [
+            "final battery warning False cancels protective Sleep while keeping the latch",
+            "final battery warning None cancels protective Sleep while keeping the latch",
+            "final requery cancels once on {'finalSnapshot': {'power': 'ac'}}",
+            "final requery cancels once on {'finalSnapshot': {'lid': 'open'}}",
+            "final requery cancels once on {'finalSnapshot': {'power': 'unknown'}}",
+            "final requery cancels once on {'finalSnapshot': {'lid': None}}",
+            "final requery cancels once on {'finalSnapshot': {'sleepDisabled': True}}",
+            "final requery cancels once on {'finalSnapshot': {'sleepDisabled': None}}",
+            "final requery cancels once on {'finalOwnerUnavailable': True}",
+            "final requery cancels once on {'finalBatteryPermitValid': True}"
+          ],
+          "scope": "current build 51 isolated helper and IPC; fake OS observations and dry-run writes; helper hash unchanged by final UI-only accessibility change"
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "adapter": "passed",
+        "physical": "notRun"
+      },
+      "pendingValidation": [
+        "physical"
+      ]
+    },
+    {
+      "id": "R3-039",
+      "title": "root는 자동트리거를 시작하지 않는 좁은 실행기",
+      "requirements": [
+        "F-01",
+        "F-04"
+      ],
+      "invariants": [
+        "I-01",
+        "I-02"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "open",
+        "thermal": "nominal",
+        "automatic": "AC",
+        "globalPause": false,
+        "helper": "running",
+        "appPermit": "absent"
+      },
+      "events": [
+        {
+          "kind": "observePower",
+          "value": "AC"
+        },
+        {
+          "kind": "sendUntrustedClient",
+          "sameBundleID": true,
+          "wrongBinaryIdentity": true
+        },
+        {
+          "kind": "requestArbitraryShell"
+        }
+      ],
+      "expected": [
+        "허가없이새트리거없음",
+        "UID/binary/설치identity검증",
+        "임의명령거부"
+      ],
+      "forbidden": [
+        "bundleID문자열만으로root신뢰",
+        "root가별도자동설정파일평가"
+      ],
+      "validationLevels": [
+        "adapter",
+        "security"
+      ],
+      "sourceReferences": [
+        "A-06",
+        "D-01"
+      ],
+      "result": "verifiedAtListedLevels",
+      "evidence": [
+        {
+          "level": "security",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "UserSessionProtocolTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 13
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "fresh helper ignores old enabled control and grants lid maintenance only for an authenticated finite v3 lease"
+          ],
+          "scope": "fresh executor ignores legacy enabled control; only the authenticated finite app lease grants work; no live root installation proof"
+        }
+      ],
+      "validationResults": {
+        "adapter": "passed",
+        "security": "passed"
+      },
+      "pendingValidation": []
+    },
+    {
+      "id": "R3-040",
+      "title": "이전 설정의 off/보호/선택만 이관",
+      "requirements": [
+        "F-10",
+        "F-11"
+      ],
+      "invariants": [
+        "I-03",
+        "I-05"
+      ],
+      "initial": {
+        "legacyVersion": "installedPriorVersion",
+        "off": true,
+        "protection": "latched",
+        "legacyBudgetMinutes": 240,
+        "manualActive": true,
+        "brightnessOriginal": "saved"
+      },
+      "events": [
+        {
+          "kind": "freezeLegacyWriter"
+        },
+        {
+          "kind": "migrateSettings"
+        },
+        {
+          "kind": "startNewRuntime"
+        }
+      ],
+      "expected": [
+        "off/보호/선택보존",
+        "240분·활성수동·예약재무장실행수입없음",
+        "밝기원본은복구전용보존"
+      ],
+      "forbidden": [
+        "공장초기화/버전코드reset",
+        "원복증거버림"
+      ],
+      "validationLevels": [
+        "migration",
+        "recovery"
+      ],
+      "sourceReferences": [
+        "U-01",
+        "D-01"
+      ],
+      "result": "verifiedAtListedLevels",
+      "evidence": [
+        {
+          "level": "migration",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "CommonSessionRoutingTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 53
+        },
+        {
+          "level": "migration",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "UserSessionControllerTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 70
+        },
+        {
+          "level": "recovery",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-recovery-executor.log",
+          "checks": [
+            "integration-recovery-executor.log"
+          ],
+          "scope": "isolated actual process / mock installer and OS writes; actual helper versions 49 and 50 used only where identified"
+        },
+        {
+          "level": "recovery",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/upgrade-real50.log",
+          "checks": [
+            "upgrade-real50.log"
+          ],
+          "scope": "isolated actual process / mock installer and OS writes; actual helper versions 49 and 50 used only where identified"
+        }
+      ],
+      "validationResults": {
+        "migration": "passed",
+        "recovery": "passed"
+      },
+      "pendingValidation": []
+    },
+    {
+      "id": "R3-041",
+      "title": "legacy 원복 실패 때 일반기능과 새전역쓰기를 분리",
+      "requirements": [
+        "F-01",
+        "F-11"
+      ],
+      "invariants": [
+        "I-04",
+        "I-05"
+      ],
+      "initial": {
+        "legacyWriter": "stopped",
+        "legacyRecoveryDebt": "present",
+        "helperCompatibility": "old"
+      },
+      "events": [
+        {
+          "kind": "restoreLegacy",
+          "result": "failure"
+        },
+        {
+          "kind": "startGeneralIdle"
+        },
+        {
+          "kind": "requestNewLid"
+        }
+      ],
+      "expected": [
+        "새globalwriter차단",
+        "가능한일반assertion·복구·UI는제공",
+        "원본삭제없음"
+      ],
+      "forbidden": [
+        "oldpolicyfallback재시작",
+        "setter실패에도원본지움"
+      ],
+      "validationLevels": [
+        "adapter",
+        "migration",
+        "recovery"
+      ],
+      "sourceReferences": [
+        "C-04",
+        "D-01"
+      ],
+      "result": "verifiedAtListedLevels",
+      "evidence": [
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "legacy restore debt retains its value and blocks the global writer while preserving app coordination"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "CommonSessionRoutingTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 53
+        },
+        {
+          "level": "migration",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "CommonSessionRoutingTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 53
+        },
+        {
+          "level": "migration",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "UserSessionControllerTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 70
+        },
+        {
+          "level": "recovery",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-recovery-executor.log",
+          "checks": [
+            "integration-recovery-executor.log"
+          ],
+          "scope": "isolated actual process / mock installer and OS writes; actual helper versions 49 and 50 used only where identified"
+        },
+        {
+          "level": "recovery",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/upgrade-real50.log",
+          "checks": [
+            "upgrade-real50.log"
+          ],
+          "scope": "isolated actual process / mock installer and OS writes; actual helper versions 49 and 50 used only where identified"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-07",
+          "path": "../.build/verification/completion-20261007T151509Z/automated/packaged-v3-helper.log",
+          "checks": [
+            "legacy restore debt retains its value and blocks the global writer while preserving app coordination"
+          ],
+          "scope": "current build 51 isolated helper and IPC; fake OS observations and dry-run writes; helper hash unchanged by final UI-only accessibility change"
+        }
+      ],
+      "validationResults": {
+        "adapter": "passed",
+        "migration": "passed",
+        "recovery": "passed"
+      },
+      "pendingValidation": []
+    },
+    {
+      "id": "R3-042",
+      "title": "설치 cancel/rollback은 최신 사용자 설정을 보존",
+      "requirements": [
+        "F-11",
+        "F-12"
+      ],
+      "invariants": [
+        "I-03",
+        "I-08"
+      ],
+      "initial": {
+        "oldBinary": "A",
+        "newBinary": "B",
+        "settingsRevision": 10,
+        "globalPause": true
+      },
+      "events": [
+        {
+          "kind": "beginInstall"
+        },
+        {
+          "kind": "editSettings",
+          "revision": 11
+        },
+        {
+          "kind": "installFailed"
+        },
+        {
+          "kind": "rollbackBinary"
+        }
+      ],
+      "expected": [
+        "binary만A로안전rollback",
+        "설정11/pause보존",
+        "옛자동writer재획득없음"
+      ],
+      "forbidden": [
+        "옛백업으로최신설정덮기",
+        "rollback이작업시작"
+      ],
+      "validationLevels": [
+        "migration",
+        "installer"
+      ],
+      "sourceReferences": [
+        "A-07",
+        "D-01"
+      ],
+      "result": "verifiedAtListedLevels",
+      "evidence": [
+        {
+          "level": "migration",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "CommonSessionRoutingTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 53
+        },
+        {
+          "level": "installer",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-upgrade.log",
+          "checks": [
+            "integration-upgrade.log"
+          ],
+          "scope": "isolated actual process / mock installer and OS writes; actual helper versions 49 and 50 used only where identified"
+        },
+        {
+          "level": "migration",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/upgrade-real49.log",
+          "checks": [
+            "upgrade-real49.log"
+          ],
+          "scope": "isolated actual process / mock installer and OS writes; actual helper versions 49 and 50 used only where identified"
+        }
+      ],
+      "validationResults": {
+        "migration": "passed",
+        "installer": "passed"
+      },
+      "pendingValidation": []
+    },
+    {
+      "id": "R3-043",
+      "title": "설치 수명 mutex와 복구 lock의 교착 방지",
+      "requirements": [
+        "F-11"
+      ],
+      "invariants": [
+        "I-05",
+        "I-08"
+      ],
+      "initial": {
+        "installLock": "heldByInstallerA",
+        "recoveryLock": "free"
+      },
+      "events": [
+        {
+          "kind": "launchConcurrentInstallerB"
+        },
+        {
+          "kind": "bootstrapNewHelper"
+        },
+        {
+          "kind": "helperReadinessNeedsRecovery"
+        },
+        {
+          "kind": "waitForReadiness"
+        },
+        {
+          "kind": "rollbackIfFailed"
+        }
+      ],
+      "expected": [
+        "두설치직렬화",
+        "bootstrap대기에RecoveryLock미보유",
+        "필요시InstallLock→RecoveryLock순서",
+        "normalhelper는InstallLock대기없이status/recovery"
+      ],
+      "forbidden": [
+        "전체설치동안복구lock유지",
+        "readiness교착"
+      ],
+      "validationLevels": [
+        "adapter",
+        "installer",
+        "recovery"
+      ],
+      "sourceReferences": [
+        "D-01"
+      ],
+      "result": "verifiedAtListedLevels",
+      "evidence": [
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-recovery-executor.log",
+          "checks": [
+            "integration-recovery-executor.log"
+          ],
+          "scope": "isolated actual process / mock installer and OS writes; actual helper versions 49 and 50 used only where identified"
+        },
+        {
+          "level": "recovery",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-recovery-executor.log",
+          "checks": [
+            "integration-recovery-executor.log"
+          ],
+          "scope": "isolated actual process / mock installer and OS writes; actual helper versions 49 and 50 used only where identified"
+        },
+        {
+          "level": "installer",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-upgrade.log",
+          "checks": [
+            "integration-upgrade.log"
+          ],
+          "scope": "isolated actual process / mock installer and OS writes; actual helper versions 49 and 50 used only where identified"
+        }
+      ],
+      "validationResults": {
+        "adapter": "passed",
+        "installer": "passed",
+        "recovery": "passed"
+      },
+      "pendingValidation": []
+    },
+    {
+      "id": "R3-044",
+      "title": "사설 SMAppService 등록·승인·실행을 구별",
+      "requirements": [
+        "F-04",
+        "F-12"
+      ],
+      "invariants": [
+        "I-04",
+        "I-09"
+      ],
+      "initial": {
+        "signing": "adHoc",
+        "service": "unregistered",
+        "os": "26.x"
+      },
+      "events": [
+        {
+          "kind": "registerService"
+        },
+        {
+          "kind": "approvalState",
+          "value": "requiresApproval"
+        },
+        {
+          "kind": "probeActualService"
+        },
+        {
+          "kind": "updateOrUninstall"
+        }
+      ],
+      "expected": [
+        "등록성공만으로ready표시않음",
+        "사설패키지실제교체/삭제증거필요",
+        "기존설치경로삭제는이실증뒤"
+      ],
+      "forbidden": [
+        "DeveloperID환경결과를adHoc에확대",
+        "NOPASSWD범용규칙"
+      ],
+      "validationLevels": [
+        "package",
+        "installer",
+        "physical"
+      ],
+      "sourceReferences": [
+        "A-07",
+        "D-01"
+      ],
+      "result": "partiallyVerified",
+      "evidence": [
+        {
+          "level": "package",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/verification-summary.json",
+          "checks": [
+            "release compilation",
+            "arm64 / minimum 26 Info",
+            "ad-hoc deep signature",
+            "177 unchanged build input hashes"
+          ],
+          "scope": "build 51 package; no macOS26 installation or published release"
+        },
+        {
+          "level": "installer",
+          "result": "partial",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-upgrade.log",
+          "checks": [
+            "48 mock installer/readiness cases"
+          ],
+          "scope": "registration, approval and live root execution are not established by fixture"
+        }
+      ],
+      "validationResults": {
+        "package": "passed",
+        "installer": "partial",
+        "physical": "notRun"
+      },
+      "pendingValidation": [
+        "installer",
+        "physical"
+      ]
+    },
+    {
+      "id": "R3-045",
+      "title": "진단 저장은 제한하며 사용자가 요청할 때만 내보냄",
+      "requirements": [
+        "F-12"
+      ],
+      "invariants": [
+        "I-06",
+        "I-10"
+      ],
+      "initial": {
+        "logs": "boundedRotation",
+        "exportRequested": false
+      },
+      "events": [
+        {
+          "kind": "repeatUnchangedSnapshot",
+          "count": 10000
+        },
+        {
+          "kind": "meaningfulTransition"
+        },
+        {
+          "kind": "inspectStoredData"
+        }
+      ],
+      "expected": [
+        "전이/오류/복구근거만기본저장",
+        "export없음",
+        "승인된시험연속수집은종료시끝냄",
+        "secret/원격화면/환경전체/Desktop파일없음"
+      ],
+      "forbidden": [
+        "기본매초전체dump",
+        "무제한log"
+      ],
+      "validationLevels": [
+        "adapter",
+        "ui"
+      ],
+      "sourceReferences": [
+        "U-01",
+        "D-01"
+      ],
+      "result": "verifiedAtListedLevels",
+      "evidence": [
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "DiagnosticRecordingTests.testLegacyChoicePreservedAndNewDurationsBounded",
+            "DiagnosticRecordingTests.testRecordingStopsAtDeadlineAndSurvivesDecode",
+            "DiagnosticRecordingTests.testReportNeverIncludesAssertionPayloadAndDistinguishesFailure"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established"
+        },
+        {
+          "level": "ui",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "PowerRequestDetailPresentationTests.testFreshnessNeverConvertsMissingOrOldCaptureToCurrentEvidence",
+            "PowerRequestDetailPresentationTests.testInstalledAndRunningAreNotPresentedAsAConfirmedRequest",
+            "PowerRequestDetailPresentationTests.testObservedRequestsDescribeOpposingIntentRatherThanFailedPhysicalSleep"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established"
+        }
+      ],
+      "validationResults": {
+        "adapter": "passed",
+        "ui": "passed"
+      },
+      "pendingValidation": []
+    },
+    {
+      "id": "R3-046",
+      "title": "메뉴바·다크·작은창의 가독성 및 조작 상태",
+      "requirements": [
+        "F-12"
+      ],
+      "invariants": [
+        "I-09",
+        "I-10"
+      ],
+      "initial": {
+        "ui": "macOS26native",
+        "appearance": "dark",
+        "reduceTransparency": true
+      },
+      "events": [
+        {
+          "kind": "renderNarrowWindow"
+        },
+        {
+          "kind": "showMultipleKeepReasons"
+        },
+        {
+          "kind": "remoteConnect"
+        },
+        {
+          "kind": "showHelperUnavailable"
+        },
+        {
+          "kind": "chooseTimeWithoutStart"
+        }
+      ],
+      "expected": [
+        "고정폭템플릿아이콘",
+        "auto/manual시간과시작상태구별",
+        "줄바꿈/대비/정렬실제확인",
+        "덮개실패는일반기능과분리"
+      ],
+      "forbidden": [
+        "원격상태폭변경",
+        "시간선택만으로유지시작표시",
+        "내부lease정보기본노출"
+      ],
+      "validationLevels": [
+        "ui",
+        "physical"
+      ],
+      "sourceReferences": [
+        "U-01",
+        "D-01"
+      ],
+      "result": "partiallyVerified",
+      "evidence": [
+        {
+          "level": "ui",
+          "result": "partial",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/live-ui-qa.ko.md",
+          "checks": [
+            "9 live UI binding/render tests",
+            "10 native images from prior preview build 50",
+            "native build51 blocked by locked Mac"
+          ],
+          "scope": "partial native observation; final request-kind lines, 2-second preview refresh and Cmd-Q remain unverified"
+        },
+        {
+          "level": "ui",
+          "result": "partial",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/scope-cleanup/verification-summary.json",
+          "checks": [
+            "86 targeted source regressions passed after simplification",
+            "CPU sampling only on explicit detail opening; cancel and late-result rejection",
+            "release package bitmap activity/system exports inspected"
+          ],
+          "scope": "source/bitmap and native read-only CPU evidence; native UI remains blocked by locked Mac, physical behavior and authenticated remote client unchanged"
+        },
+        {
+          "level": "ui",
+          "result": "partial",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/supporting-features/verification-summary.json",
+          "checks": [
+            "first-run notebook/desktop, notifications and guide binding",
+            "6 release-package bitmap exports; visible layout inspected"
+          ],
+          "scope": "source/bitmap only; native scrolling, consent and actual notification delivery remain unverified"
+        },
+        {
+          "level": "ui",
+          "result": "partial",
+          "date": "2026-10-07",
+          "path": "../.build/verification/completion-20261007T151509Z/native-ui-qa.ko.md",
+          "checks": [
+            "build51 custom duration selects without starting",
+            "manual expiry preserves AC automatic work",
+            "thermal latch and explicit resume",
+            "collapsed request kinds and desktop routing",
+            "live accessibility countdown value",
+            "normal Cmd-Q with active manual work"
+          ],
+          "scope": "native production views/controller/private IPC with simulated sensors and OS backend; production menu bar, full VoiceOver and physical behavior pending"
+        }
+      ],
+      "validationResults": {
+        "ui": "partial",
+        "physical": "notRun"
+      },
+      "pendingValidation": [
+        "ui",
+        "physical"
+      ]
+    },
+    {
+      "id": "R3-047",
+      "title": "전역 덮개 유지의 native Sleep 한계와 자체 잠자기의 해제 순서",
+      "requirements": [
+        "F-04",
+        "F-05",
+        "F-10"
+      ],
+      "invariants": [
+        "I-02",
+        "I-04",
+        "I-05",
+        "I-06",
+        "I-09"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "open",
+        "automatic": "AC",
+        "manual": "active",
+        "globalPause": false,
+        "lidBackend": "globalSleepDisabledCandidate",
+        "ownJournal": "applied",
+        "baselineSleepDisabled": false,
+        "observedSleepDisabled": true,
+        "foreignGlobalWriter": "absent"
+      },
+      "events": [
+        {
+          "kind": "nativeSleepMenuSelection"
+        },
+        {
+          "kind": "readOnlyOSLogAndOverrideQuery"
+        },
+        {
+          "kind": "userCommand",
+          "value": "tetherSleep"
+        },
+        {
+          "kind": "restoreOwnOverride",
+          "result": "verifiedBaseline"
+        },
+        {
+          "kind": "releaseOwnAssertions",
+          "result": "verified"
+        },
+        {
+          "kind": "conditionalSleepRequest",
+          "count": 1
+        },
+        {
+          "kind": "osSleepObserved"
+        },
+        {
+          "kind": "wakeObserved",
+          "value": "FullWake"
+        }
+      ],
+      "expected": [
+        "native 메뉴 선택과 실제 Sleep을 별도로 기록",
+        "native Sleep이 차단되고 OSWillSleep이 없으면 정상 정리로 판정하지 않음",
+        "userSleep 일시중지 저장 → 자체 원복 확인 → assertion 해제 → 단일 Sleep 요청 순서",
+        "OS 로그로 실제 Sleep·FullWake 확인 후 userSleep 이유만 해제",
+        "수동 세션은 부활하지 않고 일반 자동 조건만 재평가",
+        "native Sleep 보존이 필수인 프로필에는 이 backend를 적합으로 표시하지 않음"
+      ],
+      "forbidden": [
+        "SleepDisabled를 덮개 전용 설정으로 홍보",
+        "native 메뉴 가로채기·가짜 입력·반복 Sleep",
+        "자체 원복 확인 전에 Sleep 요청",
+        "다른 중지·보호 이유를 Wake로 해제"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter",
+        "physical"
+      ],
+      "sourceReferences": [
+        "A-08",
+        "A-06",
+        "A-04",
+        "D-01"
+      ],
+      "result": "partiallyVerified",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "testR3_047OwnSleepPauseClearsOnlyAfterObservedSleepAndFullWake"
+          ],
+          "scope": "pure v3 policy with controlled power, monotonic time and observations"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "authorized user Sleep shares the once-only restoration path even with open lid on AC"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-07",
+          "path": "../.build/verification/completion-20261007T151509Z/automated/packaged-v3-helper.log",
+          "checks": [
+            "authorized user Sleep shares the once-only restoration path even with open lid on AC"
+          ],
+          "scope": "current build 51 isolated helper and IPC; fake OS observations and dry-run writes; helper hash unchanged by final UI-only accessibility change"
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "adapter": "passed",
+        "physical": "notRun"
+      },
+      "pendingValidation": [
+        "physical"
+      ]
+    },
+    {
+      "id": "R3-048",
+      "title": "자체 잠자기 미확인·재실행에서 자동 획득 부활 방지",
+      "requirements": [
+        "F-10",
+        "F-11",
+        "F-12"
+      ],
+      "invariants": [
+        "I-03",
+        "I-04",
+        "I-06"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "open",
+        "automatic": "AC",
+        "pauseReason": "userSleep",
+        "ownAssertions": "released",
+        "ownOverride": "verifiedRestored"
+      },
+      "events": [
+        {
+          "kind": "sleepRequestReply",
+          "result": "success"
+        },
+        {
+          "kind": "readOnlyOSLog",
+          "result": "noMatchingSleep"
+        },
+        {
+          "kind": "duplicatePowerObservation",
+          "value": "AC"
+        },
+        {
+          "kind": "appRestart"
+        },
+        {
+          "kind": "wakeNotificationWithoutConfirmedPriorSleep"
+        },
+        {
+          "kind": "userCommand",
+          "value": "resume"
+        }
+      ],
+      "expected": [
+        "실제 Sleep 미확인을 표시하고 일시중지를 durable하게 보존",
+        "재실행·전원 중복 통지·맥락 없는 Wake에서 새 획득 없음",
+        "명시적 다시 시작 뒤 최신 조건·보호 확인 후 자동 평가",
+        "Sleep 재시도 TTL·timer·옛 수동 세션 재개 없음"
+      ],
+      "forbidden": [
+        "명령 성공을 실제 Sleep으로 기록",
+        "프로세스 재시작을 Sleep→FullWake로 추정",
+        "미확인을 숨기려고 반복 Sleep"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter",
+        "migration"
+      ],
+      "sourceReferences": [
+        "A-08",
+        "A-04",
+        "D-01"
+      ],
+      "result": "verifiedAtListedLevels",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "testR3_048RestartCannotInventThePriorSleepWakePair"
+          ],
+          "scope": "pure v3 policy with controlled power, monotonic time and observations"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "rejected Sleep remains one consumed attempt without retry TTL or pmset fallback"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "authorized user Sleep shares the once-only restoration path even with open lid on AC"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "migration",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "CommonSessionRoutingTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 53
+        },
+        {
+          "level": "migration",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "UserSessionControllerTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 70
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-07",
+          "path": "../.build/verification/completion-20261007T151509Z/automated/packaged-v3-helper.log",
+          "checks": [
+            "rejected Sleep remains one consumed attempt without retry TTL or pmset fallback",
+            "authorized user Sleep shares the once-only restoration path even with open lid on AC"
+          ],
+          "scope": "current build 51 isolated helper and IPC; fake OS observations and dry-run writes; helper hash unchanged by final UI-only accessibility change"
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "adapter": "passed",
+        "migration": "passed"
+      },
+      "pendingValidation": []
+    },
+    {
+      "id": "R3-049",
+      "title": "GUI가 응답하지 않아도 닫힌 AC 분리의 허가 해제와 Sleep 집행",
+      "requirements": [
+        "F-04",
+        "F-05",
+        "F-09"
+      ],
+      "invariants": [
+        "I-02",
+        "I-06",
+        "I-07",
+        "I-11"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "closed",
+        "wake": "FullWake",
+        "ownOverride": true,
+        "baselineSleepDisabled": false,
+        "leasePowerScope": "AC",
+        "batteryPermit": "none",
+        "disconnectAction": "sleepIfClosed",
+        "guiOwner": "verified",
+        "generalIdleAssertion": "ownedByStalledClient",
+        "foreignSleepDisabled": false,
+        "authenticatedRemote": true
+      },
+      "events": [
+        {
+          "kind": "stallUserController"
+        },
+        {
+          "kind": "physicalUnplug"
+        },
+        {
+          "kind": "helperPowerNotification"
+        },
+        {
+          "kind": "helperRequeryPower",
+          "value": "battery"
+        },
+        {
+          "kind": "revokeACLidPermit"
+        },
+        {
+          "kind": "restoreObserved",
+          "sleepDisabled": false
+        },
+        {
+          "kind": "finalSnapshot",
+          "power": "battery",
+          "lid": "closed",
+          "batteryPermit": "none",
+          "owner": "verified"
+        },
+        {
+          "kind": "conditionalSleepRequest",
+          "count": 1
+        },
+        {
+          "kind": "readOnlyOSSleepObservation"
+        },
+        {
+          "kind": "userWake"
+        },
+        {
+          "kind": "resumeUserController"
+        },
+        {
+          "kind": "discardLateACReplyAndReleaseOwnIdleAssertion"
+        }
+      ],
+      "expected": [
+        "GUI ACK・창・원격 연결・lease 전체 마감 대기 없이 helper가 AC 범위를 집행",
+        "자체 전역 원복 확인과 실제 Sleep 근거를 별도로 기록",
+        "앱 idle assertion 잔존은 general 해제 완료로 위조하지 않으며 demand Sleep을 GUI ACK 대기로 막지 않음",
+        "사용자 Wake 뒤 늦은 AC 응답으로 배터리 덮개 유지가 부활하지 않음"
+      ],
+      "forbidden": [
+        "client callback이 오지 않아서 닫힌 AC 전용 유지가 계속 활성",
+        "원격 연결을 분리 종료의 예외로 취급",
+        "타사 assertion 제거 또는 프로세스 종료",
+        "실제 Sleep 기록 없이 성공 판정"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter",
+        "physical",
+        "remote"
+      ],
+      "sourceReferences": [
+        "A-01",
+        "A-08",
+        "A-09",
+        "U-01"
+      ],
+      "result": "partiallyVerified",
+      "evidence": [
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "stalled GUI, remote connection and foreign idle work cannot delay one approved disconnect Sleep"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "testBatteryPermitScopeNeedsAnIdentityFiniteDurationAndDirectBatteryDeadline",
+            "testBatteryReceiptCannotCarryADeadlineOutsideItsFirstObservedProductCapOrAcrossBoot",
+            "testDisconnectEndsOnlyTheApprovedClosedBatteryIncident",
+            "testExplicitUserSleepUsesRestoredOwnershipAndCurrentWakeEvenWithOpenLidOnAC",
+            "testNewExecutionFieldsDoNotInventAuthorityWhenDecodingOldData",
+            "testProtectionOverridesBatteryPermitOnBothPowerSourcesAndRequiresCurrentThermalPressure"
+          ],
+          "scope": "pure disconnect gate depends on fresh owner/restoration/power/lid/permit; GUI response and remote fields are not gate inputs; stalled-GUI execution separately tested in 28 helper cases"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-07",
+          "path": "../.build/verification/completion-20261007T151509Z/automated/packaged-v3-helper.log",
+          "checks": [
+            "stalled GUI, remote connection and foreign idle work cannot delay one approved disconnect Sleep",
+            "systemSleep preserves late battery evidence without granting work; a new authenticated preparation excludes the old session",
+            "lidEnd preserves late battery evidence without granting work; a new authenticated preparation excludes the old session",
+            "the newest consumed end selects its own session's evidence over an older system Sleep receipt",
+            "terminal receipt metadata excludes mismatched sessionID",
+            "terminal receipt metadata excludes mismatched bootID"
+          ],
+          "scope": "current build 51 isolated helper and IPC; fake OS observations and dry-run writes; helper hash unchanged by final UI-only accessibility change"
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "adapter": "passed",
+        "physical": "notRun",
+        "remote": "notRun"
+      },
+      "pendingValidation": [
+        "physical",
+        "remote"
+      ]
+    },
+    {
+      "id": "R3-050",
+      "title": "자동 ON/OFF는 조건과 수동 요청을 보존하고 전체 중지를 해제하지 않음",
+      "requirements": [
+        "F-02",
+        "F-03",
+        "F-10"
+      ],
+      "invariants": [
+        "I-01",
+        "I-03"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "open",
+        "thermal": "nominal",
+        "automaticEnabled": true,
+        "automatic": "both",
+        "batteryAutomaticDurationSeconds": 3600,
+        "manual": "active",
+        "manualDeadline": "unchanged",
+        "globalPause": false
+      },
+      "events": [
+        {
+          "kind": "disableAutomaticOnly"
+        },
+        {
+          "kind": "enableAutomaticOnly"
+        },
+        {
+          "kind": "stopAll"
+        },
+        {
+          "kind": "disableAutomaticOnly"
+        },
+        {
+          "kind": "enableAutomaticOnly"
+        },
+        {
+          "kind": "restartApp"
+        }
+      ],
+      "expected": [
+        "첫 OFF는 자동만 해제하고 수동 유지·마감·조건·배터리 시간을 보존",
+        "ON은 유효한 현재 조건을 평가하며 수동을 새로 시작하지 않음",
+        "전체 중지 이후 토글 왕복·재실행에도 중지를 보존하고 실행하지 않음"
+      ],
+      "forbidden": [
+        "OFF를 조건 초기화로 취급",
+        "토글로 수동 세션 종료/재생성",
+        "ON으로 사용자 전체 중지 또는 보호 우회"
+      ],
+      "validationLevels": [
+        "policy",
+        "ui",
+        "migration"
+      ],
+      "sourceReferences": [
+        "C-03",
+        "U-01",
+        "D-01"
+      ],
+      "result": "verifiedAtListedLevels",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "testR3_050AutomaticToggleDoesNotChangeManualOrClearWholePause"
+          ],
+          "scope": "pure v3 policy with controlled power, monotonic time and observations"
+        },
+        {
+          "level": "migration",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "CommonSessionRoutingTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 53
+        },
+        {
+          "level": "ui",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "LiveUIBindingTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 9
+        },
+        {
+          "level": "migration",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "UserSessionControllerTests"
+          ],
+          "scope": "dated source tests; only the modeled contract at this level is established",
+          "passedMethodsInReferencedClass": 70
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "ui": "passed",
+        "migration": "passed"
+      },
+      "pendingValidation": []
+    },
+    {
+      "id": "R3-051",
+      "title": "닫힌 AC 무제한 유지 중 열 보호는 GUI stall·자동 ON보다 우선",
+      "requirements": [
+        "F-02",
+        "F-03",
+        "F-04",
+        "F-08",
+        "F-10"
+      ],
+      "invariants": [
+        "I-02",
+        "I-03",
+        "I-06",
+        "I-12"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "AC",
+        "lid": "closed",
+        "thermal": "nominal",
+        "automaticEnabled": true,
+        "automatic": "AC",
+        "manual": "unlimitedAC",
+        "ownOverride": true,
+        "baselineSleepDisabled": false,
+        "guiOwner": "verified",
+        "generalIdleAssertion": "ownedByStalledClient",
+        "foreignSleepDisabled": false,
+        "protectiveAction": "sleepIfClosed",
+        "authenticatedRemote": true
+      },
+      "events": [
+        {
+          "kind": "stallUserController"
+        },
+        {
+          "kind": "helperObserveThermal",
+          "value": "serious"
+        },
+        {
+          "kind": "revokeAllOwnPermitsForProtection"
+        },
+        {
+          "kind": "persistProtectionMarker"
+        },
+        {
+          "kind": "restoreObserved",
+          "sleepDisabled": false
+        },
+        {
+          "kind": "finalSnapshot",
+          "lid": "closed",
+          "thermal": "serious",
+          "owner": "verified"
+        },
+        {
+          "kind": "conditionalProtectionSleepRequest",
+          "count": 1
+        },
+        {
+          "kind": "readOnlyOSSleepObservation"
+        },
+        {
+          "kind": "userWake"
+        },
+        {
+          "kind": "helperObserveThermal",
+          "value": "nominal"
+        },
+        {
+          "kind": "resumeUserController"
+        },
+        {
+          "kind": "disableAutomaticOnly"
+        },
+        {
+          "kind": "enableAutomaticOnly"
+        },
+        {
+          "kind": "restartApp"
+        }
+      ],
+      "expected": [
+        "GUI ACK・원격 연결・무제한 수동 때문에 높은 열 상태의 허가 해제가 지연되지 않음",
+        "자체 원복과 일반 assertion 잔존과 실제 OS Sleep을 별도 기록",
+        "냉각 뒤 ON/OFF·Wake·재실행에도 보호 중지와 소모된 수동 요청을 보존",
+        "새 획득을 거부하고 정상 상태에서 명시적 재개만 허용"
+      ],
+      "forbidden": [
+        "AC 무제한으로 열 보호 우회",
+        "원복 실패/외부 전역 차단/상태 미확인인데 실제 Sleep 성공으로 표시",
+        "반복 Sleep 요청",
+        "온도 정상 통지만으로 자동 재획득"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter",
+        "physical",
+        "remote"
+      ],
+      "sourceReferences": [
+        "A-01",
+        "A-05",
+        "A-08",
+        "A-10",
+        "U-01"
+      ],
+      "result": "partiallyVerified",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "testR3_051And052ThermalProtectsACUnlimitedAndBatteryException"
+          ],
+          "scope": "pure v3 policy with controlled power, monotonic time and observations"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "ac thermal 2 revokes all permits once and requires the observed latch on explicit safe Resume"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "cooling before final protective Sleep cancels that call while retaining the protection latch"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-07",
+          "path": "../.build/verification/completion-20261007T151509Z/automated/packaged-v3-helper.log",
+          "checks": [
+            "ac thermal 2 revokes all permits once and requires the observed latch on explicit safe Resume",
+            "AC work ignores the battery warning value True",
+            "AC work ignores the battery warning value None",
+            "cooling before final protective Sleep cancels that call while retaining the protection latch"
+          ],
+          "scope": "current build 51 isolated helper and IPC; fake OS observations and dry-run writes; helper hash unchanged by final UI-only accessibility change"
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "adapter": "passed",
+        "physical": "notRun",
+        "remote": "notRun"
+      },
+      "pendingValidation": [
+        "physical",
+        "remote"
+      ]
+    },
+    {
+      "id": "R3-052",
+      "title": "닫힌 배터리 예외가 유효해도 심각한 열 상태에서는 보호 종료",
+      "requirements": [
+        "F-03",
+        "F-04",
+        "F-08"
+      ],
+      "invariants": [
+        "I-02",
+        "I-03",
+        "I-06",
+        "I-12"
+      ],
+      "initial": {
+        "os": "26.x",
+        "architecture": "arm64",
+        "power": "battery",
+        "lid": "closed",
+        "thermal": "fair",
+        "automaticEnabled": false,
+        "manual": "active",
+        "manualRemainingSeconds": 3600,
+        "batteryPermit": "valid",
+        "batteryPercent": 80,
+        "ownOverride": true,
+        "baselineSleepDisabled": false,
+        "guiOwner": "verified",
+        "foreignSleepDisabled": false,
+        "disconnectAction": "followOS",
+        "protectiveAction": "sleepIfClosed"
+      },
+      "events": [
+        {
+          "kind": "helperObserveThermal",
+          "value": "critical"
+        },
+        {
+          "kind": "revokeAllOwnPermitsForProtection"
+        },
+        {
+          "kind": "persistProtectionMarker"
+        },
+        {
+          "kind": "restoreObserved",
+          "sleepDisabled": false
+        },
+        {
+          "kind": "finalSnapshot",
+          "lid": "closed",
+          "thermal": "critical",
+          "owner": "verified",
+          "batteryPermit": "revoked"
+        },
+        {
+          "kind": "conditionalProtectionSleepRequest",
+          "count": 1
+        },
+        {
+          "kind": "readOnlyOSSleepObservation"
+        }
+      ],
+      "expected": [
+        "배터리 잔량·남은 시간·자동 OFF와 무관하게 열 보호 적용",
+        "분리 시 macOS에 맡기기 설정은 열 보호를 비활성화하지 않음",
+        "배터리 허가도 무효화한 뒤 한 번의 보호 Sleep을 요청하며 실제 Sleep은 별도 확인"
+      ],
+      "forbidden": [
+        "유효한 배터리 허가로 보호 종료 억제",
+        "사용자 동의 없는 타사 assertion 해제/프로세스 종료",
+        "기기 전원 종료 또는 배터리 충전/팬 제어",
+        "명령 성공만으로 냉각/내구성 개선 보증"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter",
+        "physical"
+      ],
+      "sourceReferences": [
+        "A-05",
+        "A-08",
+        "A-10",
+        "U-01"
+      ],
+      "result": "partiallyVerified",
+      "evidence": [
+        {
+          "level": "policy",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/swift-test-v3-complete.log",
+          "checks": [
+            "testR3_051And052ThermalProtectsACUnlimitedAndBatteryException"
+          ],
+          "scope": "pure v3 policy with controlled power, monotonic time and observations"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-06",
+          "path": "../.build/verification/v3-20261006T102138Z/integration-redesign-helper.log",
+          "checks": [
+            "battery thermal 3 revokes all permits once and requires the observed latch on explicit safe Resume"
+          ],
+          "scope": "real isolated helper and IPC, fake OS observations and dry-run writes"
+        },
+        {
+          "level": "adapter",
+          "result": "passed",
+          "date": "2026-10-07",
+          "path": "../.build/verification/completion-20261007T151509Z/automated/packaged-v3-helper.log",
+          "checks": [
+            "battery thermal 3 revokes all permits once and requires the observed latch on explicit safe Resume",
+            "closed: direct OS battery warning above floor ends stalled-GUI work, consumes Sleep once and requires explicit warning-clear Resume",
+            "open: direct OS battery warning above floor ends stalled-GUI work, consumes Sleep once and requires explicit warning-clear Resume",
+            "warning, helper restart, cooling and warning-clear observations never reactivate ended work or replay Sleep",
+            "new battery permit rejects warning=True without treating unknown as healthy",
+            "new battery permit rejects warning=None without treating unknown as healthy",
+            "unavailable direct warning releases owned battery work, retains observation protection and cannot authorize Sleep or Resume",
+            "final battery warning False cancels protective Sleep while keeping the latch",
+            "final battery warning None cancels protective Sleep while keeping the latch",
+            "battery floor protection shares the one-shot path and rechecks final charge 30",
+            "battery floor protection shares the one-shot path and rechecks final charge 80"
+          ],
+          "scope": "current build 51 isolated helper and IPC; fake OS observations and dry-run writes; helper hash unchanged by final UI-only accessibility change"
+        }
+      ],
+      "validationResults": {
+        "policy": "passed",
+        "adapter": "passed",
+        "physical": "notRun"
+      },
+      "pendingValidation": [
+        "physical"
+      ]
+    }
+  ],
+  "primaryAcceptance": {
+    "requirement": "F-05",
+    "path": "Awake clamshell on AC -> lid remains closed -> unplug -> end own AC hold -> actual OS Sleep",
+    "exceptions": "Only an explicitly enabled, unexpired battery request can continue the hold.",
+    "independence": "Remote connections, UI visibility and stalled client callbacks must not prevent helper enforcement.",
+    "evidence": "Own restoration and actual OS Sleep must be verified separately."
+  },
+  "excludedRequirements": [
+    "Wake a sleeping closed Mac through AC reconnection alone."
+  ],
+  "automaticEvidenceSummary": "../.build/verification/completion-20261007T151509Z/completion-summary.json",
+  "verificationScope": {
+    "date": "2026-10-07",
+    "design": 3,
+    "candidateBuild": 51,
+    "installedBuild": 50,
+    "hostOS": "macOS 27.0.1 (26A434) arm64",
+    "sourceDirty": true,
+    "minimumOSRuntime": "notRun",
+    "physicalSleep": "notRun",
+    "authenticatedRemote": "notRun",
+    "nativeUI": "passedListedPreviewPaths; productionMenuBarAndAssistiveTechnologyAcceptancePending"
+  },
+  "verificationCounts": {
+    "partiallyVerified": 25,
+    "verifiedAtListedLevels": 26,
+    "notRun": 1
+  },
+  "remainingLevels": {
+    "physical": 24,
+    "remote": 8,
+    "installer": 1,
+    "ui": 1
+  },
+  "scopeCleanupEvidence": {
+    "date": "2026-10-06",
+    "path": "../.build/verification/v3-20261006T102138Z/scope-cleanup/verification-summary.json",
+    "sourceRegressions": 86,
+    "newSourceTests": 5,
+    "helperRecoveryCLIHashesUnchanged": true,
+    "nativeUI": "blockedByLockedMac",
+    "physicalSleepProven": false,
+    "authenticatedRemoteClientProven": false
+  },
+  "supportingFeaturesEvidence": {
+    "date": "2026-10-06",
+    "path": "../.build/verification/v3-20261006T102138Z/supporting-features/verification-summary.json",
+    "fullSourceTests": 951,
+    "coreSourceTests": 661,
+    "appAndUpdateSourceTests": 290,
+    "sourceFailures": 0,
+    "sourceSkipped": 0,
+    "packagedHelperChecks": 28,
+    "macbookSetupRequired": true,
+    "desktopHelperRequired": false,
+    "nativeUI": "notVerified",
+    "liveInstallPerformed": false,
+    "physicalSleepProven": false,
+    "authenticatedRemoteClientProven": false
+  },
+  "latestCompletionEvidence": {
+    "date": "2026-10-07",
+    "path": "../.build/verification/completion-20261007T151509Z/completion-summary.json",
+    "fullSourceTests": 967,
+    "coreSourceTests": 671,
+    "appAndUpdateSourceTests": 296,
+    "sourceFailures": 0,
+    "sourceSkipped": 0,
+    "automatedSteps": 42,
+    "packagedHelperChecks": 49,
+    "actualPreviousHelperUpgradeCases": 14,
+    "nativeSparkleCases": 13,
+    "nativeUI": "passedListedPreviewPaths",
+    "liveInstallPerformed": false,
+    "physicalSleepProven": false,
+    "minimumOSRuntimeProven": false,
+    "authenticatedRemoteClientProven": false
+  }
+}

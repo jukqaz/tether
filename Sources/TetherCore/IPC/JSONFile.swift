@@ -8,11 +8,22 @@ public enum JSONFile {
     public static let maxSize = 4 << 20
 
     public static func read<T: Decodable>(_ type: T.Type, from path: String) -> T? {
+        guard let data = readBytes(from: path) else { return nil }
+        return try? JSONDecoder().decode(type, from: data)
+    }
+
+    public static func readBytes(from path: String, expectedOwner: uid_t? = nil,
+                                 expectedPermissions: mode_t? = nil) -> Data? {
         let fd = open(path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
         guard fd >= 0 else { return nil }
         defer { close(fd) }  // also releases the file lock
-        guard lock(fd, exclusive: false), let data = readData(from: fd) else { return nil }
-        return try? JSONDecoder().decode(type, from: data)
+        var info = stat()
+        guard fstat(fd, &info) == 0,
+              (expectedOwner == nil && expectedPermissions == nil) || info.st_nlink == 1,
+              expectedOwner.map({ info.st_uid == $0 }) ?? true,
+              expectedPermissions.map({ info.st_mode & 0o7777 == $0 }) ?? true,
+              lock(fd, exclusive: false), let data = readData(from: fd) else { return nil }
+        return data
     }
 
     static func encode<T: Encodable>(_ value: T) -> Data? {
@@ -26,19 +37,34 @@ public enum JSONFile {
     /// on the open file, then renamed over the target, which replaces a link rather than
     /// following it. For the helper's own files.
     @discardableResult
-    public static func write<T: Encodable>(_ value: T, to path: String, permissions: Int) -> Bool {
-        guard let data = encode(value) else { return false }
+    public static func write<T: Encodable>(_ value: T, to path: String, permissions: Int, durable: Bool = false) -> Bool {
+        guard let data = encode(value), data.count <= maxSize else { return false }
+        return writeBytes(data, to: path, permissions: permissions, durable: durable)
+    }
+
+    @discardableResult
+    public static func writeBytes(_ data: Data, to path: String, permissions: Int, durable: Bool = false) -> Bool {
+        guard data.count <= maxSize else { return false }
         var template = Array("\(path).XXXXXX".utf8CString)
         let fd = mkstemp(&template)
         guard fd >= 0 else { return false }
         let temp = String(cString: template)
-        let written = fchmod(fd, mode_t(permissions)) == 0 && writeAll(data, to: fd)
+        let written = fchmod(fd, mode_t(permissions)) == 0 && writeAll(data, to: fd) && (!durable || fsync(fd) == 0)
         close(fd)
         guard written, rename(temp, path) == 0 else {
             unlink(temp)
             return false
         }
-        return true
+        return !durable || syncDirectory(containing: path)
+    }
+
+    /// Commit a journal name change before allowing its associated OS command.
+    public static func syncDirectory(containing path: String) -> Bool {
+        let folder = URL(fileURLWithPath: path).deletingLastPathComponent().path
+        let fd = open(folder, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+        guard fd >= 0 else { return false }
+        defer { close(fd) }
+        return fsync(fd) == 0
     }
 
     /// Rewrites an existing file in place, keeping its owner and mode: how control.json is
