@@ -33,9 +33,7 @@ extension Helper {
         let removed = withRecoveryLock { () -> Bool in
             guard reloadOwnership(), !ownsOverride, currentSnapshot().observedSleepDisabled == false,
                   state.savedBatteryLowPower == nil, state.savedACLowPower == nil else { return false }
-            for file in [TetherPaths.helperPlistPath, TetherPaths.helperPath, TetherPaths.watchdogPlistPath,
-                         TetherPaths.watchdogPath, TetherPaths.recoveryLockLibraryPath,
-                         TetherPaths.supportDirectory] {
+            for file in TetherPaths.orphanedSystemArtifactPaths {
                 try? fm.removeItem(atPath: file)
             }
             return true

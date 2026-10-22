@@ -30,6 +30,44 @@ final class AppResidueCleanupTests: XCTestCase {
         return lstat(url.path, &entry) == 0
     }
 
+    func testOrphanRetirementRemovesAllInstalledToolsAndDaemonsButPreservesTheSharedLockInode() throws {
+        try fixture { folder in
+            // Mirror only the installation layout under a temporary root. Never
+            // pass the production paths to a filesystem mutation in this test.
+            let installed = [
+                TetherPaths.helperPath, TetherPaths.watchdogPath,
+                TetherPaths.recoveryLockLibraryPath, TetherPaths.recoveryExecutorPath,
+                TetherPaths.helperPlistPath, TetherPaths.watchdogPlistPath,
+            ]
+            for path in installed {
+                try Data("installed".utf8).write(to: leaf(String(path.dropFirst()), in: folder))
+            }
+            let support = folder.appendingPathComponent(String(TetherPaths.supportDirectory.dropFirst()))
+            try Data("journal".utf8).write(to: leaf(
+                String(TetherPaths.helperStatePath.dropFirst()), in: folder))
+            let lockPath = RecoveryLock.path(supportDirectory: TetherPaths.supportDirectory)
+            let lock = try leaf(String(lockPath.dropFirst()), in: folder)
+            let sentinel = Data("stable recovery lock".utf8)
+            try sentinel.write(to: lock)
+            var before = stat()
+            XCTAssertEqual(lstat(lock.path, &before), 0)
+
+            for path in TetherPaths.orphanedSystemArtifactPaths {
+                try FileManager.default.removeItem(at: folder.appendingPathComponent(String(path.dropFirst())))
+            }
+
+            for path in installed {
+                XCTAssertFalse(exists(folder.appendingPathComponent(String(path.dropFirst()))), path)
+            }
+            XCTAssertFalse(exists(support))
+            XCTAssertEqual(try Data(contentsOf: lock), sentinel)
+            var after = stat()
+            XCTAssertEqual(lstat(lock.path, &after), 0)
+            XCTAssertEqual(after.st_dev, before.st_dev)
+            XCTAssertEqual(after.st_ino, before.st_ino)
+        }
+    }
+
     func testMatchingCLIAndLoginItemAreRemoved() throws {
         try fixture { folder in
             let cli = try leaf(".local/bin/tether", in: folder)

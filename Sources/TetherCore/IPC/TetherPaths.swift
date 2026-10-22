@@ -23,6 +23,12 @@ public enum TetherPaths {
     public static let recoveryLockLibraryPath = "/Library/PrivilegedHelperTools/local.tether.recovery-lock"
     public static let recoveryExecutorPath = "/Library/PrivilegedHelperTools/local.tether.power-recovery"
     public static let watchdogPlistPath = "/Library/LaunchDaemons/local.tether.watchdog.plist"
+    /// Orphan retirement removes every installed system artifact after restoring power.
+    /// The shared recovery lock lives beside the support folder; its inode must survive.
+    public static let orphanedSystemArtifactPaths = [
+        helperPlistPath, helperPath, watchdogPlistPath, watchdogPath,
+        recoveryLockLibraryPath, recoveryExecutorPath, supportDirectory,
+    ]
     /// Darwin notification the app posts after writing the control file.
     public static let controlChanged = "local.tether.control"
     /// Darwin notification the helper posts after writing the status file.
