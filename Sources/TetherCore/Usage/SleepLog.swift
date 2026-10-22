@@ -17,6 +17,8 @@ public struct SleepRecord: Codable, Equatable, Sendable {
     public var wakeType: String?
     public var wakeReason: String?
     public var darkWakes: Int
+    /// Nil in old files or while the notification-only estimate is not reconciled.
+    public var darkWakeCountVerified: Bool?
 
     public init(sleptAt: Double, percentBefore: Int?, onBatteryBefore: Bool, byTether: Bool = false) {
         self.sleptAt = sleptAt
@@ -27,6 +29,9 @@ public struct SleepRecord: Codable, Equatable, Sendable {
     }
 
     public var duration: TimeInterval? { wokeAt.map { $0 - sleptAt } }
+    public var darkWakeSummary: String {
+        darkWakeCountVerified == true ? "\(darkWakes) (system log)" : "unverified (\(darkWakes) notifications)"
+    }
 
     /// Charge used per hour, only for sleeps on battery throughout and long enough for whole
     /// percentage points to mean something.
@@ -46,7 +51,7 @@ public struct SleepLog: Codable, Equatable, Sendable {
     /// Shorter "sleeps" were cancelled on the way down (input during the pre-sleep window).
     public static let minimumDuration: TimeInterval = 60
     public static let minimumForDrain: TimeInterval = 1800
-    /// Above this per hour, sleep is costing more than it should (1–2 %/h is typical).
+    /// Legacy diagnostic flag only; not a manufacturer benchmark for healthy sleep drain.
     public static let highDrain: Double = 3
 
     public init(open: SleepRecord? = nil, recent: [SleepRecord] = []) {
@@ -94,5 +99,18 @@ public struct SleepLog: Codable, Equatable, Sendable {
         guard hours > 0 else { return nil }
         let used = measured.reduce(0) { $0 + Double(($1.percentBefore ?? 0) - ($1.percentAfter ?? 0)) }
         return used / hours
+    }
+
+    /// Merge into the current records, not a stale asynchronous copy of all usage data.
+    @discardableResult
+    public mutating func reconcileDarkWakes(with events: SystemSleepEvents) -> Int {
+        var changed = 0
+        for index in recent.indices where recent[index].darkWakeCountVerified != true {
+            guard let count = events.darkWakeCount(for: recent[index]) else { continue }
+            recent[index].darkWakes = count
+            recent[index].darkWakeCountVerified = true
+            changed += 1
+        }
+        return changed
     }
 }

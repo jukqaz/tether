@@ -11,7 +11,8 @@ func appVersion() -> String? {
 
 /// `tether doctor`: the quick checks, one line each; exits 1 when one failed.
 func doctor() -> Never {
-    let checks = HealthChecks.run()
+    let common = try? userSessionClient().snapshot()
+    let checks = HealthChecks.run(userSession: common, userSessionRequested: true)
     for check in checks {
         let mark = switch check.result {
         case .ok: "✓"
@@ -26,38 +27,55 @@ func doctor() -> Never {
 func diagnose(_ rest: [String]) -> Never {
     var output: String?
     var record = false
+    var recordingMinutes = 15
+    var includeProcessNames = false
     var hours = 24.0
     var i = 0
     while i < rest.count {
         switch rest[i] {
         case "--record": record = true
+        case "--include-app-names": includeProcessNames = true
+        case "--record-minutes" where i + 1 < rest.count:
+            i += 1
+            guard let value = Int(rest[i]), (1...240).contains(value) else { fail("--record-minutes must be 1...240", code: 2) }
+            recordingMinutes = value; record = true
         case "--out" where i + 1 < rest.count:
             i += 1
             output = rest[i]
         case "--hours" where i + 1 < rest.count:
             i += 1
-            hours = Double(rest[i]) ?? hours
+            guard let value = Double(rest[i]), value.isFinite, value > 0, value <= 72 else { fail("--hours must be greater than 0 and at most 72", code: 2) }
+            hours = value
         default:
-            fail(L("Usage: tether diagnose [--record] [--out <file>] [--hours <n>]", "사용법: tether diagnose [--record] [--out <파일>] [--hours <n>]"), code: 2)
+            fail(L("Usage: tether diagnose [--record] [--record-minutes 1...240] [--out <file>] [--hours 1...72] [--include-app-names]", "사용법: tether diagnose [--record] [--record-minutes 1...240] [--out <파일>] [--hours 1...72] [--include-app-names]"), code: 2)
         }
         i += 1
     }
     var since: Date?
     if record {
-        let before = ControlStore.read().debugLog
+        let before = try? ServiceClient().perform(ServiceRequest(.snapshot)).control
         let started = Date()
-        let logging = ControlStore.update { $0.debugLog = true }
+        let deadline = DiagnosticRecording.deadline(minutes: recordingMinutes, now: started)
+        let logging = before != nil && ControlStore.update { $0.debugLog = true; $0.debugLogUntil = deadline }
+        if logging { _ = try? ServiceClient().perform(ServiceRequest(.markDiagnostic)) }
         note(logging
-            ? L("Recording with detailed logging. Reproduce the problem now, then press Return.",
-                "자세히 기록하는 중입니다. 지금 문제를 재현한 뒤 Return 키를 누르세요.")
-            : L("Recording (detailed logging needs the helper, which isn't installed). Reproduce the problem, then press Return.",
-                "기록 중입니다 (도우미가 없어 자세한 기록은 불가). 문제를 재현한 뒤 Return 키를 누르세요."))
+            ? L("Detailed logging for up to \(recordingMinutes) minutes. Reproduce the problem, then press Return to export.",
+                "최대 \(recordingMinutes)분간 자세히 기록합니다. 문제를 재현한 뒤 Return 키를 눌러 내보내세요.")
+            : L("Couldn't start detailed recording. Check the helper connection/version. Press Return to export available logs.",
+                "상세 기록을 켜지 못했습니다. 도우미 연결·버전을 확인하세요. Return 키를 누르면 보관된 기록을 내보냅니다."))
         _ = readLine()
-        if logging { ControlStore.update { $0.debugLog = before } }
+        if logging { ControlStore.update {
+            // Do not overwrite a newer recording choice made by the UI while we waited.
+            if $0.debugLog == true, $0.debugLogUntil == deadline {
+                $0.debugLog = before?.debugLog; $0.debugLogUntil = before?.debugLogUntil
+            }
+        } }
         since = started.addingTimeInterval(-60)
     }
     note(L("Collecting (a few seconds)…", "모으는 중입니다 (몇 초 걸려요)…"))
-    let report = Diagnostics.report(appVersion: appVersion(), since: since, hours: hours)
+    let common = try? userSessionClient().snapshot()
+    let report = Diagnostics.report(appVersion: appVersion(), since: since, hours: hours, includeProcessNames: includeProcessNames,
+        userSession: common, userSessionRequested: true)
     guard let output else {
         print(report)
         exit(0)

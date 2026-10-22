@@ -25,8 +25,10 @@ public struct DayStats: Codable, Equatable, Sendable {
     public var day: String
     /// Time spent awake with the lid closed.
     public var lidClosedSeconds: Double
-    /// Sleeps Tether forced: power pulled with the lid closed, a hold ending, "sleep now".
+    /// Legacy stored key for sleep-request attempts, not completed physical sleeps.
+    /// Earlier totals are retained; a current native request counts even if refused.
     public var forcedSleeps: Int
+    public var sleepRequestAttempts: Int { forcedSleeps }
     public var batteryHolds: Int
     public var heatGuards: Int
     // Measurements behind the data-based settings (absent in files from before 1.9).
@@ -116,8 +118,15 @@ public struct StatsTracker: Codable, Equatable, Sendable {
         tick(now: now, sample: UsageSample(lidClosed: active, clamshellOn: active), calendar: calendar)
     }
 
-    public mutating func recordForcedSleep(now: Date, calendar: Calendar = .current) {
+    /// Record once for each native sleep-request call, regardless of its result.
+    /// Releasing a keep-awake request without calling sleep is not an attempt.
+    public mutating func recordSleepRequestAttempt(now: Date, calendar: Calendar = .current) {
         edit(now, calendar) { $0.forcedSleeps += 1 }
+    }
+
+    /// Source-compatible name used by older request paths; never proves physical sleep.
+    public mutating func recordForcedSleep(now: Date, calendar: Calendar = .current) {
+        recordSleepRequestAttempt(now: now, calendar: calendar)
     }
 
     public mutating func recordBatteryHold(now: Date, calendar: Calendar = .current) {

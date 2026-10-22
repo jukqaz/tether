@@ -1,53 +1,5 @@
 import AppKit
-import CoreGraphics
-import IOKit.pwr_mgt
-import TetherCore
-
-/// Another app (a video player, a presentation, a call) keeping the display awake on purpose.
-enum DisplayAssertions {
-    static var heldByOthers: Bool {
-        var raw: Unmanaged<CFDictionary>?
-        guard IOPMCopyAssertionsByProcess(&raw) == kIOReturnSuccess,
-              let byProcess = raw?.takeRetainedValue() as? [NSNumber: [[String: Any]]] else { return false }
-        let me = Int(getpid())
-        return byProcess.contains { pid, assertions in
-            pid.intValue != me && assertions.contains { assertion in
-                let type = assertion["AssertType"] as? String
-                let level = assertion["AssertLevel"] as? Int ?? 255
-                return level != 0 && (type == "PreventUserIdleDisplaySleep" || type == "NoDisplaySleepAssertion")
-            }
-        }
-    }
-}
-
-/// Locks the screen at once, the way ⌃⌘Q does, through private login.framework.
-enum ScreenLock {
-    private typealias LockFn = @convention(c) () -> Int32
-    private static let lockFn: LockFn? =
-        dlopen("/System/Library/PrivateFrameworks/login.framework/Versions/Current/login", RTLD_LAZY)
-            .flatMap { dlsym($0, "SACLockScreenImmediate") }
-            .map { unsafeBitCast($0, to: LockFn.self) }
-
-    static var available: Bool { lockFn != nil }
-
-    static func now() {
-        _ = lockFn?()
-    }
-}
-
-/// Every display's gamma to black: the screen shows nothing but stays awake, so nothing locks.
-/// WindowServer also restores gamma by itself if this process exits.
-enum Blackout {
-    static func apply() {
-        for display in Displays.online {
-            CGSetDisplayTransferByFormula(display, 0, 0, 1, 0, 0, 1, 0, 0, 1)
-        }
-    }
-
-    static func restore() {
-        CGDisplayRestoreColorSyncSettings()
-    }
-}
+import IOKit
 
 enum Displays {
     static var online: [CGDirectDisplayID] {

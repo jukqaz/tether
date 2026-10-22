@@ -1,61 +1,40 @@
-# Security
+# 보안
 
-## What runs with administrator rights
+## 배포와 업데이트
 
-Tether installs two root LaunchDaemons, only after you enter your administrator password.
+Tether는 현재 사설 배포를 전제로 ad-hoc 코드 서명을 사용하며 Developer ID 공증을 하지 않는다. 코드 무결성 검사 성공이 Gatekeeper의 개발자 신원 확인을 대신하지 않는다. 설치 시 macOS가 요구하는 사용자 승인을 따르며 SIP나 Gatekeeper를 끄지 않는다.
 
-The helper, `/Library/PrivilegedHelperTools/local.tether.helper`
-(`/Library/LaunchDaemons/local.tether.helper.plist`), only ever:
+앱 업데이트는 Sparkle와 앱에 고정된 Ed25519 공개키로 검증한다. `SURequireSignedFeed=true`, `SUSignedFeedFailureExpirationInterval=0`으로 서명이 없거나 잘못된 피드를 기간 제한 없이 거부한다. ZIP도 `SUVerifyUpdateBeforeExtraction=true`로 추출 전에 검증한다. 피드 서명이 장기간 실패하면 배포자가 서명·키 문제를 해결해야 하며 자동으로 검증을 완화하지 않는다. 개인 서명키는 저장소와 배포 파일에 포함하지 않는다.
 
-- runs `pmset -a disablesleep 0|1`, `pmset -b|-c lowpowermode <value>` and, as a fallback,
-  `pmset sleepnow`, with fixed arguments;
-- asks the system to sleep (`IOPMSleepSystem`);
-- reads power, lid, battery and thermal state from IOKit;
-- writes its status, stats and log under `/Library/Application Support/Tether` and
-  `/Library/Logs/Tether`;
-- removes itself, the watchdog, their files, and the `tether` links and per-user login items that
-  point into Tether.app, once Tether.app has been gone for 10 minutes (dragged to the Trash). The
-  app path it watches must end in `.app/Contents/MacOS/Tether`, so a hand-edited control file
-  can't aim this clean-up elsewhere.
+## 관리자 권한으로 실행되는 구성 요소
 
-It makes no network connections and runs no program other than `pmset` and, when removing
-itself, `launchctl bootout`.
+관리자 인증을 거쳐 다음 두 LaunchDaemon을 설치한다.
 
-The watchdog, `/Library/PrivilegedHelperTools/local.tether.watchdog`
-(`/Library/LaunchDaemons/local.tether.watchdog.plist`), is a short shell script launchd runs every
-minute. It reads the power source, `SleepDisabled` and the age of the helper's status file, and
-only ever runs `pmset -a disablesleep 0` (turning sleep back on) when the helper has gone silent
-while sleep is off on battery.
+- `/Library/PrivilegedHelperTools/local.tether.helper`: 전원·덮개·배터리·발열 상태를 읽고 허용된 전원 동작을 수행한다.
+- `/Library/PrivilegedHelperTools/local.tether.watchdog`: 도우미가 응답하지 않을 때 Tether가 소유한 절전 방지 설정의 복구를 시도한다.
 
-## Diagnostics
+도우미는 임의 명령이나 셸 문자열을 받아 실행하지 않는다. 전원 동작은 IOKit 잠자기 요청과 고정된 `pmset` 인자로 제한된다. `disablesleep 0|1`, 지원되는 `lowpowermode`/`powermode` 값, `displaysleepnow`, `sleepnow`를 사용한다. 임시 전원 모드는 원래 값을 기록하고 Tether가 관리하던 값일 때 복원한다. 도우미 자체는 네트워크에 연결하지 않는다.
 
-The diagnostic report (Settings › System › Diagnostics, `tether diagnose`) is written to your
-Desktop or clipboard and sent nowhere. It contains Tether's settings, state, records and logs,
-the relevant lines of `pmset -g log` and the names of apps holding power assertions; your home
-folder, user name, full name and the Mac's name are masked. Read it before sharing it.
+앱 실행 파일이 사라진 상태가 10분간 이어지면 도우미는 자체 설정 해제를 시도하고 Tether의 도우미·감시 장치·지원 폴더를 정리한다. 앱 경로는 `.app/Contents/MacOS/Tether` 형식으로 제한한다. 사용자별 CLI 링크와 로그인 항목은 모든 중간 디렉터리를 링크를 따르지 않는 파일 디스크립터로 고정하고, 대상과 파일 형식을 확인한 뒤 최종 항목만 비재귀 삭제한다. 링크로 된 중간 경로나 무관한 항목은 남겨 둔다. 서비스 종료에는 고정된 `launchctl bootout` 호출을 사용한다.
 
-## Inputs
+감시 장치는 30초마다 실행된다. 도우미 상태가 90초 이상 갱신되지 않았고 현재 부팅 세션의 Tether 소유권 기록도 오래됐다면 AC·배터리 모두에서 해당 절전 방지를 해제한다. 도우미 충돌 복구를 새로운 전원 분리나 사용자 잠자기 요청으로 취급하지 않으며, 감시 장치가 새 잠자기 요청을 만들지는 않는다. 해제 성공은 실제 잠자기 진입의 증명이 아니다.
 
-The app and the `tether` command talk to the helper through
-`/Library/Application Support/Tether/control.json`, owned by root and writable by the `admin`
-group, so only administrators can change settings. The folder itself is root's alone (root:wheel
-0755): nobody else can add, remove or replace files in it, so the helper's files can't be swapped
-for links. The file is rewritten in place and a link or a hard link is refused; the helper writes
-its own files through a fresh, unpredictable temporary file that is renamed into place, never
-through a path somebody else chose. Files over 4 MB aren't read.
+## 제어 경계와 파일 권한
 
-The helper treats control.json as untrusted: safety limits are clamped again so a hand-edited file
-can only make them stricter, and a hold never survives a helper restart.
+운영 CLI는 사용자별 `~/Library/Application Support/io.github.jukqaz.tether/commands.sock`을 통해 실행 중인 앱에 요청한다. 이 소켓은 사용자 전용 폴더와 `0600` 권한, 동일 UID·커널 PID·동반 실행 파일 및 현재 GUI 세션 검사로 보호한다. 앱이 도우미에 요청하는 경로는 `/Library/Application Support/Tether/service.sock`이다. 이 운영 소켓은 `root:admin 0660`이며 연결 상대의 UID·관리자 그룹과 커널이 제공하는 PID를 확인한다. 이는 관리자 계정 경계이며 특정 서명된 앱만 허용하는 인증은 아니다. 관리자 계정으로 실행되는 다른 프로세스도 제한된 프로토콜을 호출할 수 있다. 임의 파일 쓰기나 임의 프로그램 실행 기능은 제공하지 않는다. CLI의 도우미 직접 호출은 명시적인 개발용 서비스 소켓을 지정한 격리 시험 경로다.
 
-2.0.0 left the folder writable by the `admin` group while the helper wrote its files through
-predictable temporary names, so a process running as an administrator could, without the password,
-have the helper overwrite or change the mode of other files as root. 2.0.1 fixes this: installing
-it (or the new helper's first start) takes the folder back and removes anything unexpected in it.
+지원 폴더는 `root:wheel 0755`, `control.json`은 `root:wheel 0644`다. 일반 앱이 제어 파일을 직접 고치지 않고 도우미가 요청 검증 후 저장한다. 알려진 상태 파일의 심볼릭 링크·하드 링크·비정상 파일 형식을 거부하며, JSON은 크기를 제한해 읽고 예측 불가능한 임시 파일을 거쳐 원자적으로 저장한다. 예전 버전의 마이그레이션 백업과 모르는 파일은 임의로 삭제하지 않는다. 보호 상태·소유권 등 내부 기록은 `0600`으로 저장한다.
 
-`tether://` URLs can turn clamshell mode on or off, start or end a battery hold, or sleep the Mac.
-Browsers ask before opening them. `tether run` is not available as a URL.
+도우미는 요청과 저장된 설정을 다시 검증한다. 시간·배터리·발열 한계를 적용하고 지원하지 않는 schema/protocol, 잘못된 요청, 오래된 설정 revision을 거부한다. 설정 변경만으로 안전 차단을 해제하거나 소비된 타이머를 되살릴 수 없다. 설정 마이그레이션과 도우미 갱신은 백업을 남기고, 새 서비스 검증에 실패하면 이전 버전으로 복구한다. 업그레이드 백업을 만들기 전에는 지원·백업 디렉터리의 소유자·형식·권한·확장 ACL을 디스크립터로 확인한다. 정상적인 구버전 `root:admin 0775` 지원 폴더는 좁히되, 외부 소유이거나 ACL이 있는 백업 경로를 소유권 변경만으로 채택하지 않고 설치를 중단한다.
 
-## Reporting a vulnerability
+`tether://` URL은 클램쉘 켜기·끄기, 배터리 유지 시작·연장·종료, 잠자기 등을 요청할 수 있다. 브라우저의 외부 앱 실행 확인 여부는 브라우저 정책에 달려 있다. URL과 CLI는 공통 파서에서 유한성과 정수 변환의 안전성을 검사한다. 배터리 `hold`는 1~120분, 연장은 15분·30분이며, `manual`의 유한·무제한 요청에는 전원·배터리별 별도 세션 한도를 적용한다. 잘못된 입력은 앱에서 무시하고 CLI에서는 사용법 오류로 거부한다. URL에서 임의 명령을 실행하는 기능은 없다.
 
-Please use GitHub's private vulnerability reporting (Security › Report a vulnerability) on
-[jukqaz/tether](https://github.com/jukqaz/tether) rather than a public issue.
+## 진단과 로그
+
+진단 보고서는 자동 전송하지 않는다. 앱에서 사용자가 선택한 파일이나 클립보드로 내보내고, `tether diagnose`는 표준 출력 또는 `--out` 파일에 기록한다. 설정·상태·전원 기록·관련 로그가 포함된다. 프로세스 이름은 기본적으로 제외하고 명시적으로 포함하도록 선택할 수 있다. 홈 경로·사용자 이름·기기 이름 등의 알려진 식별자는 가리지만 완전한 익명화를 보장하지 않으므로 공유 전에 내용을 확인한다.
+
+상세 기록은 제한된 기간만 켤 수 있다. 운영 로그와 일부 상태·사용 통계는 다른 로컬 사용자가 읽을 수 있으므로 비밀 저장소로 사용하지 않는다. 개인키·인증 토큰·암호를 진단 정보에 넣지 않는다.
+
+## 취약점 제보
+
+공개 이슈 대신 [jukqaz/tether의 비공개 취약점 제보](https://github.com/jukqaz/tether/security/advisories/new)를 사용한다. 영향을 받는 빌드, 재현 입력, 기대한 거부 동작을 적되 개인키나 식별 정보가 든 원본 진단 파일은 공개하지 않는다.

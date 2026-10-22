@@ -6,26 +6,29 @@ import TetherCore
 /// `SafetyNetTracker`, tested in Core.
 extension Helper {
     func updateSafetyNet(_ s: Snapshot, clamshellOn: Bool, readings r: SafetyReadings) {
-        let now = Date()
-        let reason = safetyNet.update(s, clamshellOn: clamshellOn, readings: r,
-                                      floor: SafetyPolicy.floor(limits), now: now)
-        if safetyNet.criticalSince == nil { criticalAlerted = false }
-        if ACThermalPolicy.shouldAlert(criticalSince: safetyNet.criticalSince, alreadyAlerted: criticalAlerted, now: now) {
+        let now = Date(timeIntervalSince1970: ContinuousTime.now)
+        let criticalNow = clamshellOn && s.power == .ac && s.lidClosed && !s.defersToDisplaySetup && r.thermal == 3
+        if !criticalNow { criticalAlerted = false }
+        if criticalNow && !criticalAlerted {
             criticalAlerted = true
-            thermalAlertAt = now.timeIntervalSince1970
+            thermalAlertAt = Date().timeIntervalSince1970
             note(.heatCritical)
             logReadings(r)
         }
+        let reason = safetyNet.update(s, clamshellOn: clamshellOn, readings: r,
+                                      floor: SafetyPolicy.floor(limits), now: now)
         switch reason {
-        case .overheatSleep: overheatSleepAt = now.timeIntervalSince1970
-        case .weakChargerSleep: weakChargerSleepAt = now.timeIntervalSince1970
+        case .overheatSleep: overheatSleepAt = Date().timeIntervalSince1970
+        case .weakChargerSleep: weakChargerSleepAt = Date().timeIntervalSince1970
         default: return
         }
         // Like "sleep now", it ends an armed hold; quietly, as the reason is reported after wake.
         criticalAlerted = false
+        protection.block(reason == .overheatSleep ? "thermal" : (reason?.rawValue ?? "thermal"))
         if holdWasActive { consumeHold() }
         sleepNowReason = reason ?? .sleepNow
-        sleepNowUntil = now.addingTimeInterval(20)
+        sleepNowIntent = .protection
+        sleepNowUntil = Date().addingTimeInterval(20)
         schedule(.sleepNow)
     }
 }

@@ -3,179 +3,289 @@ import TetherCore
 
 struct SystemPage: View {
     @ObservedObject var model: AppModel
-    @State private var lowPower: (battery: Int?, ac: Int?) = (nil, nil)
-    @State private var blockers: [SleepBlocker] = []
-    @State private var checks: [HealthCheck] = []
-    @State private var confirmingRemoval = false
+    var disclosures: Binding<SettingsDisclosureState>? = nil
+    @State private var diagnosticsExpanded = false
+    @State private var updateOptionsExpanded = false
+    @State private var helperExpanded = false
+    @State private var alertsExpanded = false
+    @State private var showMenuPreview = false
+    @State private var usageStatisticsExpanded = false
+    @State private var otherAppRequestsExpanded = false
 
     var body: some View {
-        Page {
-            Section {
-                LabeledContent(L("Status", "상태")) {
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(model.helperStatus.color)
-                            .frame(width: 8, height: 8)
-                        Text(model.helperStatus.text)
-                    }
+        SettingsForm {
+            if let problem = model.problem, case .error = problem {
+                ProblemBanner(problem: problem, model: model, compact: false, embeddedInForm: true)
+                    .accessibilityIdentifier("settings-error-context")
+            }
+            if model.showsLidOptions && helperRequiresAttention { helperAttentionSection }
+            if updateRequiresAttention {
+                updateAttentionSection
+            }
+            activeRecordingStatus
+            SettingsContentGroup(L("Startup and display", "시작과 표시")) {
+                SettingsToggle(title: L("Launch at login", "로그인 시 시작"), isOn: Binding(
+                    get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
+                    .disabled(model.userCommandsArePreview || model.developmentService)
+                LoginItemSystemNotice(model: model)
+                SettingRow(title: L("Menu bar", "메뉴바"), showsAccessibleTitle: false) {
+                    Picker(L("Menu bar display", "메뉴바 표시"), selection: $model.menuBarDetails) {
+                        Text(L("Icon only", "아이콘만")).tag(false)
+                        Text(L("Icon + time remaining", "아이콘 + 남은 시간")).tag(true)
+                    }.labelsHidden().pickerStyle(.menu)
+                        .frame(width: SettingsMetrics.controlWidth, alignment: .trailing)
+                        .disabled(!model.acceptingUserCommands || model.commandPending)
+                        .accessibilityIdentifier("settings-menu-bar-display")
                 }
-                HStack {
-                    if model.helperInstalled {
-                        Button(L("Reinstall…", "다시 설치…")) { model.installHelper() }
-                        Button(L("Remove…", "제거…"), role: .destructive) { model.uninstallHelper() }
-                    } else {
-                        Button(L("Install…", "설치…")) { model.installHelper() }
-                    }
-                    Spacer()
-                    Button(L("Show Log", "기록 보기")) { model.openLog() }
+                SettingRow(title: L("Language", "언어"), showsAccessibleTitle: false) {
+                    Picker(L("Language", "언어"), selection: $model.language) {
+                        Text(L("Same as macOS", "macOS와 같게")).tag(LanguageChoice.system)
+                        Text("한국어").tag(LanguageChoice.korean)
+                        Text("English").tag(LanguageChoice.english)
+                    }.labelsHidden().pickerStyle(.menu)
+                        .frame(width: SettingsMetrics.controlWidth, alignment: .trailing)
+                        .disabled(model.userCommandsArePreview || model.developmentService)
                 }
-            } header: {
-                Text(L("Helper", "도우미"))
-            } footer: {
-                Note(L("The helper runs with administrator rights and keeps the power rules even while the app is closed. Remove it here so “prevent sleep” is turned back off.",
-                       "도우미는 관리자 권한으로 돌며, 앱이 꺼져 있어도 전원 규칙을 지켜요. 지울 때는 여기서 제거해야 잠자기 금지가 풀려요."))
+                if model.userCommandsArePreview || model.developmentService {
+                    Button(L("Preview menu panel…", "메뉴 패널 보기…")) { showMenuPreview = true }
+                        .popover(isPresented: $showMenuPreview) { TetherPanel(model: model) }
+                }
             }
 
-            Section {
-                LabeledContent(L("Prevent sleep", "잠자기 금지")) {
-                    Text(model.snapshot.sleepDisabled ? L("on", "켜짐") : L("off", "꺼짐"))
+            SettingsDisclosure(title: L("Notifications", "알림"),
+                summary: notificationSummary, isExpanded: alertsExpansion) {
+                VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
+                    NotificationSettingsView(model: model, monitor: model.notificationSettings)
                 }
-                LabeledContent(L("Low Power Mode", "저전력 모드")) {
-                    HStack(spacing: 8) {
-                        Text(lowPowerText)
-                        Button(L("Battery Settings…", "배터리 설정…")) { model.open(.battery) }
-                    }
+            }.accessibilityIdentifier("settings-protection-alerts-details")
+
+            SettingsContentGroup(L("Quitting and updates", "앱 종료와 업데이트")) {
+                SettingRow(title: L("When Tether quits", "Tether를 종료하면")) {
+                    Text(L("End all Tether work", "잠자기 방지 모두 끝내기"))
+                        .foregroundStyle(Color.tetherSecondary)
                 }
-                LabeledContent(L("Keep-screen-on request", "화면 켜 둠 요청")) {
-                    Text(model.holdsDisplayAwake ? L("active", "사용 중") : L("inactive", "사용 안 함"))
-                }
-                LabeledContent(L("Background items (3)", "백그라운드 항목 3개")) {
-                    Button(L("Open Login Items…", "로그인 항목 열기…")) { model.open(.loginItems) }
-                }
-            } header: {
-                Text(L("What Tether Changes", "Tether가 바꾸는 시스템 설정"))
-            } footer: {
-                Note(L("“Prevent sleep” is a hidden setting, on only while power is connected, and not shown in System Settings. Low Power Mode is switched on only in the cases chosen in Safety, then restored. The keep-screen-on request shows in Activity Monitor › Energy. A small watchdog checks every minute that sleep is never left off on battery should the helper stop. Sleep and display timers, the lock password, the screen saver and input sources are never changed.",
-                       "잠자기 금지는 전원이 연결돼 있을 때만 켜는 숨은 값이라 설정 앱에는 없어요. 저전력 모드는 배터리와 발열 설정에서 고른 경우에만 잠깐 켜고 원래 값으로 돌려요. 화면 켜 둠 요청은 활동 모니터 › 에너지에 보여요. 작은 감시 장치가 1분마다 확인해서, 도우미가 멈춰도 배터리에서 잠자기 금지가 남지 않게 해요. 잠자기·화면 끄기 타이머, 잠금 암호, 화면 보호기, 입력 소스는 바꾸지 않아요."))
+                Note(L("Tether restores its changes before quitting. Ended timers never restart.",
+                       "자체 변경을 되돌린 뒤 종료합니다. 끝난 타이머를 다시 실행하지 않습니다."))
             }
 
-            Section {
-                if blockers.isEmpty {
-                    Text(L("No other app is keeping the Mac awake.", "지금 잠을 막는 다른 앱이 없어요."))
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(Array(blockers.enumerated()), id: \.offset) { _, b in
-                        LabeledContent {
-                            Text(b.reason.isEmpty ? Texts.blockerKind(b.kind) : "\(b.reason) · \(Texts.blockerKind(b.kind))")
-                                .foregroundStyle(.secondary)
-                        } label: {
-                            Text(b.process)
+            SettingsDisclosure(title: L("Updates", "업데이트"),
+                summary: updateSummary, isExpanded: updateExpansion) {
+                updateDetails
+            }.accessibilityIdentifier("settings-updates-details")
+
+            SettingsDisclosure(title: L("Usage statistics", "사용 통계"),
+                summary: L("Last 7 days", "최근 7일"), isExpanded: usageStatisticsExpansion) {
+                UsageStatisticsView(model: model)
+            }.accessibilityIdentifier("settings-usage-statistics-details")
+
+            RecentActivityView(model: model)
+
+            SettingsDisclosure(title: L("Other app keep-awake requests", "다른 앱의 잠자기 방지 요청"),
+                summary: model.otherAppKeepAwakeSummary ?? L("Check when needed", "필요할 때 확인"),
+                isExpanded: otherAppRequestsExpansion) {
+                VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
+                    Note(L("Review currently observed requests. Installed or running apps are not automatically conflicts.",
+                           "현재 관측한 요청을 확인합니다. 설치되었거나 실행 중이라는 이유만으로 충돌로 표시하지 않습니다."))
+                    Button(L("Review requests…", "요청 확인…")) { model.presentActivityReview() }
+                        .actionButton()
+                        .accessibilityLabel(L("Review other app keep-awake requests", "다른 앱의 잠자기 방지 요청 확인"))
+                        .accessibilityIdentifier("settings-review-sleep-influences")
+                }
+            }.accessibilityIdentifier("settings-other-app-requests-details")
+
+            SettingsDisclosure(title: L("Logs and reports", "로그와 보고서"),
+                summary: L("Advanced", "고급"), isExpanded: diagnosticsExpansion) {
+                    VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
+                        DiagnosticControls(model: model, showActiveRecordingStatus: false)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Divider()
+                        DisclosureGroup(L("Features shared with macOS", "macOS와 겹치는 기능")) {
+                            SystemFeatureOverlapView(model: model, monitor: model.systemSettings)
+                                .padding(.top, 4)
                         }
                     }
-                }
-            } header: {
-                Text(L("Apps Keeping the Mac Awake", "잠을 막는 앱"))
-            } footer: {
-                Note(L("Apps can hold off idle sleep, on battery too; that's what an AI app's “prevent sleep” setting does. Closing the lid and Tether's own sleep still win, but with the lid open on battery the Mac stays awake and drains.",
-                       "앱은 배터리일 때도 '입력이 없어 잠드는 것'을 막을 수 있어요. AI 앱의 '절전 방지' 설정이 이런 방식이에요. 덮개를 닫거나 Tether가 재우는 것은 막지 못하지만, 배터리로 덮개를 열어 둔 채 두면 Mac이 깨어 있어 배터리가 닳아요."))
-            }
+            }.accessibilityIdentifier("settings-records-diagnostics-details")
 
-            Section {
-                let problems = checks.filter { $0.result != .ok }
-                if problems.isEmpty, !checks.isEmpty {
-                    Label(L("All \(checks.count) checks pass", "점검 \(checks.count)개 모두 정상"), systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                } else {
-                    ForEach(problems, id: \.name) { check in
-                        LabeledContent {
-                            Text(check.detail).foregroundStyle(.secondary)
-                        } label: {
-                            Label(check.name, systemImage: check.result == .failed ? "xmark.octagon.fill" : "exclamationmark.triangle.fill")
-                                .foregroundStyle(check.result == .failed ? Color.red : Color.orange)
-                        }
-                    }
-                }
-                Toggle(L("Detailed logging", "자세한 기록 남기기"),
-                       isOn: Binding(get: { model.debugLogging }, set: { model.setDebugLogging($0) }))
-                    .disabled(!model.helperInstalled)
-                HStack(spacing: 8) {
-                    Button(L("Create Report…", "보고서 만들기…")) { model.createDiagnosticReport() }
-                    Button(L("Copy Report", "보고서 복사")) { model.createDiagnosticReport(copy: true) }
-                    if model.diagnosticsBusy {
-                        ProgressView().controlSize(.small)
-                    } else if let note = model.reportNote {
-                        Text(note).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                }
-                .disabled(model.diagnosticsBusy)
-            } header: {
-                Text(L("Diagnostics", "진단"))
-            } footer: {
-                Note(L("If something goes wrong, turn on detailed logging, make it happen again, then create a report for an issue or an AI assistant. It's a Markdown file on your Desktop with the settings, recent sleeps and logs; your user name and the Mac's name are masked, and nothing is sent anywhere. In Terminal: tether diagnose --record",
-                       "문제가 생기면 자세한 기록을 켜고 문제를 다시 일으킨 뒤 보고서를 만들어 이슈나 AI 도우미에게 주세요. 설정, 최근 잠자기 기록, 로그가 담긴 Markdown 파일이 바탕화면에 저장되고, 사용자·Mac 이름은 가려지며 어디에도 전송되지 않아요. 터미널에서는 tether diagnose --record"))
+            if model.showsLidOptions && !helperRequiresAttention {
+                SettingsDisclosure(title: L("Closed-lid helper", "덮개 유지 도우미"),
+                    summary: model.helperStatus.text, isExpanded: helperExpansion) {
+                    helperDetails
+                }.accessibilityIdentifier("settings-helper-details")
             }
-
-            Section {
-                LabeledContent(L("Version", "버전")) {
-                    Text("v\(AppModel.appVersion)")
-                }
-                Toggle(L("Check for updates automatically", "업데이트 자동 확인"), isOn: $model.checkUpdates)
-                HStack {
-                    if let update = model.availableUpdate {
-                        Label(L("Tether \(update) is available", "Tether \(update)이(가) 나왔어요"), systemImage: "arrow.down.circle.fill")
-                            .foregroundStyle(Color.tetherMint)
-                        Spacer()
-                        Button(L("Download…", "받기…")) { model.openReleases() }
-                    } else {
-                        Button(L("Check Now", "지금 확인")) { model.checkForUpdates(force: true) }
-                        Spacer()
-                        Button(L("GitHub…", "GitHub…")) { NSWorkspace.shared.open(UpdateChecker.projectURL) }
-                    }
-                }
-            } header: {
-                Text(L("Updates", "업데이트"))
-            } footer: {
-                Note(L("Once a day Tether asks GitHub for the latest release; nothing else is sent.",
-                       "하루에 한 번 GitHub에 최신 릴리스만 물어봐요. 다른 정보는 보내지 않아요."))
-            }
-
-            Section {
-                HStack {
-                    Spacer()
-                    Button(L("Uninstall Tether…", "Tether 완전히 제거…"), role: .destructive) { confirmingRemoval = true }
-                }
-            } footer: {
-                Note(L("Removes the helper (turning “prevent sleep” back off), its files and logs, the login item, the tether command and preferences, then moves the app to the Trash.",
-                       "도우미(잠자기 금지 해제 포함), 설정·기록 파일, 로그인 항목, tether 명령, 환경설정을 지우고 앱을 휴지통으로 옮겨요."))
-            }
+            Text("Tether · \(AppModel.appDisplayVersion) (\(AppModel.appBuild))")
+                .font(TetherTypography.secondary)
+                .foregroundStyle(Color.tetherSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 2)
         }
-        .confirmationDialog(L("Uninstall Tether completely?", "Tether를 완전히 제거할까요?"), isPresented: $confirmingRemoval) {
-            Button(L("Uninstall", "제거"), role: .destructive) { model.uninstallEverything() }
-            Button(L("Cancel", "취소"), role: .cancel) {}
-        } message: {
-            Text(L("Your administrator password is needed once. Your Mac goes back to normal sleep.",
-                   "관리자 암호를 한 번 입력해야 해요. Mac은 원래의 잠자기 동작으로 돌아가요."))
+        .toggleStyle(.switch)
+        .onAppear { revealRequestedOtherAppDetails() }
+        .onChange(of: model.otherAppDetailsRequested) { _, requested in
+            if requested { revealRequestedOtherAppDetails() }
         }
-        .task {
-            // Only while this page is visible.
-            while !Task.isCancelled {
-                lowPower = SystemProbe.lowPowerModes()
-                blockers = model.sleepBlockers()
-                checks = HealthChecks.run()
-                try? await Task.sleep(for: .seconds(5))
+    }
+
+    var activeRecordingStatus: DiagnosticRecordingStatusRow {
+        DiagnosticRecordingStatusRow(model: model)
+    }
+
+    private func revealRequestedOtherAppDetails() {
+        guard model.otherAppDetailsRequested else { return }
+        otherAppRequestsExpansion.wrappedValue = true
+        model.otherAppDetailsRequested = false
+    }
+
+    private var usageStatisticsExpansion: Binding<Bool> { disclosures?.usageStatistics ?? $usageStatisticsExpanded }
+    private var otherAppRequestsExpansion: Binding<Bool> { disclosures?.otherAppRequests ?? $otherAppRequestsExpanded }
+    private var diagnosticsExpansion: Binding<Bool> { disclosures?.diagnostics ?? $diagnosticsExpanded }
+    private var updateExpansion: Binding<Bool> { disclosures?.updates ?? $updateOptionsExpanded }
+    private var helperExpansion: Binding<Bool> { disclosures?.helper ?? $helperExpanded }
+    private var alertsExpansion: Binding<Bool> { disclosures?.protectionAlerts ?? $alertsExpanded }
+    private var notificationSummary: String {
+        [model.notifySessionEnd ? L("Timer end on", "타이머 종료 켬") : L("Timer end off", "타이머 종료 꺼짐"),
+         model.notifyExpiryWarning ? L("Warning on", "미리 알림 켬") : L("Warning off", "미리 알림 꺼짐")].joined(separator: " · ")
+    }
+    private var updateSummary: String {
+        model.availableUpdate.map { L("\($0) available", "\($0) 사용 가능") } ?? updateCheckSummary
+    }
+
+    private var updateRequiresAttention: Bool {
+        model.updateStatus.waitingForOpenLid || model.updateStatus.error != nil
+            || model.updateStatus.checking || model.updateStatus.sessionInProgress
+    }
+
+    private var updateCheckSummary: String {
+        model.updateStatus.lastChecked.map { L("Checked \(Texts.dateTime($0))", "확인 \(Texts.dateTime($0))") }
+            ?? L("Not checked", "확인 전")
+    }
+
+    private var helperRequiresAttention: Bool {
+        !model.helperInstalled || !model.helperResponding || model.helperOutdated || model.helperNeedsRepair
+            || model.coordinatedLidError != nil || model.coordinatedLidBlockReason != nil || model.helperInstallInFlight
+    }
+
+    private var helperAttentionSection: some View {
+        VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text(L("Closed-lid helper", "덮개 유지 도우미"))
+                Spacer(minLength: 6)
+                helperStatus
+                helperSetupButton
+            }.frame(minHeight: 30)
+            if let issue = model.helperInstallationIssue { Note(issue, color: .tetherWarning) }
+            helperCurrentIssue
+            DisclosureGroup(L("Setup and recovery", "준비와 복구"), isExpanded: helperExpansion) {
+                helperRecoveryNotes.padding(.top, 6)
+            }.accessibilityIdentifier("settings-helper-details")
+        }
+    }
+
+    private var helperDetails: some View {
+        VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
+            helperSetupButton
+            helperInstallationProgress
+            helperRecoveryNotes
+        }
+    }
+
+    @ViewBuilder
+    private var helperInstallationProgress: some View {
+        if model.helperInstallInFlight {
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text(L("Waiting for administrator approval…", "관리자 인증을 기다리는 중…"))
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
 
-    private var lowPowerText: String {
-        func text(_ value: Int?) -> String { value.map { $0 == 1 ? L("on", "켜짐") : L("off", "꺼짐") } ?? "–" }
-        var line = L("battery \(text(lowPower.battery)) · power \(text(lowPower.ac))", "배터리 \(text(lowPower.battery)) · 전원 \(text(lowPower.ac))")
-        if model.heatGuardActive {
-            line += L(" (heat guard)", " (발열 보호)")
-        } else if model.holdingOnBattery {
-            line += L(" (battery hold)", " (배터리 유지)")
+    private var helperRecoveryNotes: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Note(L("Required for closed-lid work on MacBooks. The app runs general work sessions; the helper carries out closed-lid requests approved during setup.",
+                   "MacBook의 덮개 유지에 필요합니다. 일반 작업은 앱이 유지하고, 도우미는 준비 과정에서 승인한 덮개 유지 요청을 실행합니다."))
         }
-        return line
+    }
+
+    @ViewBuilder
+    private var helperCurrentIssue: some View {
+        if let problem = model.problem, case .lid = problem {
+            WorkSessionNote(title: problem.title, detail: problem.message,
+                symbol: "exclamationmark.circle", color: problem.color)
+        }
+        if let reason = model.coordinatedLidBlockReason { Note(protectionReason(reason)) }
+    }
+
+    private var updateAttentionSection: some View {
+        VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
+            if model.updateStatus.waitingForOpenLid {
+                WorkSessionNote(title: L("Installation paused", "설치 대기 중"),
+                    detail: L("Open your MacBook and finish your current work before continuing.",
+                              "MacBook을 열고 진행 중인 작업을 마친 뒤 계속해 주세요."),
+                    symbol: "laptopcomputer", color: .tetherWarning)
+                Button(L("Continue Installation", "설치 계속")) { model.resumeUpdateInstallation() }
+                    .actionButton(prominent: true)
+                    .disabled(model.userCommandsArePreview || model.developmentService)
+            } else if let error = model.updateStatus.error {
+                Note(error, color: .tetherError)
+                updateCheckButton
+            } else {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text(model.updateStatus.checking
+                        ? L("Checking for updates…", "업데이트 확인 중…")
+                        : L("Update in progress", "업데이트 진행 중"))
+                        .fixedSize(horizontal: false, vertical: true)
+                    if model.updateStatus.sessionInProgress && !model.updateStatus.checking { updateCheckButton }
+                }
+            }
+        }
+    }
+
+    private var updateDetails: some View {
+        VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
+            if !updateRequiresAttention {
+                updateCheckButton
+            }
+            SettingsToggle(title: L("Check for updates automatically", "업데이트 자동 확인"), isOn: $model.checkUpdates)
+                .disabled(model.userCommandsArePreview || model.developmentService)
+            Text(L("Update channel and installation", "업데이트 채널과 설치"))
+                .font(TetherTypography.section).accessibilityAddTraits(.isHeader)
+            UpdateInstallationView(model: model)
+            UpdateSettingsCard(model: model, includesOverview: false)
+                .disabled(model.userCommandsArePreview)
+        }
+    }
+
+    private var helperStatus: some View {
+        Text(model.helperStatus.text)
+            .font(TetherTypography.body.weight(.medium)).foregroundStyle(model.helperStatus.color)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var updateCheckButton: some View {
+        Button(model.updateStatus.checking ? L("Checking…", "확인 중…")
+            : model.availableUpdate == nil ? L("Check for Updates…", "업데이트 확인…") : L("View Update…", "업데이트 보기…")) {
+            model.checkForUpdates(force: true)
+        }
+        .actionButton(prominent: model.availableUpdate != nil)
+        .disabled(model.userCommandsArePreview || model.developmentService || model.updateStatus.checking || model.updateStatus.waitingForOpenLid)
+    }
+
+    private func updateAvailability(_ version: String) -> some View {
+        Label(L("\(version) available", "\(version) 사용 가능"), systemImage: "arrow.down.circle")
+            .font(TetherTypography.secondary).foregroundStyle(Color.tetherAccent)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var helperSetupButton: some View {
+        Button(model.helperInstallInFlight ? L("Working…", "처리 중…")
+            : model.helperNeedsRepair || !model.helperResponding && model.helperInstalled ? L("Repair…", "복구…")
+            : model.helperInstalled ? L("Review…", "확인…") : L("Prepare…", "준비…")) {
+            if model.helperInstalled && !helperRequiresAttention { model.refresh() }
+            else { model.installHelper() }
+        }
+        .actionButton(prominent: !model.helperInstalled || model.helperNeedsRepair)
+        .accessibilityHint(L("macOS requests administrator approval for installation", "설치 시 macOS 관리자 인증이 필요합니다"))
+        .disabled(model.userCommandsArePreview || model.developmentService || model.helperInstallInFlight)
     }
 }

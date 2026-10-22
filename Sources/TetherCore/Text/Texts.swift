@@ -23,7 +23,7 @@ public enum Texts {
 
     /// "1 h 23 min" / "1시간 23분", "42 min" / "42분", "30 s" / "30초".
     public static func duration(_ seconds: TimeInterval) -> String {
-        let s = max(0, Int(seconds.rounded()))
+        guard seconds.isFinite, let s = Int(exactly: max(0, seconds).rounded()) else { return "—" }
         if s < 60 { return L("\(s) s", "\(s)초") }
         let hours = s / 3600
         let minutes = s % 3600 / 60
@@ -37,12 +37,18 @@ public enum Texts {
         seconds < 60 ? L("0 min", "0분") : duration(seconds)
     }
 
+    /// A request count is independent of whether macOS completed physical sleep.
+    public static func sleepRequestAttempts(_ count: Int) -> String {
+        L("sleep request attempts \(count)×", "잠자기 요청 시도 \(count)회")
+    }
+
     /// A ticking countdown: "29:41", or "1:29:41" from an hour up. Rounded up, so it never shows
     /// 0:00 while time is left.
     public static func countdown(_ seconds: TimeInterval) -> String {
-        let s = max(0, Int(seconds.rounded(.up)))
+        guard seconds.isFinite, let s = Int(exactly: max(0, seconds).rounded(.up)) else { return "—" }
         let hours = s / 3600, minutes = s % 3600 / 60, rest = s % 60
-        return hours > 0 ? String(format: "%d:%02d:%02d", hours, minutes, rest) : String(format: "%d:%02d", minutes, rest)
+        return hours > 0 ? "\(hours):" + String(format: "%02d:%02d", minutes, rest)
+            : "\(minutes):" + String(format: "%02d", rest)
     }
 
     /// Why the Mac went to sleep, from IOPMrootDomain "Last Sleep Reason".
@@ -112,8 +118,10 @@ public enum Texts {
     /// What a blocker holds off.
     public static func blockerKind(_ kind: SleepBlocker.Kind) -> String {
         switch kind {
-        case .system: L("keeps the Mac awake", "잠자기 막음")
+        case .system: L("prevents system idle sleep", "시스템 유휴 절전 방지")
         case .display: L("keeps the display on", "화면 꺼짐 막음")
+        case .network: L("keeps network work active", "네트워크 작업 유지")
+        case .legacySystem: L("legacy system sleep request", "구형 시스템 절전 요청")
         }
     }
 }
@@ -126,22 +134,24 @@ extension EventKind {
         case .clamshellOffPower: L("power disconnected → clamshell off", "전원 해제 → 클램쉘 끔")
         case .clamshellOffDisabled: L("Tether turned off → clamshell off", "Tether 끔 → 클램쉘 끔")
         case .clamshellOffSleepNow: L("sleep now → clamshell off", "지금 잠자기 → 클램쉘 끔")
-        case .lidSleep: L("lid was closed → put to sleep", "덮개 닫힌 상태 → 잠재움")
-        case .sleepNow: L("sleep now", "지금 잠자기")
-        case .sleepRefused: L("sleep refused → retried", "잠자기 거부됨 → 다시 시도")
+        case .clamshellReleased: L("keep-awake released", "잠자기 방지 해제")
+        case .lidSleep: L("lid closed → sleep requested", "덮개 닫힘 → 잠자기 요청")
+        case .sleepNow: L("sleep requested", "잠자기 요청")
+        case .sleepRefused: L("sleep request refused", "잠자기 요청 거절됨")
+        case .protectionSleep: L("protection stop → sleep requested", "보호 중지 → 잠자기 요청")
         case .stopping: L("helper stopping → clamshell off", "도우미 종료 → 클램쉘 끔")
         case .holdOnBattery: L("battery hold started on battery", "배터리로 유지 시작")
         case .holdEndedTime: L("battery hold ended · time up", "배터리 유지 종료 · 시간 끝")
         case .holdEndedBattery: L("battery hold ended · battery low", "배터리 유지 종료 · 배터리 부족")
         case .holdEndedHeat: L("battery hold ended · battery hot", "배터리 유지 종료 · 배터리 과열")
         case .holdEndedThermal: L("battery hold ended · system heat", "배터리 유지 종료 · 시스템 발열")
-        case .holdEndedSensor: L("battery hold ended · no temperature", "배터리 유지 종료 · 온도 확인 불가")
+        case .holdEndedSensor: L("battery hold ended · missing charge or thermal state", "배터리 유지 종료 · 잔량·발열 확인 불가")
         case .holdCancelled: L("battery hold cancelled", "배터리 유지 취소")
         case .heatGuardOn: L("heat guard · Low Power Mode on", "발열 보호 · 저전력 모드 켬")
         case .heatGuardOff: L("heat guard off · Low Power Mode restored", "발열 보호 끝 · 저전력 모드 복원")
-        case .heatCritical: L("critical heat for 3 minutes", "발열 위험 3분 지속")
-        case .overheatSleep: L("overheating on power → put to sleep", "전원 연결 중 과열 → 잠재움")
-        case .weakChargerSleep: L("charger too weak, battery low → put to sleep", "충전 부족, 배터리 부족 → 잠재움")
+        case .heatCritical: L("critical thermal pressure detected", "시스템 발열 위험 감지")
+        case .overheatSleep: L("overheating on power → sleep requested", "전원 연결 중 과열 → 잠자기 요청")
+        case .weakChargerSleep: L("battery low and draining on power → sleep requested", "전원 연결 중 잔량 감소 → 잠자기 요청")
         }
     }
 }
@@ -151,9 +161,9 @@ extension HoldEnd {
         switch self {
         case .time: L("the time you set is up", "정한 시간이 끝났습니다")
         case .battery: L("the battery reached its floor", "배터리가 하한선까지 내려갔습니다")
-        case .heat: L("the battery got too hot", "배터리 온도가 안전 기준을 넘었습니다")
+        case .heat: L("the battery got too hot", "배터리 온도가 이전 설정의 제한을 넘었습니다")
         case .thermal: L("the system got too hot", "시스템 발열이 안전 기준을 넘었습니다")
-        case .sensor: L("the battery temperature could not be read", "배터리 온도를 읽을 수 없었습니다")
+        case .sensor: L("battery charge or macOS thermal state could not be read", "배터리 잔량이나 시스템 발열 상태를 확인할 수 없었습니다")
         case .cancelled: L("the hold was cancelled", "배터리 유지가 취소됐습니다")
         }
     }

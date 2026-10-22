@@ -18,9 +18,8 @@ enum SystemIntegration {
     static var launchAgentPath: String { NSHomeDirectory() + "/Library/LaunchAgents/\(launchAgentLabel).plist" }
     static var launchAtLogin: Bool { FileManager.default.fileExists(atPath: launchAgentPath) }
 
-    /// A per-user LaunchAgent works without a Developer ID signature, unlike SMAppService. It
-    /// relaunches the app after a crash (not after Quit), since a crash with the lid closed would
-    /// leave the built-in screen at 0 brightness and the session free to lock.
+    /// A per-user LaunchAgent works without a Developer ID signature, unlike SMAppService.
+    /// It relaunches the app after an abnormal exit; a normal Quit remains a quit.
     private static var loginItem: [String: Any] {
         [
             "Label": launchAgentLabel,
@@ -34,7 +33,7 @@ enum SystemIntegration {
     static func setLaunchAtLogin(_ on: Bool) throws {
         let url = URL(fileURLWithPath: launchAgentPath)
         guard on else {
-            try? FileManager.default.removeItem(at: url)
+            try removeLoginItem(at: url)
             return
         }
         let plist = loginItem
@@ -44,6 +43,19 @@ enum SystemIntegration {
         } catch {
             throw Failure.message(L("Couldn't create the login item: \(error.localizedDescription)",
                                     "로그인 항목을 만들지 못했습니다: \(error.localizedDescription)"))
+        }
+    }
+
+    /// A missing item is already disabled; any other removal failure must reach
+    /// the caller before it reports success or continues removing the app.
+    static func removeLoginItem(at url: URL, fileManager: FileManager = .default) throws {
+        do {
+            try fileManager.removeItem(at: url)
+        } catch let error as NSError {
+            guard error.domain == NSCocoaErrorDomain, error.code == NSFileNoSuchFileError else {
+                throw Failure.message(L("Couldn't remove the login item: \(error.localizedDescription)",
+                                        "로그인 항목을 제거하지 못했습니다: \(error.localizedDescription)"))
+            }
         }
     }
 
@@ -103,6 +115,35 @@ enum SystemIntegration {
 
     // MARK: Root
 
+    static func missingHelperFiles(fileManager: FileManager = .default) -> [HelperInstallationFile] {
+        HealthChecks.missingHelperFiles(fileManager: fileManager)
+    }
+
+    /// Only helper installation uses this asynchronous authorization path. The
+    /// password dialog belongs to macOS; waiting for it never occupies the UI actor.
+    static func installHelper() async throws {
+        guard let path = Bundle.main.path(forResource: "install-helper.sh", ofType: nil) else {
+            throw Failure.message(L("install-helper.sh is missing. Run a Tether.app built with scripts/build.sh.",
+                                    "install-helper.sh를 찾을 수 없습니다. build.sh로 만든 Tether.app에서 실행하세요."))
+        }
+        let output = try await HelperAuthorizationProcess().run(arguments: helperInstallationArguments(path: path))
+        if let failure = helperInstallationFailure(exitStatus: output.exitStatus, stderr: output.stderr) { throw failure }
+    }
+
+    static func helperInstallationArguments(path: String) -> [String] {
+        let command = "/bin/sh " + shellQuoted(path)
+        return ["-e", "do shell script \(appleScriptQuoted(command)) with administrator privileges"]
+    }
+
+    /// osascript returns the AppleScript error number even in a localized dialog.
+    /// Cancellation keeps the same meaning as the existing NSAppleScript executor.
+    static func helperInstallationFailure(exitStatus: Int32, stderr: String) -> Failure? {
+        guard exitStatus != 0 else { return nil }
+        let message = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+        if message.range(of: #"\(-128\)\s*$"#, options: .regularExpression) != nil { return .cancelled }
+        return .message(message.isEmpty ? L("The helper task failed.", "도우미 작업에 실패했습니다.") : message)
+    }
+
     /// Runs a bundled script as root after the standard administrator password prompt.
     static func runScript(_ name: String) throws {
         guard let path = Bundle.main.path(forResource: name, ofType: nil) else {
@@ -127,5 +168,77 @@ enum SystemIntegration {
 
     private static func appleScriptQuoted(_ s: String) -> String {
         "\"" + s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\""
+    }
+}
+
+/// Termination and stderr EOF can arrive in either order. Drain the pipe throughout
+/// the wait, but retain only bounded diagnostic text; installer output cannot fill
+/// a pipe and stall authorization completion. No password is read or supplied.
+final class HelperAuthorizationProcess: @unchecked Sendable {
+    struct Output: Sendable { let exitStatus: Int32; let stderr: String }
+    private let process = Process()
+    private let errorPipe = Pipe()
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Output, Error>?
+    private var exitStatus: Int32?
+    private var stderrEnded = false
+    private var errorData = Data()
+    private let maximumErrorBytes = 16_384
+    private let executableURL: URL
+
+    /// The production call always uses osascript. Existing test modules may use
+    /// a fixed nonprivileged fixture executable to exercise completion ordering.
+    init(executableURL: URL = URL(fileURLWithPath: "/usr/bin/osascript")) { self.executableURL = executableURL }
+
+    func run(arguments: [String]) async throws -> Output {
+        try await withCheckedThrowingContinuation { continuation in
+            self.continuation = continuation
+            process.executableURL = executableURL
+            process.arguments = arguments
+            process.standardInput = FileHandle.nullDevice
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = errorPipe
+            errorPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
+                guard let self else { return }
+                let data = handle.availableData
+                if data.isEmpty { handle.readabilityHandler = nil }
+                self.lock.withLock {
+                    self.errorData.append(data.prefix(max(0, self.maximumErrorBytes - self.errorData.count)))
+                    if data.isEmpty { self.stderrEnded = true }
+                }
+                self.finishIfPossible()
+            }
+            process.terminationHandler = { [self] process in
+                lock.withLock { exitStatus = process.terminationStatus }
+                finishIfPossible()
+            }
+            do {
+                try process.run()
+                // The child's duplicated stderr descriptor stays open. Closing
+                // this parent's writer lets EOF arrive when that child finishes.
+                errorPipe.fileHandleForWriting.closeFile()
+            } catch {
+                errorPipe.fileHandleForReading.readabilityHandler = nil
+                process.terminationHandler = nil
+                let waiting = lock.withLock {
+                    let waiting = self.continuation
+                    self.continuation = nil
+                    return waiting
+                }
+                errorPipe.fileHandleForWriting.closeFile()
+                waiting?.resume(throwing: error)
+            }
+        }
+    }
+
+    private func finishIfPossible() {
+        let completion = lock.withLock { () -> (CheckedContinuation<Output, Error>, Output)? in
+            guard stderrEnded, let exitStatus, let continuation else { return nil }
+            self.continuation = nil
+            return (continuation, Output(exitStatus: exitStatus, stderr: String(decoding: errorData, as: UTF8.self)))
+        }
+        guard let completion else { return }
+        process.terminationHandler = nil
+        completion.0.resume(returning: completion.1)
     }
 }

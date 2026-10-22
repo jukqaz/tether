@@ -1,5 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <!-- The power cable, plugged into the side of the lid and running down out of the frame. A
-       filled outline, not a stroke: the glass renderer closes open paths and lights the seam. -->
-  <path fill="#A9D0F5" d="M730 500H842A118 118 0 0 1 960 618V1100H900V618A58 58 0 0 0 842 560H730A30 30 0 0 1 730 500Z"/>
-</svg>

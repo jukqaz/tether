@@ -1,0 +1,621 @@
+{
+  "documentSchemaVersion": 1,
+  "purpose": "Future regression definitions for Mac-wide sessions and remote cooperation; not runtime test results",
+  "minimumMacOS": "26",
+  "platform": "Apple Silicon",
+  "status": "specifiedNotImplemented",
+  "contracts": "MAC-REMOTE-COOPERATION.ko.md",
+  "specification": "PRODUCT-SPEC.ko.md",
+  "sharedInvariants": "ARCHITECTURE-REVIEW.ko.md",
+  "cases": [
+    {
+      "id": "QA-51",
+      "title": "데스크톱 비관리자 공통 세션",
+      "initial": {
+        "hardwareKind": "desktop",
+        "internalBattery": "notApplicable",
+        "lid": "notApplicable",
+        "thermal": 0,
+        "helper": "notInstalled"
+      },
+      "events": [
+        "startTimedManualSession",
+        "observeOwnIdleAssertion",
+        "advancePastDeadline",
+        "startThenStopManualSession"
+      ],
+      "expected": [
+        "general idle hold available without administrator helper",
+        "battery absence is not sensor failure",
+        "release only own assertion",
+        "no automatic system sleep"
+      ],
+      "forbidden": [
+        "require battery percent",
+        "create lid override",
+        "request helper authentication for general hold"
+      ],
+      "invariants": [
+        "I-01",
+        "I-04",
+        "I-08",
+        "I-14"
+      ],
+      "sourceReferences": [
+        "C-05"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter",
+        "physical"
+      ],
+      "result": "notRun"
+    },
+    {
+      "id": "QA-52",
+      "title": "데스크톱 자동 유지와 억제·이관",
+      "initial": {
+        "hardwareKind": "desktop",
+        "power": "ac",
+        "desktopAutomaticHold": false,
+        "migration": "portableSettings"
+      },
+      "events": [
+        "launchApplication",
+        "migratePortableChoices",
+        "explicitlyEnableAutomaticHold",
+        "repeatCurrentACObservation1000Times",
+        "manualStop",
+        "restartOnSamePower"
+      ],
+      "expected": [
+        "no automatic hold at first launch or from portable migration",
+        "explicit opt-in evaluates current eligible power",
+        "one assertion per kind",
+        "manual suppression survives restart"
+      ],
+      "forbidden": [
+        "always-on from AC alone",
+        "restore a cancelled session",
+        "reset deadlines from repeated conditions"
+      ],
+      "invariants": [
+        "I-06",
+        "I-08",
+        "I-09",
+        "I-17"
+      ],
+      "sourceReferences": [
+        "C-05"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter",
+        "physical"
+      ],
+      "result": "notRun"
+    },
+    {
+      "id": "QA-53",
+      "title": "headless 데스크톱과 iMac 화면 분리",
+      "initial": {
+        "hardwareKind": "desktop",
+        "displayVariant": "noDisplayOrBuiltInIMac",
+        "remoteUseExpected": true
+      },
+      "events": [
+        "probeHostCapabilities",
+        "startGeneralSession",
+        "remoteFrameObservationUnavailable"
+      ],
+      "expected": [
+        "built-in display does not imply lid",
+        "no display does not imply unsupported platform",
+        "work hold remains distinct from unavailable remote frames",
+        "no panel control when not applicable"
+      ],
+      "forbidden": [
+        "classify iMac as portable",
+        "create desktop lid lease",
+        "publish remote-ready without frames and input"
+      ],
+      "invariants": [
+        "I-05",
+        "I-12",
+        "I-15"
+      ],
+      "sourceReferences": [
+        "C-02",
+        "C-05"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter",
+        "physical",
+        "remote"
+      ],
+      "result": "notRun"
+    },
+    {
+      "id": "QA-54",
+      "title": "UPS를 내장 배터리로 오인하지 않음",
+      "initial": {
+        "hardwareKind": "desktop",
+        "internalBattery": "notApplicable",
+        "supply": "externalUPS",
+        "automaticCondition": "acOnly"
+      },
+      "events": [
+        "observeUPSAndSupplyTransition",
+        "repeatProbeWithPowerUnavailable",
+        "requestPortableBatteryContinuation"
+      ],
+      "expected": [
+        "hardware remains desktop",
+        "portable battery request rejected as not applicable",
+        "selected power condition evaluated only from fresh evidence",
+        "general manual capability evaluated separately"
+      ],
+      "forbidden": [
+        "require laptop battery reserve",
+        "turn power unknown into AC",
+        "change UPS shutdown or wake settings"
+      ],
+      "invariants": [
+        "I-06",
+        "I-12",
+        "I-17"
+      ],
+      "sourceReferences": [
+        "C-05"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter",
+        "physical"
+      ],
+      "result": "notRun"
+    },
+    {
+      "id": "QA-55",
+      "title": "노트북 관측 실패와 형태 판정",
+      "initial": {
+        "hardwareKind": "knownPortable",
+        "internalBattery": "knownPresent",
+        "lid": "knownPresent",
+        "batteryBudget": "partiallyConsumed"
+      },
+      "events": [
+        "batteryReadFails",
+        "lidReadFails",
+        "retryWithValidReadings"
+      ],
+      "expected": [
+        "retain known hardware capabilities",
+        "unavailable observations are not notApplicable",
+        "shared budget and suppression retained",
+        "new control follows freshness contract"
+      ],
+      "forbidden": [
+        "reclassify laptop as desktop",
+        "reset consumed battery budget",
+        "enable desktop unlimited hold"
+      ],
+      "invariants": [
+        "I-06",
+        "I-09",
+        "I-12"
+      ],
+      "sourceReferences": [
+        "C-05"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter"
+      ],
+      "result": "notRun"
+    },
+    {
+      "id": "QA-56",
+      "title": "원격 앱 실행은 실제 접속 증거가 아님",
+      "initial": {
+        "providerVariant": "splashtopOrAppleSharingOrRustDeskOrUnknown",
+        "applicationOrServiceAlive": true,
+        "virtualDisplayHint": true
+      },
+      "events": [
+        "readProviderCandidates",
+        "observeProviderSessionAPIUnavailable",
+        "readDisplayHint"
+      ],
+      "expected": [
+        "connection frame delivery and input remain separately unavailable",
+        "hint never promoted to session proof",
+        "OS sharing service need not have GUI app PID"
+      ],
+      "forbidden": [
+        "ready from process existence",
+        "infer connection from open port",
+        "claim input success from assertion"
+      ],
+      "invariants": [
+        "I-04",
+        "I-12",
+        "I-15"
+      ],
+      "sourceReferences": [
+        "C-01",
+        "C-02",
+        "C-04"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter"
+      ],
+      "result": "notRun"
+    },
+    {
+      "id": "QA-57",
+      "title": "원격 앱 정책에 의한 잠금과 유휴 종료",
+      "initial": {
+        "work": "active",
+        "provider": "splashtop",
+        "providerEditionAndVersion": "testFixture",
+        "disconnectLockSetting": "observedOrUnavailable"
+      },
+      "events": [
+        "disconnectProviderSession",
+        "observeAuthenticationRequired",
+        "compareOSAndProviderPolicyEvidence"
+      ],
+      "expected": [
+        "known provider lock policy separated from OS policy and explicit user actions",
+        "unreadable current setting reported as candidate only",
+        "work and protection state unaffected by authentication failure"
+      ],
+      "forbidden": [
+        "assume Tether caused lock",
+        "silently disable provider lock",
+        "weaken global password requirement"
+      ],
+      "invariants": [
+        "I-05",
+        "I-12",
+        "I-15"
+      ],
+      "sourceReferences": [
+        "C-03"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter",
+        "physical",
+        "remote"
+      ],
+      "result": "notRun"
+    },
+    {
+      "id": "QA-58",
+      "title": "승인 대상 앱과 원격 권한 구별",
+      "initial": {
+        "provider": "rustdesk",
+        "tetherScreenCapturePermission": "granted",
+        "providerCaptureOrInputPermission": "missingOrUnavailable"
+      },
+      "events": [
+        "runRemoteReadinessCheck",
+        "observeFrameOrInputFailure",
+        "showTargetApplicationPermissionGuidance"
+      ],
+      "expected": [
+        "Tether grant not used as provider grant",
+        "permission reason scoped to provider app",
+        "unavailable provider authority stays unavailable"
+      ],
+      "forbidden": [
+        "read private TCC database",
+        "reset permissions automatically",
+        "request broad Tether permission solely to inspect another app"
+      ],
+      "invariants": [
+        "I-05",
+        "I-12",
+        "I-15",
+        "I-16"
+      ],
+      "sourceReferences": [
+        "C-04"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter",
+        "physical",
+        "remote"
+      ],
+      "result": "notRun"
+    },
+    {
+      "id": "QA-59",
+      "title": "프레임 성공과 입력 실패를 분리",
+      "initial": {
+        "work": "active",
+        "connection": "verified",
+        "frameDelivery": "verified",
+        "inputRoundTrip": "failed",
+        "protection": "clear"
+      },
+      "events": [
+        "publishRemoteEvidence",
+        "observeInputPermissionOrInputMappingIssue",
+        "receiveFreshConnectionHeartbeatWhileInputEvidenceExpires",
+        "retryWithFreshVerification"
+      ],
+      "expected": [
+        "remote readiness remains action required until input verified",
+        "general work hold remains active",
+        "input issue points to provider configuration",
+        "each dimension has its own observation time and freshness",
+        "connection heartbeat never refreshes old input evidence"
+      ],
+      "forbidden": [
+        "ready from video alone",
+        "fake input to keep login unlocked",
+        "stop work due to remote input failure"
+      ],
+      "invariants": [
+        "I-04",
+        "I-05",
+        "I-15"
+      ],
+      "sourceReferences": [
+        "C-04",
+        "C-03"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter",
+        "physical",
+        "remote"
+      ],
+      "result": "notRun"
+    },
+    {
+      "id": "QA-60",
+      "title": "Apple 화면 공유 서비스와 Remote Management",
+      "initial": {
+        "provider": "appleScreenSharing",
+        "remoteManagement": "enabled",
+        "screenSharing": "notEnabledOrUnavailable",
+        "GUIAppPID": null
+      },
+      "events": [
+        "inspectSupportedConfigurationEvidence",
+        "showServiceConflictGuidance",
+        "verifyActualConnectionSeparately"
+      ],
+      "expected": [
+        "configuration readiness distinct from actual session",
+        "document mutually exclusive service configuration",
+        "guide only through supported settings"
+      ],
+      "forbidden": [
+        "automatically toggle sharing services",
+        "service PID treated as active connection",
+        "disable managed organization setting"
+      ],
+      "invariants": [
+        "I-12",
+        "I-15",
+        "I-16"
+      ],
+      "sourceReferences": [
+        "C-01"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter",
+        "physical",
+        "remote"
+      ],
+      "result": "notRun"
+    },
+    {
+      "id": "QA-61",
+      "title": "원격 중 화면 구성 변경과 늦은 관측",
+      "initial": {
+        "work": "active",
+        "displayRevision": 10,
+        "remoteUseExpected": true,
+        "pendingRemoteObservationRevision": 10
+      },
+      "events": [
+        "attachOrDetachPhysicalAndVirtualDisplays",
+        "incrementDisplayRevision",
+        "receiveOldRemoteObservation",
+        "observeActiveExternalDisplayNeed"
+      ],
+      "expected": [
+        "stale observation rejected",
+        "physical handoff only from fresh verified topology",
+        "all-display sleep deferred without stopping system hold",
+        "verification scope includes user session provider edition versions OS and display revision"
+      ],
+      "forbidden": [
+        "publish old ready state",
+        "handoff from virtual hint",
+        "sleep every output to force internal panel off"
+      ],
+      "invariants": [
+        "I-05",
+        "I-10",
+        "I-12",
+        "I-15"
+      ],
+      "sourceReferences": [
+        "C-02",
+        "C-05"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter",
+        "physical",
+        "remote"
+      ],
+      "result": "notRun"
+    },
+    {
+      "id": "QA-62",
+      "title": "단절·재접속·동시 원격 앱",
+      "initial": {
+        "work": "active",
+        "batteryBudget": "partiallyConsumed",
+        "providerDisplayNeeds": [
+          "providerA",
+          "providerB"
+        ],
+        "remoteUseExpected": true
+      },
+      "events": [
+        "networkDropForProviderA",
+        "providerADisconnects",
+        "providerBNeedStillFresh",
+        "providerAReconnects",
+        "repeatConnectionEdges"
+      ],
+      "expected": [
+        "latest surviving display need retained",
+        "work lifetime remains controlled by selected power time and protection",
+        "no budget reset or extra assertion from reconnect"
+      ],
+      "forbidden": [
+        "lock or sleep on network outage",
+        "clear all provider needs when one ends",
+        "start an unbounded remote-derived battery hold"
+      ],
+      "invariants": [
+        "I-05",
+        "I-06",
+        "I-08",
+        "I-15",
+        "I-18"
+      ],
+      "sourceReferences": [
+        "C-02",
+        "C-03"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter",
+        "physical",
+        "remote"
+      ],
+      "result": "notRun"
+    },
+    {
+      "id": "QA-63",
+      "title": "원격·LLM·영상 앱 정상 공존",
+      "initial": {
+        "work": "active",
+        "ownAssertionIDs": [
+          "ownIdle"
+        ],
+        "externalRequests": [
+          "remoteIdle",
+          "llmIdle",
+          "videoDisplay"
+        ]
+      },
+      "events": [
+        "readFreshExternalRequests",
+        "stopTetherSession",
+        "observeExternalRequestsRemaining"
+      ],
+      "expected": [
+        "only own assertion IDs released",
+        "normal external hold explained without conflict banner",
+        "unsafe all-display request deferred",
+        "actual system Sleep checked separately"
+      ],
+      "forbidden": [
+        "kill external applications",
+        "release foreign assertion",
+        "infer heat source from name or CPU alone"
+      ],
+      "invariants": [
+        "I-01",
+        "I-02",
+        "I-04",
+        "I-05"
+      ],
+      "sourceReferences": [
+        "C-05"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter",
+        "physical",
+        "remote"
+      ],
+      "result": "notRun"
+    },
+    {
+      "id": "QA-64",
+      "title": "로그아웃·재부팅·업데이트와 원격 서비스 수명",
+      "initial": {
+        "hardwareVariant": "desktopOrPortable",
+        "userSession": "active",
+        "remoteProviderService": "independent",
+        "ownRecoveryRecord": "valid",
+        "ownerGUISession": "OSVerifiedSessionA"
+      },
+      "events": [
+        "lockSameGUISession",
+        "fastSwitchToDifferentGUISession",
+        "oldOwnerOrRemoteServiceRequestsLeaseRenewal",
+        "logoutOrRebootOrRequestUpdate",
+        "restoreMatchingOwnState",
+        "verifyProviderReconnectSeparately"
+      ],
+      "expected": [
+        "own user session not restored implicitly",
+        "desktop update has no lid-open requirement",
+        "general idle capability independent of helper failure",
+        "FileVault pre-login distinct from remote authentication",
+        "same GUI session lock does not transfer or implicitly end existing ownership",
+        "OS-verified GUI session identity required for global lease",
+        "user switch blocks old lease renewal and new acquisition and restores only own state",
+        "unknown GUI ownership blocks new global acquisition or renewal"
+      ],
+      "forbidden": [
+        "bypass login or FileVault",
+        "claim provider service availability from Tether helper",
+        "revive temporary timers",
+        "treat lock as fast user switch",
+        "infer GUI control authority from remote provider service UID",
+        "transfer lease automatically to another GUI user",
+        "force system sleep solely because GUI user changed"
+      ],
+      "invariants": [
+        "I-01",
+        "I-04",
+        "I-09",
+        "I-13",
+        "I-16"
+      ],
+      "sourceReferences": [
+        "C-01",
+        "C-02",
+        "C-05"
+      ],
+      "validationLevels": [
+        "policy",
+        "adapter",
+        "physical",
+        "remote"
+      ],
+      "result": "notRun"
+    }
+  ],
+  "designUse": "historicalReferenceOnlyNotV3Acceptance",
+  "supersededBy": "REDESIGN-FAILURE-CASES.json"
+}
