@@ -54,9 +54,7 @@ public enum ControlStore {
     /// the file does not exist, or the user isn't an administrator.
     @discardableResult
     public static func update(path: String = TetherPaths.controlPath, _ change: (inout Control) -> Void) -> Bool {
-        var control = read(path: path)
-        change(&control)
-        guard JSONFile.overwrite(control, at: path) else { return false }
+        guard JSONFile.update(Control.self, at: path, change) else { return false }
         DarwinNotification.post(TetherPaths.controlChanged)
         return true
     }
