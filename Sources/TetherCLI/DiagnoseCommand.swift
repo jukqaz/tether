@@ -53,23 +53,18 @@ func diagnose(_ rest: [String]) -> Never {
     }
     var since: Date?
     if record {
-        let before = try? ServiceClient().perform(ServiceRequest(.snapshot)).control
         let started = Date()
-        let deadline = DiagnosticRecording.deadline(minutes: recordingMinutes, now: started)
-        let logging = before != nil && ControlStore.update { $0.debugLog = true; $0.debugLogUntil = deadline }
-        if logging { _ = try? ServiceClient().perform(ServiceRequest(.markDiagnostic)) }
-        note(logging
+        let recording = try? userSessionClient().perform(.status, recording: .start(minutes: recordingMinutes))
+        note(recording != nil
             ? L("Detailed logging for up to \(recordingMinutes) minutes. Reproduce the problem, then press Return to export.",
                 "최대 \(recordingMinutes)분간 자세히 기록합니다. 문제를 재현한 뒤 Return 키를 눌러 내보내세요.")
-            : L("Couldn't start detailed recording. Check the helper connection/version. Press Return to export available logs.",
-                "상세 기록을 켜지 못했습니다. 도우미 연결·버전을 확인하세요. Return 키를 누르면 보관된 기록을 내보냅니다."))
+            : L("Couldn't start detailed recording. Open the matching Tether app and check its command connection. Press Return to export available logs.",
+                "상세 기록을 켜지 못했습니다. 같은 버전의 Tether 앱과 명령 연결을 확인하세요. Return 키를 누르면 보관된 기록을 내보냅니다."))
         _ = readLine()
-        if logging { ControlStore.update {
-            // Do not overwrite a newer recording choice made by the UI while we waited.
-            if $0.debugLog == true, $0.debugLogUntil == deadline {
-                $0.debugLog = before?.debugLog; $0.debugLogUntil = before?.debugLogUntil
-            }
-        } }
+        if let recording {
+            do { _ = try userSessionClient().perform(.status, recording: .finish(recordingID: recording.id)) }
+            catch { note(L("Couldn't confirm detailed recording ended: ", "상세 기록 종료를 확인하지 못했습니다: ") + error.localizedDescription) }
+        }
         since = started.addingTimeInterval(-60)
     }
     note(L("Collecting (a few seconds)…", "모으는 중입니다 (몇 초 걸려요)…"))

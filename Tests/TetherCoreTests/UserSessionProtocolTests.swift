@@ -49,6 +49,33 @@ final class UserSessionProtocolTests: XCTestCase {
         value.command = .hold(minutes: 121); XCTAssertFalse(value.isValid(now: 100))
         value.command = .extendManual(minutes: 1); XCTAssertFalse(value.isValid(now: 100))
     }
+    func testRecordingWireHasBoundedDurationAndCannotCarryPowerOrTaskAuthority() throws {
+        for minutes in [1, 15, 240] {
+            let request = UserSessionRequest(now: 100, recording: .start(minutes: minutes))
+            XCTAssertTrue(request.isValid(now: 100))
+            XCTAssertEqual(try JSONDecoder().decode(UserSessionRequest.self, from: JSONEncoder().encode(request)), request)
+            XCTAssertFalse(request.isValid(now: 115), "Recording commands retain the ordinary 15-second request lifetime")
+        }
+        for minutes in [Int.min, 0, 241, Int.max] {
+            XCTAssertFalse(UserSessionRequest(now: 100, recording: .start(minutes: minutes)).isValid(now: 100))
+        }
+        var request = UserSessionRequest(now: 100, recording: .finish(recordingID: UUID()))
+        XCTAssertTrue(request.isValid(now: 100))
+        request.command = .off; XCTAssertFalse(request.isValid(now: 100))
+        request.command = .status
+        request.workEvent = .init(jobID: UUID(), eventID: UUID(), sequence: 0,
+            scope: .init(bootID: "fixture", ownerID: "owner", powerGeneration: 0), producerID: "fixture", kind: .start)
+        XCTAssertFalse(request.isValid(now: 100))
+        request.workEvent = nil
+        request.manualPID = .init(pid: 42, startIdentity: 100, executableIdentity: "/fixture/task")
+        XCTAssertFalse(request.isValid(now: 100))
+        XCTAssertNil(TetherCommand.parse(["record", "15"]))
+        XCTAssertNil(TetherCommand.parse(url: try XCTUnwrap(URL(string: "tether://record/15"))))
+        let old = UserSessionRequest(now: 100)
+        XCTAssertNil(try JSONDecoder().decode(UserSessionRequest.self, from: JSONEncoder().encode(old)).recording)
+        let oldReply = UserSessionReply(id: old.id, epoch: UUID(), revision: 0, ok: true)
+        XCTAssertNil(try JSONDecoder().decode(UserSessionReply.self, from: JSONEncoder().encode(oldReply)).recordingID)
+    }
     func testCLIUsesCurrentAppOwnerAndNeverTransfersOwnershipToANonGraphicalPeer() {
         let login = GUISessionIdentity(uid: 501, sessionID: 100001)
         let owner = GUISessionObservation(login: login, consoleUID: 501)
@@ -211,6 +238,36 @@ final class UserSessionProtocolTests: XCTestCase {
             catch { return "unexpected" }
         }.value
         XCTAssertEqual(mismatched, "unsupportedVersion", "A replaced bundle path alone cannot establish the running app's build")
+    }
+    @MainActor
+    func testRecordingClientRequiresAMatchingReceiptAndFutureDeadlineInsteadOfStatusSuccess() async throws {
+        let folder = try privateFolder(); defer { try? FileManager.default.removeItem(at: folder) }
+        let socket = folder.appendingPathComponent("commands.sock").path
+        let service = UserSessionService(path: socket); defer { service.stop() }
+        let server = try XCTUnwrap(ProcessIdentity.capture(pid: getpid())?.executable)
+        let epoch = UUID()
+        var response = "legacyStatus"
+        try service.start { request, _ in
+            var reply = UserSessionReply(id: request.id, epoch: epoch, revision: 0, ok: true)
+            guard request.recording != nil else { return reply }
+            if response != "legacyStatus" { reply.recordingID = response == "wrongID" ? UUID() : request.id }
+            if response != "missingDeadline" {
+                reply.recordingUntil = Date().addingTimeInterval(response == "expiredDeadline" ? -1 : 60)
+            }
+            return reply
+        }
+        for scenario in ["legacyStatus", "wrongID", "missingDeadline", "expiredDeadline", "confirmed"] {
+            response = scenario
+            let result = await Task.detached { () -> String in
+                do {
+                    _ = try UserSessionClient(path: socket, expectedServer: server)
+                        .perform(.status, recording: .start(minutes: 1))
+                    return "accepted"
+                } catch let failure as UserSessionFailure { return failure.code }
+                catch { return "unexpected" }
+            }.value
+            XCTAssertEqual(result, scenario == "confirmed" ? "accepted" : "recordingUnavailable", scenario)
+        }
     }
     private func privateFolder() throws -> URL {
         let url = URL(fileURLWithPath: "/tmp").appendingPathComponent("tether-user-" + UUID().uuidString)

@@ -202,8 +202,11 @@ public struct UserSessionActivity: Sendable {
     }
     /// Keep insertion order: wall-clock corrections must not reverse the causal chain.
     public func report(since: Date) -> String {
+        Self.report(entries: entries, since: since)
+    }
+    public static func report(entries: [Entry], since: Date) -> String {
         let formatter = ISO8601DateFormatter()
-        let selected = entries.filter { $0.date >= since }
+        let selected = entries.suffix(capacity).filter { $0.date >= since }
         return (["## Common work activity", "", "Source: bounded local decisions (up to 128 events / 72 hours); detailed observations are current-process only. OS logs have separate retention. These decisions do not prove physical Sleep/Wake, display power or remote readiness.", ""]
             + (selected.isEmpty ? ["No retained events in the selected range."] : selected.map { "- \(formatter.string(from: $0.date)) · sequence \($0.id) · \($0.line)" }) + [""]).joined(separator: "\n")
     }

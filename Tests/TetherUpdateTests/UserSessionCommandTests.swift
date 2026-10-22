@@ -67,6 +67,9 @@ private final class CommandFixture {
     func perform(_ command: TetherCommand) async -> UserSessionReply {
         await model.handleUserCommand(request(command), peer: peer)
     }
+    func recordingRequest(_ action: UserSessionRecordingAction) -> UserSessionRequest {
+        var value = request(.status); value.recording = action; return value
+    }
     func observeHealthyProtectionRecovery() {
         let base = ContinuousTime.now + IdleSessionPolicy.observationTTL
         for second in stride(from: 0, through: 60, by: 10) {
@@ -845,6 +848,103 @@ final class UserSessionCommandTests: XCTestCase {
         XCTAssertFalse(f.controller.status.manualActive); XCTAssertEqual(f.backend.creates, 0)
     }
     @MainActor
+    func testRecordingUsesAuthenticatedCASReceiptsAndKeepsTheNewerGUIChoice() async throws {
+        let f = try CommandFixture(); defer { f.close() }
+        var request = f.recordingRequest(.start(minutes: 15))
+        var foreign = f.peer; foreign.login = .init(uid: getuid(), sessionID: 100002)
+        let foreignReply = await f.model.handleUserCommand(request, peer: foreign)
+        XCTAssertEqual(foreignReply.error, "guiSessionUnavailable")
+        var reused = f.peer; reused.process.started += 1
+        let reusedReply = await f.model.handleUserCommand(request, peer: reused)
+        XCTAssertEqual(reusedReply.error, "unauthorized")
+        var wrongUID = f.peer; wrongUID.uid += 1
+        let wrongUIDReply = await f.model.handleUserCommand(request, peer: wrongUID)
+        XCTAssertEqual(wrongUIDReply.error, "unauthorized")
+        f.model.userCommandCompanion = "/not/the/companion"
+        let wrongCompanion = await f.model.handleUserCommand(request, peer: f.peer)
+        XCTAssertEqual(wrongCompanion.error, "unauthorized")
+        f.model.userCommandCompanion = f.peer.process.executable
+        XCTAssertFalse(f.controller.activity.isRecording())
+        var expired = request; expired.deadline = ContinuousTime.now - 1
+        let expiredReply = await f.model.handleUserCommand(expired, peer: f.peer)
+        XCTAssertEqual(expiredReply.error, "invalidRequest")
+        f.model.setEnabled(false)
+        let stale = await f.model.handleUserCommand(request, peer: f.peer)
+        XCTAssertEqual(stale.error, "staleRevision")
+        request = f.recordingRequest(.start(minutes: 15))
+        let started = await f.model.handleUserCommand(request, peer: f.peer)
+        XCTAssertTrue(started.ok); XCTAssertTrue(f.controller.activity.isRecording())
+        XCTAssertEqual(started.recordingID, request.id)
+        XCTAssertEqual(try XCTUnwrap(started.recordingUntil).timeIntervalSinceNow, 900, accuracy: 3)
+        let count = f.controller.activity.entries.count
+        let replay = await f.model.handleUserCommand(request, peer: f.peer)
+        XCTAssertTrue(replay.ok); XCTAssertEqual(replay.replayed, true)
+        XCTAssertEqual(replay.recordingID, request.id)
+        XCTAssertEqual(replay.recordingUntil, started.recordingUntil)
+        XCTAssertEqual(f.controller.activity.entries.count, count, "Lost acknowledgement cannot restart or extend recording")
+        var replacement = request; replacement.recording = .start(minutes: 240)
+        let invalidReplay = await f.model.handleUserCommand(replacement, peer: f.peer)
+        XCTAssertEqual(invalidReplay.error, "invalidReplay")
+        f.model.setDebugLogging(true, minutes: 30)
+        let guiDeadline = f.controller.activity.recordingUntil
+        let finished = await f.model.handleUserCommand(f.recordingRequest(.finish(recordingID: request.id)), peer: f.peer)
+        XCTAssertTrue(finished.ok); XCTAssertTrue(f.controller.activity.isRecording())
+        XCTAssertEqual(f.controller.activity.recordingUntil, guiDeadline, "Finishing the CLI cannot stop a newer GUI recording")
+        XCTAssertEqual(f.backend.creates, 0); XCTAssertEqual(f.backend.releases, 0)
+    }
+    @MainActor
+    func testRecordingFinishOnlyEndsItsMatchingStartAndExportsDetailWithoutPowerChanges() async throws {
+        let f = try CommandFixture(); defer { f.close() }
+        let started = await f.model.handleUserCommand(f.recordingRequest(.start(minutes: 1)), peer: f.peer)
+        XCTAssertTrue(started.ok)
+        XCTAssertFalse(f.controller.activity.isRecording(now: ContinuousTime.now + 61),
+            "The command must use the bounded continuous-time activity recorder")
+        let wrong = await f.model.handleUserCommand(f.recordingRequest(.finish(recordingID: UUID())), peer: f.peer)
+        XCTAssertTrue(wrong.ok); XCTAssertTrue(f.controller.activity.isRecording())
+        f.controller.update(power: .ac, thermal: 1, fullWake: true, controllingUser: true, now: ContinuousTime.now)
+        let finished = await f.model.handleUserCommand(f.recordingRequest(.finish(recordingID: started.id)), peer: f.peer)
+        XCTAssertTrue(finished.ok); XCTAssertFalse(f.controller.activity.isRecording()); XCTAssertNil(finished.recordingUntil)
+        let entries = try XCTUnwrap(finished.commonActivity)
+        XCTAssertTrue(entries.contains { $0.kind == .recordingStarted })
+        XCTAssertTrue(entries.contains { $0.kind == .detail && $0.inputs?.thermal == 1 })
+        XCTAssertEqual(entries.last?.kind, .recordingEnded)
+        XCTAssertEqual(f.backend.creates, 0); XCTAssertEqual(f.backend.releases, 0)
+    }
+    @MainActor
+    func testCLIJoinsAnExistingGUIRecordingWithoutReplacingOrEndingItsDeadline() async throws {
+        let f = try CommandFixture(); defer { f.close() }
+        f.model.setDebugLogging(true, minutes: 30)
+        let originalDeadline = try XCTUnwrap(f.controller.activity.recordingUntil)
+        let originalEvents = f.controller.activity.entries.count
+        let request = f.recordingRequest(.start(minutes: 1))
+        let joined = await f.model.handleUserCommand(request, peer: f.peer)
+        XCTAssertTrue(joined.ok); XCTAssertEqual(joined.recordingID, request.id)
+        XCTAssertEqual(joined.recordingUntil, originalDeadline)
+        XCTAssertEqual(f.controller.activity.entries.count, originalEvents,
+            "Joining preserves the original recorder's capped timer and event sequence")
+        let finished = await f.model.handleUserCommand(f.recordingRequest(.finish(recordingID: joined.id)), peer: f.peer)
+        XCTAssertTrue(finished.ok); XCTAssertEqual(f.controller.activity.recordingUntil, originalDeadline)
+        XCTAssertTrue(f.controller.activity.isRecording())
+        XCTAssertEqual(f.controller.activity.entries.count, originalEvents)
+    }
+    @MainActor
+    func testASecondCLIStartMakesBothWaitingFinishesNonOwningWithoutExtendingTheOriginalTimer() async throws {
+        let f = try CommandFixture(); defer { f.close() }
+        let first = await f.model.handleUserCommand(f.recordingRequest(.start(minutes: 1)), peer: f.peer)
+        let deadline = try XCTUnwrap(first.recordingUntil)
+        let second = await f.model.handleUserCommand(f.recordingRequest(.start(minutes: 240)), peer: f.peer)
+        XCTAssertTrue(second.ok); XCTAssertEqual(second.recordingUntil, deadline)
+        for started in [first, second] {
+            let finish = await f.model.handleUserCommand(f.recordingRequest(.finish(recordingID: started.id)), peer: f.peer)
+            XCTAssertTrue(finish.ok); XCTAssertEqual(finish.recordingUntil, deadline)
+            XCTAssertTrue(f.controller.activity.isRecording())
+        }
+        XCTAssertFalse(f.controller.activity.isRecording(now: ContinuousTime.now + 61))
+        XCTAssertEqual(f.controller.activity.entries.filter { $0.kind == .recordingStarted }.count, 1)
+        XCTAssertFalse(f.controller.activity.entries.contains { $0.kind == .recordingEnded })
+        XCTAssertEqual(f.backend.creates, 0); XCTAssertEqual(f.backend.releases, 0)
+    }
+    @MainActor
     func testForeignGUIAndUnverifiedProcessCannotChangeTheAppState() async throws {
         let f = try CommandFixture(); defer { f.close() }
         var peer = f.peer; peer.login = GUISessionIdentity(uid: getuid(), sessionID: 100002)
@@ -1323,6 +1423,141 @@ final class UserSessionCommandTests: XCTestCase {
         XCTAssertFalse(f.controller.status.manualActive); XCTAssertEqual(f.backend.creates, 0)
         XCTAssertFalse(FileManager.default.fileExists(atPath: f.socket))
     }
+    @MainActor
+    func testActualCLIDiagnoseRecordsAndExportsDesktopAndCoordinatedNotebookActivity() async throws {
+        let executable = try cliExecutable()
+        for notebook in [false, true] {
+            let f = try CommandFixture(); defer { f.close() }
+            var helperActions: [ServiceAction] = []
+            let model: AppModel
+            if notebook {
+                var helper = helperInstallationReply()
+                helper.workSessionBridge = .init(coordinated: true, automaticBudget: ProtectionState(), manualBudget: nil)
+                model = AppModel(preview: true,
+                    capabilities: .init(supportedPlatform: true, internalBattery: true, lid: true),
+                    previewSession: f.controller, previewWorkService: { request in
+                        helperActions.append(request.action)
+                        var reply = helper; reply.id = request.id
+                        if request.action == .configure { reply.ok = false; reply.error = "coordinatorRequired" }
+                        if request.action == .prepareWorkSession, let lease = request.workSession {
+                            reply.workSessionPreparation = .init(sessionID: lease.sessionID, epoch: reply.epoch,
+                                revision: reply.revision, expiresAt: ContinuousTime.now + IdleSessionPolicy.healthTTL)
+                        }
+                        return reply
+                    }, previewHelperReply: helper, previewDefaults: f.defaults)
+                XCTAssertTrue(model.coordinatingLid)
+            } else { model = f.model }
+            let owner = GUISessionObservation(login: GUISessionProbe.caller() ?? f.owner.login, consoleUID: getuid())
+            XCTAssertTrue(model.startUserCommandService(path: f.socket, expectedCompanion: executable, ownerProbe: { owner }))
+            defer { model.userCommandService?.stop() }
+            let input = Pipe()
+            // Private, absent helper endpoint keeps report collection simulated. The
+            // real CLI must still start recording through the authenticated app socket.
+            let arguments = ["diagnose"] + (notebook ? ["--record-minutes", "1"] : ["--record"])
+            let pending = Task { try await cli(arguments, fixture: f, executable: executable, input: input,
+                diagnosticServiceSocket: f.folder.appendingPathComponent("no-helper.sock").path) }
+            let deadline = ContinuousTime.now + 3
+            while !f.controller.activity.isRecording(), ContinuousTime.now < deadline {
+                try await Task.sleep(nanoseconds: 1_000_000)
+            }
+            XCTAssertTrue(f.controller.activity.isRecording())
+            if let until = f.controller.activity.recordingUntil {
+                XCTAssertEqual(until.timeIntervalSinceNow, notebook ? 60 : 900, accuracy: 3)
+            } else { XCTFail("The actual CLI must receive a finite recording deadline") }
+            f.controller.update(power: .ac, thermal: 1, fullWake: true, controllingUser: true, now: ContinuousTime.now)
+            input.fileHandleForWriting.write(Data("\n".utf8)); try input.fileHandleForWriting.close()
+            let result = try await pending.value
+            XCTAssertEqual(result.code, 0, result.error)
+            XCTAssertFalse(result.error.contains("Couldn't start"), result.error)
+            XCTAssertTrue(result.output.contains("## Common work activity"), result.output)
+            for event in ["event=recordingStarted", "event=detail", "thermal=1", "event=recordingEnded"] {
+                XCTAssertTrue(result.output.contains(event), "The report is missing \(event)")
+            }
+            XCTAssertTrue(result.output.contains("SIMULATED dry-run"))
+            XCTAssertFalse(f.controller.activity.isRecording())
+            XCTAssertFalse(helperActions.contains(.configure), "Recording cannot attempt root control configuration")
+            XCTAssertEqual(f.backend.creates, 0); XCTAssertEqual(f.backend.releases, 0)
+        }
+    }
+    @MainActor
+    func testActualCLIDiagnoseFinishKeepsARecordingSelectedByTheGUIWhileWaitingForReturn() async throws {
+        let f = try CommandFixture(); defer { f.close() }
+        let executable = try cliExecutable()
+        let owner = GUISessionObservation(login: GUISessionProbe.caller() ?? f.owner.login, consoleUID: getuid())
+        XCTAssertTrue(f.model.startUserCommandService(path: f.socket, expectedCompanion: executable, ownerProbe: { owner }))
+        let input = Pipe()
+        let pending = Task { try await cli(["diagnose", "--record-minutes", "1"], fixture: f,
+            executable: executable, input: input,
+            diagnosticServiceSocket: f.folder.appendingPathComponent("no-helper.sock").path) }
+        let deadline = ContinuousTime.now + 3
+        while !f.controller.activity.isRecording(), ContinuousTime.now < deadline {
+            try await Task.sleep(nanoseconds: 1_000_000)
+        }
+        XCTAssertTrue(f.controller.activity.isRecording())
+        f.model.setDebugLogging(true, minutes: 30)
+        let guiDeadline = f.controller.activity.recordingUntil
+        input.fileHandleForWriting.write(Data("\n".utf8)); try input.fileHandleForWriting.close()
+        let result = try await pending.value
+        XCTAssertEqual(result.code, 0, result.error)
+        XCTAssertTrue(f.controller.activity.isRecording()); XCTAssertEqual(f.controller.activity.recordingUntil, guiDeadline)
+        XCTAssertFalse(result.output.contains("event=recordingEnded"))
+        XCTAssertEqual(f.backend.creates, 0); XCTAssertEqual(f.backend.releases, 0)
+    }
+    @MainActor
+    func testActualCLIDiagnoseJoinsAndPreservesAnAlreadyActiveGUIRecording() async throws {
+        let f = try CommandFixture(); defer { f.close() }
+        let executable = try cliExecutable()
+        let owner = GUISessionObservation(login: GUISessionProbe.caller() ?? f.owner.login, consoleUID: getuid())
+        XCTAssertTrue(f.model.startUserCommandService(path: f.socket, expectedCompanion: executable, ownerProbe: { owner }))
+        f.model.setDebugLogging(true, minutes: 30)
+        let originalDeadline = try XCTUnwrap(f.controller.activity.recordingUntil)
+        let originalRevision = f.model.userCommandLedger.revision
+        let input = Pipe()
+        let pending = Task { try await cli(["diagnose", "--record-minutes", "1"], fixture: f,
+            executable: executable, input: input,
+            diagnosticServiceSocket: f.folder.appendingPathComponent("no-helper.sock").path) }
+        let deadline = ContinuousTime.now + 3
+        while f.model.userCommandLedger.revision == originalRevision, ContinuousTime.now < deadline {
+            try await Task.sleep(nanoseconds: 1_000_000)
+        }
+        XCTAssertGreaterThan(f.model.userCommandLedger.revision, originalRevision)
+        XCTAssertEqual(f.controller.activity.recordingUntil, originalDeadline)
+        input.fileHandleForWriting.write(Data("\n".utf8)); try input.fileHandleForWriting.close()
+        let result = try await pending.value
+        XCTAssertEqual(result.code, 0, result.error)
+        XCTAssertFalse(result.error.contains("Couldn't start"), result.error)
+        XCTAssertTrue(f.controller.activity.isRecording()); XCTAssertEqual(f.controller.activity.recordingUntil, originalDeadline)
+        XCTAssertEqual(f.controller.activity.entries.filter { $0.kind == .recordingStarted }.count, 1)
+        XCTAssertFalse(result.output.contains("event=recordingEnded"))
+    }
+    @MainActor
+    func testActualCLIDiagnoseRejectsAnOlderAppsStatusReplyAsRecordingConfirmation() async throws {
+        let f = try CommandFixture(); defer { f.close() }
+        let service = UserSessionService(path: f.socket); defer { service.stop() }
+        var starts = 0, finishes = 0
+        try service.start { request, _ in
+            if let recording = request.recording {
+                switch recording {
+                case .start: starts += 1
+                case .finish: finishes += 1
+                }
+            }
+            // Simulate an older same-build app ignoring the new request payload.
+            // A plausible deadline also cannot replace a matching recording ID.
+            var reply = f.model.userCommandReply(request)
+            reply.recordingUntil = Date().addingTimeInterval(900)
+            return reply
+        }
+        let input = Pipe(); input.fileHandleForWriting.write(Data("\n".utf8)); try input.fileHandleForWriting.close()
+        let result = try await cli(["diagnose", "--record"], fixture: f, executable: try cliExecutable(), input: input,
+            diagnosticServiceSocket: f.folder.appendingPathComponent("no-helper.sock").path)
+        XCTAssertEqual(result.code, 0, result.error)
+        XCTAssertTrue(result.error.contains("Couldn't start detailed recording") || result.error.contains("상세 기록을 켜지 못했습니다"), result.error)
+        XCTAssertEqual(starts, 1); XCTAssertEqual(finishes, 0)
+        XCTAssertFalse(f.controller.activity.isRecording())
+        XCTAssertFalse(result.output.contains("event=recordingStarted"))
+        XCTAssertEqual(f.backend.creates, 0); XCTAssertEqual(f.backend.releases, 0)
+    }
     private func cliExecutable() throws -> String {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let path = ProcessInfo.processInfo.environment["TETHER_TEST_CLI_EXECUTABLE"] ?? root.appendingPathComponent(".build/debug/TetherCLI").path
@@ -1333,7 +1568,8 @@ final class UserSessionCommandTests: XCTestCase {
         try XCTUnwrap(JSONSerialization.jsonObject(with: Data(string.utf8)) as? [String: Any])
     }
     @MainActor
-    private func cli(_ arguments: [String], fixture: CommandFixture, executable: String) async throws -> (code: Int32, output: String, error: String) {
+    private func cli(_ arguments: [String], fixture: CommandFixture, executable: String, input: Pipe? = nil,
+                     diagnosticServiceSocket: String? = nil) async throws -> (code: Int32, output: String, error: String) {
         let socket = fixture.socket
         let serverExecutable = try XCTUnwrap(ProcessIdentity.capture(pid: getpid())?.executable)
         return try await Task.detached {
@@ -1341,9 +1577,11 @@ final class UserSessionCommandTests: XCTestCase {
             process.executableURL = URL(fileURLWithPath: executable); process.arguments = arguments
             var env = ProcessInfo.processInfo.environment
             env.removeValue(forKey: "TETHER_SERVICE_SOCKET")
+            if let diagnosticServiceSocket { env["TETHER_SERVICE_SOCKET"] = diagnosticServiceSocket }
             env["TETHER_USER_SESSION_SOCKET"] = socket
             env["TETHER_USER_SESSION_SERVER_EXECUTABLE"] = serverExecutable
             process.environment = env; process.standardOutput = output; process.standardError = error
+            if let input { process.standardInput = input }
             try process.run()
             let text = output.fileHandleForReading.readDataToEndOfFile()
             let message = error.fileHandleForReading.readDataToEndOfFile()

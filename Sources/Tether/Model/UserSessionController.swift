@@ -98,6 +98,7 @@ final class UserSessionController {
     private var endRequested = false
     private var failure: String?
     private(set) var activity = UserSessionActivity()
+    private var commandRecordingID: UUID?
     private(set) var activityStorageError: String?
     var activityPersistenceEnabled = false
     private var rootHandoffPrepared: Bool
@@ -1079,11 +1080,33 @@ final class UserSessionController {
         return true
     }
     func setActivityRecording(_ on: Bool, minutes: Int = 15) {
+        // Every GUI selection supersedes an older CLI's eventual finish request.
+        commandRecordingID = nil
         if !on { writeActivity(activity.setRecording(false)); return }
         guard ownershipProbe(), !ended, !endRequested else { return }
         writeActivity(activity.observe(status))
         writeActivity(activity.setRecording(on, minutes: minutes))
         if on { writeActivity(activity.observe(status)) }
+    }
+
+    func applyActivityRecording(_ action: UserSessionRecordingAction, requestID: UUID) -> Bool {
+        switch action {
+        case .start(let minutes):
+            guard (1...240).contains(minutes), ownershipProbe(), !ended, !endRequested else { return false }
+            if activity.isRecording() {
+                // Join an existing bounded recording without replacing its deadline.
+                // No waiting CLI may end a recording now shared with another caller.
+                commandRecordingID = nil
+                return true
+            }
+            setActivityRecording(true, minutes: minutes)
+            commandRecordingID = requestID
+            return activity.isRecording()
+        case .finish(let recordingID):
+            guard commandRecordingID == recordingID else { return true }
+            setActivityRecording(false)
+            return true
+        }
     }
 
     @discardableResult

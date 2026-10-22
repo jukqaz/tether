@@ -98,13 +98,14 @@ public struct UserSessionClient {
     /// CAS failures have no receipt and can reuse this ID. A lost acknowledgement
     /// retries the identical frame, so an extension or toggle cannot run twice.
     public func perform(_ command: TetherCommand, workEvent: V4WorkEvent? = nil,
-                        manualPID: V4ProcessIdentity? = nil) throws -> UserSessionReply {
-        if command == .status && workEvent == nil && manualPID == nil { return try snapshot() }
+                        manualPID: V4ProcessIdentity? = nil,
+                        recording: UserSessionRecordingAction? = nil) throws -> UserSessionReply {
+        if command == .status && workEvent == nil && manualPID == nil && recording == nil { return try snapshot() }
         let id = UUID(), started = ContinuousTime.now
         for _ in 0..<8 {
             let state = try snapshot()
             let request = UserSessionRequest(command, id: id, epoch: state.epoch, revision: state.revision,
-                now: started, workEvent: workEvent, manualPID: manualPID)
+                now: started, workEvent: workEvent, manualPID: manualPID, recording: recording)
             let reply: UserSessionReply
             do { reply = try call(request) }
             catch let failure as ServiceFailure where failure.code == "connectionClosed" {
@@ -116,6 +117,13 @@ public struct UserSessionClient {
             // failures have no task result and continue to throw, so they cannot look like admission.
             if workEvent != nil, reply.workEventResult != nil { return reply }
             guard reply.ok else { throw UserSessionFailure(reply.error ?? "failed") }
+            if let recording {
+                guard reply.recordingID == request.id else { throw UserSessionFailure("recordingUnavailable") }
+                if case .start = recording {
+                    guard let until = reply.recordingUntil, until.timeIntervalSince1970.isFinite,
+                          until > Date() else { throw UserSessionFailure("recordingUnavailable") }
+                }
+            }
             return reply
         }
         throw UserSessionFailure("staleRevision")

@@ -75,6 +75,19 @@ public struct UserSessionStatus: Codable, Equatable, Sendable {
 
 public enum UserLidSupport: String, Codable, Sendable { case notRequired, inactive, active, pending, unavailable, error }
 
+/// Diagnostic recording is a same-account app operation, not a power command or URL action.
+public enum UserSessionRecordingAction: Codable, Equatable, Sendable {
+    case start(minutes: Int)
+    case finish(recordingID: UUID)
+
+    var isValid: Bool {
+        switch self {
+        case .start(let minutes): (1...240).contains(minutes)
+        case .finish: true
+        }
+    }
+}
+
 public struct UserSessionRequest: Codable, Equatable, Sendable {
     public static let maximumLifetime: Double = 15
     public var version = 1
@@ -88,12 +101,15 @@ public struct UserSessionRequest: Codable, Equatable, Sendable {
     /// Legacy wire compatibility only. The app rejects process-bound manual requests;
     /// decoding this field must never fall back to an ordinary manual timer.
     public var manualPID: V4ProcessIdentity?
+    public var recording: UserSessionRecordingAction?
     public var deadline: Double
     public init(_ command: TetherCommand = .status, id: UUID = UUID(), epoch: UUID? = nil,
                 revision: UInt64? = nil, now: Double = ContinuousTime.now,
-                workEvent: V4WorkEvent? = nil, manualPID: V4ProcessIdentity? = nil) {
+                workEvent: V4WorkEvent? = nil, manualPID: V4ProcessIdentity? = nil,
+                recording: UserSessionRecordingAction? = nil) {
         self.id = id; self.command = command; self.epoch = epoch; self.revision = revision
         self.workEvent = workEvent; self.manualPID = manualPID
+        self.recording = recording
         deadline = now + Self.maximumLifetime
     }
     public func isValid(now: Double) -> Bool {
@@ -101,6 +117,9 @@ public struct UserSessionRequest: Codable, Equatable, Sendable {
             && deadline > now && deadline <= now + Self.maximumLifetime && payloadIsValid
     }
     private var payloadIsValid: Bool {
+        if let recording {
+            return command == .status && workEvent == nil && manualPID == nil && recording.isValid
+        }
         guard workEvent == nil || manualPID == nil else { return false }
         if let event = workEvent {
             return command == .status && event.scope.isValid && !event.producerID.isEmpty
@@ -136,6 +155,12 @@ public struct UserSessionReply: Codable, Sendable {
     public var replayed: Bool?
     public var workScope: V4Scope?
     public var workEventResult: V4WorkEventResult?
+    /// Positive acknowledgement of this recording operation. Older same-build
+    /// apps may ignore optional request fields and return an ordinary status reply.
+    public var recordingID: UUID?
+    public var recordingUntil: Date?
+    /// Allowlisted, bounded app decisions, including this process's opt-in detail buffer.
+    public var commonActivity: [UserSessionActivity.Entry]?
     public init(id: UUID, epoch: UUID, revision: UInt64, ok: Bool, error: String? = nil, status: UserSessionStatus? = nil) {
         self.id = id; self.epoch = epoch; self.revision = revision; self.ok = ok; self.error = error
         observedAt = Date().timeIntervalSince1970; self.status = status
@@ -198,6 +223,7 @@ public struct UserSessionFailure: LocalizedError {
         case "processBoundManualRemoved": L("Process-bound manual sessions are no longer supported. Start a timed session with 'tether manual 30m' instead.", "프로세스 종료에 연동한 수동 유지는 더 이상 지원하지 않습니다. 'tether manual 30m'로 시간을 정해 시작해 주세요.")
         case "expired", "invalidRequest", "invalidReplay": L("This app request expired or is invalid; it was not replayed.", "앱 요청의 시간이 지났거나 유효하지 않아 다시 실행하지 않았습니다.")
         case "sleepUnavailable": L("Sleep execution is unavailable in this test context.", "이 시험 환경에서는 실제 잠자기를 실행하지 않습니다.")
+        case "recordingUnavailable": L("The app did not confirm detailed recording. Open the matching Tether app and retry.", "앱이 상세 기록을 확인하지 않았습니다. 같은 버전의 Tether 앱을 열고 다시 시도해 주세요.")
         default: ServiceFailure(code).localizedDescription
         }
     }

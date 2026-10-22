@@ -51,6 +51,7 @@ public enum Diagnostics {
         if userSessionRequested {
             out.append(commonSessionReport(userSession, now: now))
             if let commonActivity { out.append(commonActivity.report(since: from)) }
+            else if let entries = userSession?.commonActivity { out.append(UserSessionActivity.report(entries: entries, since: from)) }
             else { out.append("Common activity buffer not supplied by this caller; missing events are not proof of inactivity.\n") }
         }
         if let remoteContext {
