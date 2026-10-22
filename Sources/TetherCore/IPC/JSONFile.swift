@@ -8,10 +8,11 @@ public enum JSONFile {
     public static let maxSize = 4 << 20
 
     public static func read<T: Decodable>(_ type: T.Type, from path: String) -> T? {
-        guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
-        defer { try? handle.close() }
-        guard let data = try? handle.read(upToCount: maxSize + 1), data.count <= maxSize else { return nil }
-        return try? JSONDecoder().decode(T.self, from: data)
+        let fd = open(path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
+        guard fd >= 0 else { return nil }
+        defer { close(fd) }  // also releases the file lock
+        guard lock(fd, exclusive: false), let data = readData(from: fd) else { return nil }
+        return try? JSONDecoder().decode(type, from: data)
     }
 
     static func encode<T: Encodable>(_ value: T) -> Data? {
@@ -45,14 +46,59 @@ public enum JSONFile {
     /// but a plain file, and a file with more than one name (a hard link to something else).
     @discardableResult
     public static func overwrite<T: Encodable>(_ value: T, at path: String) -> Bool {
-        guard let data = encode(value) else { return false }
+        guard let data = encode(value), data.count <= maxSize else { return false }
         let fd = open(path, O_WRONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
         guard fd >= 0 else { return false }
         defer { close(fd) }
+        guard lock(fd, exclusive: true), isWritableFile(fd) else { return false }
+        return replaceContents(data, of: fd)
+    }
+
+    /// Holds one exclusive lock across decode, change and write. Readers take a shared lock,
+    /// so app/CLI/helper changes cannot overwrite each other or read a truncated intermediate
+    /// file. An unreadable or malformed file is left alone, never replaced with defaults.
+    /// The closure must only change the value; it must not perform I/O or reenter this store.
+    @discardableResult
+    public static func update<T: Codable>(_ type: T.Type, at path: String, _ change: (inout T) -> Void) -> Bool {
+        let fd = open(path, O_RDWR | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
+        guard fd >= 0 else { return false }
+        defer { close(fd) }
+        guard lock(fd, exclusive: true), isWritableFile(fd), let data = readData(from: fd),
+              var value = try? JSONDecoder().decode(type, from: data) else { return false }
+        change(&value)
+        guard let updated = encode(value), updated.count <= maxSize else { return false }
+        return replaceContents(updated, of: fd)
+    }
+
+    private static func isWritableFile(_ fd: Int32) -> Bool {
         var info = stat()
-        guard fstat(fd, &info) == 0, (info.st_mode & S_IFMT) == S_IFREG, info.st_nlink == 1,
-              ftruncate(fd, 0) == 0 else { return false }
+        return fstat(fd, &info) == 0 && (info.st_mode & S_IFMT) == S_IFREG && info.st_nlink == 1
+    }
+
+    private static func readData(from fd: Int32) -> Data? {
+        var info = stat()
+        guard fstat(fd, &info) == 0, (info.st_mode & S_IFMT) == S_IFREG,
+              info.st_size <= maxSize else { return nil }
+        let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: false)
+        guard let data = try? handle.read(upToCount: maxSize + 1), data.count <= maxSize else { return nil }
+        return data
+    }
+
+    private static func replaceContents(_ data: Data, of fd: Int32) -> Bool {
+        guard lseek(fd, 0, SEEK_SET) == 0, ftruncate(fd, 0) == 0 else { return false }
         return writeAll(data, to: fd)
+    }
+
+    /// A suspended client must not stall the helper's safety checks indefinitely. A busy file
+    /// fails after 250 ms; callers retain their last good settings or report that saving failed.
+    private static func lock(_ fd: Int32, exclusive: Bool) -> Bool {
+        let deadline = DispatchTime.now().uptimeNanoseconds + 250_000_000
+        repeat {
+            if flock(fd, (exclusive ? LOCK_EX : LOCK_SH) | LOCK_NB) == 0 { return true }
+            guard errno == EWOULDBLOCK || errno == EINTR else { return false }
+            usleep(2_000)
+        } while DispatchTime.now().uptimeNanoseconds < deadline
+        return false
     }
 
     private static func writeAll(_ data: Data, to fd: Int32) -> Bool {
@@ -60,6 +106,7 @@ public enum JSONFile {
             var offset = 0
             while offset < buffer.count {
                 let n = Darwin.write(fd, buffer.baseAddress! + offset, buffer.count - offset)
+                if n < 0, errno == EINTR { continue }
                 if n <= 0 { return false }
                 offset += n
             }
@@ -87,8 +134,16 @@ public final class JSONWatch<T: Decodable & Equatable> {
             ? [Int(truncatingIfNeeded: info.st_ino), Int(info.st_size), info.st_mtimespec.tv_sec, info.st_mtimespec.tv_nsec]
             : []
         guard current != stamp else { return false }
+        // A locked or malformed file is not a new setting. Keep the last good value and retry
+        // next poll even if its stat stamp is unchanged (e.g. a suspended writer just resumed).
+        let decoded: T?
+        if current.isEmpty {
+            decoded = nil
+        } else {
+            guard let loaded = JSONFile.read(T.self, from: path) else { return false }
+            decoded = loaded
+        }
         stamp = current
-        let decoded = current.isEmpty ? nil : JSONFile.read(T.self, from: path)
         guard decoded != value else { return false }
         value = decoded
         return true

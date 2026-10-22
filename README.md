@@ -264,15 +264,19 @@ In Settings, the options that need explaining have an **ⓘ** next to them.
 
 ## FAQ
 
-**How is this different from Amphetamine or `caffeinate`?** Those keep a Mac awake. Tether decides
-by power source: automatically awake with the lid closed on power, asleep the moment you unplug,
-and never locked while awake.
+**How is this different from Amphetamine or `caffeinate`?** Tether starts with a power-source
+policy: clamshell mode on AC, a sleep request when unplugged with the lid closed, and explicit,
+time-limited battery holds with temperature and battery limits. It also records lid sessions
+and sleep drain. Amphetamine offers configurable power-source triggers and clamshell sessions;
+`caffeinate` provides command-line sleep assertions. Tether puts its cable policy, safety limits
+and history in one menu bar app.
 
 **Does it work with an external display?** Yes. macOS already keeps a closed Mac awake with an
 external display on power; Tether adds the unplug rule and leaves the displays to macOS.
 
-**Can it limit charging like AlDente?** No. macOS 26.4 added a charge limit of its own (Battery ›
-Charging), and macOS 27 blocks third-party apps from controlling charging.
+**Can it limit charging like AlDente?** Tether does not control charging. Its battery floor
+ends a keep-awake session; it is not a charging limit. Available charging controls depend on
+the Mac and macOS version and must be checked separately.
 
 **Why "not notarized"?** Notarization needs a paid Apple developer account. The source is here,
 and building it yourself is one script.

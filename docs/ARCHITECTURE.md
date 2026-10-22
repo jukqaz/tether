@@ -137,7 +137,12 @@ while it was on and the Mac then ran on battery with the lid closed, nothing wou
 - `local.tether.watchdog` is a second LaunchDaemon that launchd runs every 60 seconds: a plain
   shell script (`tether-watchdog.sh`), so it works even when the helper binary can't. On battery,
   with `SleepDisabled` on and `status.json` older than 3 minutes (the helper rewrites it at least
-  every 30 seconds), it runs `pmset -a disablesleep 0` and logs to the helper log.
+  every 30 seconds), it runs `pmset -a disablesleep 0` and logs to the helper log. It then
+  rechecks the power source, helper heartbeat, sleep setting, lid and wake capabilities. If
+  still on battery with the lid closed in a full wake, it requests `pmset sleepnow`; clearing
+  the setting alone does not replay a lid-close event. Open lids, Dark Wake, unknown wake
+  capabilities, restored helper heartbeats and reconnected chargers skip this explicit request.
+  A successful command is logged as a request, not proof of physical sleep.
 - The login item relaunches the app after a crash (`KeepAlive` → `SuccessfulExit: false`), since a
   crash with the lid closed would leave the built-in screen at 0 brightness; Quit is final.
 - Only one copy of the app runs; a second launch brings the first forward and quits, as two would
@@ -320,7 +325,14 @@ A menu bar utility should cost nothing while nothing happens:
 Files: `/Library/Application Support/Tether/{control,status,usage,helper-state}.json`, log at
 `/Library/Logs/Tether/helper.log` (trimmed past 2 MB). The folder is root:wheel 0755, so only root
 can add, remove or replace files in it; control.json is root:admin 0664, so administrators (the app,
-the `tether` command) rewrite it in place (`JSONFile.overwrite`: no link, a single name, no create).
+the `tether` command) rewrite it in place (`JSONFile.update`: no link, a single name, no create).
+An exclusive file lock covers each control read/change/write transaction; readers take a shared
+lock so they cannot decode the truncate/write gap. Locks time out after 250 ms to keep the safety
+loop responsive if a client is suspended. Malformed or busy files fail an update without writing
+defaults. `JSONWatch` retains its last good value and retries failed reads. This preserves inode,
+ownership and permissions, but it is not a crash-atomic storage protocol: a process killed during
+the actual in-place write can still leave a damaged file. A future helper-owned request protocol
+must provide durable atomic commits before claiming crash-safe configuration persistence.
 The helper replaces its own files through `mkstemp` and `rename` (`JSONFile.write`), and at every
 start takes the folder back and removes anything unexpected (`Helper.secureSupportFolder`), as the
 install script does.

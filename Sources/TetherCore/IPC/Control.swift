@@ -49,14 +49,11 @@ public enum ControlStore {
         JSONFile.read(Control.self, from: path) ?? Control()
     }
 
-    /// Applies a change to the control file, in place (see `JSONFile.overwrite`), and nudges the
-    /// helper. Returns false when it cannot be written, e.g. the helper was never installed, so
-    /// the file does not exist, or the user isn't an administrator.
+    /// Applies a locked read/change/write transaction in place and nudges the helper. Returns
+    /// false for a busy, missing, malformed or unwritable file without replacing it with defaults.
     @discardableResult
     public static func update(path: String = TetherPaths.controlPath, _ change: (inout Control) -> Void) -> Bool {
-        var control = read(path: path)
-        change(&control)
-        guard JSONFile.overwrite(control, at: path) else { return false }
+        guard JSONFile.update(Control.self, at: path, change) else { return false }
         DarwinNotification.post(TetherPaths.controlChanged)
         return true
     }
