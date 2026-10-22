@@ -5,3 +5,6 @@ dist/
 .claude/
 Resources/*.iconset/
 .DS_Store
+*.key
+*.pem
+__pycache__/

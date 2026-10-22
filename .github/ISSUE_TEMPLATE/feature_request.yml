@@ -1,0 +1,18 @@
+name: 기능 제안
+description: 필요한 작업과 완료 조건을 정합니다.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: task
+    attributes:
+      label: 하려는 작업
+      description: 현재 어떤 상황에서 불편한지 알려 주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: 원하는 동작과 완료 조건
+      description: 전원·덮개·기본 트리거·수동 세션·원격 연결 조건을 구분해 주세요.
+    validations:
+      required: true
