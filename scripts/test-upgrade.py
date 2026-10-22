@@ -42,6 +42,7 @@ def alive(pid):
 def identity(pid):
  return subprocess.check_output(['/bin/ps','-ww','-o','lstart=','-o','command=','-p',str(pid)],text=True).strip()
 def stop():
+ (root/'legacy-helper.loaded').unlink(missing_ok=True)
  if pidfile.exists():
   pid=int(pidfile.read_text())
   if alive(pid) and identity(pid)!=(root/'helper.identity').read_text():
@@ -82,6 +83,7 @@ if a[0]=='bootout':
  sys.exit(0)
 if a[0]=='print':
  if label=='watchdog':sys.exit(0 if (root/'watchdog.loaded').exists() else 1)
+ if (root/'legacy-helper.loaded').exists():sys.exit(0)
  if not pidfile.exists():sys.exit(1)
  if alive(int(pidfile.read_text())):sys.exit(0)
  pidfile.unlink();sys.exit(1)
@@ -90,10 +92,18 @@ if a[0]=='bootstrap':
  if not Path(a[2]).is_file():
   record('bootstrap-missing-registration',service=label);sys.exit(1)
  binary=tools/'local.tether.helper'
- if binary.read_bytes().startswith(b'legacy-'):sys.exit(0)
+ if binary.read_bytes().startswith(b'legacy-'):
+  (root/('legacy-helper.loaded' if label=='helper' else 'watchdog.loaded')).touch()
+  sys.exit(0)
  # Inject failures only into the candidate. The real previous helper must be
  # allowed to bootstrap during rollback, rather than silently failing too.
  if (root/'failure').exists() and (root/'failure').read_text()==label and binary.read_bytes()==(root/'resources/tether-helper').read_bytes():
+  if (root/'lock-on-failure').exists():
+   (root/'rollback-lock-requested').touch()
+   until=time.monotonic()+3
+   while not (root/'rollback-lock-held').exists() and time.monotonic()<until:time.sleep(.01)
+   if not (root/'rollback-lock-held').exists():sys.exit(2)
+   (root/'failure').unlink()
   record('bootstrap-failed',service=label);sys.exit(1)
  if label=='helper':
   if not stop():sys.exit(1)
@@ -433,11 +443,14 @@ def run_case(case):
   root=Path(temp);support=root/'Library/Application Support/Tether';support.mkdir(parents=True)
   lock=support.parent/'.tether-power-recovery.lock';lock.touch(mode=0o600);lock_inode=lock.stat().st_ino
   holder=lock.open('r+')
-  if case=='lock-busy':fcntl.flock(holder,fcntl.LOCK_EX|fcntl.LOCK_NB)
+  if case in ['lock-busy','lock-busy-loaded-services']:fcntl.flock(holder,fcntl.LOCK_EX|fcntl.LOCK_NB)
+  if case=='lock-busy-loaded-services':
+   (root/'legacy-helper.loaded').touch();(root/'watchdog.loaded').touch()
   if case=='unsafe-lock':lock.chmod(0o666)
-  if case in ['owned-recovery','no-effect','owned-watchdog-failure']:
+  if case in ['owned-recovery','no-effect','owned-watchdog-failure','lock-busy-loaded-services']:
    boot=subprocess.check_output(['/usr/sbin/sysctl','-n','kern.bootsessionuuid'],text=True).strip()
    (support/'power-ownership.json').write_text(json.dumps({'owned':True,'boot':boot}))
+  ownership_before=(support/'power-ownership.json').read_bytes() if case=='lock-busy-loaded-services' else None
   if case=='no-effect':(root/'no-effect').touch()
   tools=root/'Library/PrivilegedHelperTools';tools.mkdir(parents=True)
   daemons=root/'Library/LaunchDaemons';daemons.mkdir(parents=True)
@@ -482,7 +495,8 @@ def run_case(case):
   if missing_daemon:
    fake=json.loads((root/'fake.json').read_text());fake.update(guiAuthority=True,guiConsoleUID=os.geteuid())
    (root/'fake.json').write_text(json.dumps(fake))
-  if case in ['watchdog-failure','owned-watchdog-failure','logs-watchdog-rollback']:(root/'failure').write_text('watchdog')
+  if case in ['watchdog-failure','owned-watchdog-failure','logs-watchdog-rollback','rollback-lock-busy']:(root/'failure').write_text('watchdog')
+  if case=='rollback-lock-busy':(root/'lock-on-failure').touch()
   if case=='migration-failure':(support/'migrations').write_text('occupied')
   if case=='future-schema':(support/'control.json').write_text('{"enabled":true,"schemaVersion":99}');raw=(support/'control.json').read_bytes()
   if case=='corrupt-settings':(support/'control.json').write_text('{');raw=(support/'control.json').read_bytes()
@@ -581,10 +595,28 @@ def run_case(case):
     if case.endswith('watchdog-failure'):(root/'failure').write_text('watchdog')
     if case.endswith('bootstrap-failure'):(root/'failure').write_text('helper')
     started=time.time()
+   blocker=None
+   if case=='rollback-lock-busy':
+    def acquire_rollback_lock():
+     deadline=time.monotonic()+15
+     while not (root/'rollback-lock-requested').exists() and time.monotonic()<deadline:time.sleep(.01)
+     if (root/'rollback-lock-requested').exists():
+      fcntl.flock(holder,fcntl.LOCK_EX);(root/'rollback-lock-held').touch()
+    blocker=threading.Thread(target=acquire_rollback_lock);blocker.start()
    result=subprocess.run(['/bin/sh',str(resources/'install-helper.sh')],env=env,text=True,capture_output=True,timeout=35,
                          umask=0o077 if case=='logs-new-umask077' else -1)
    if previous_case:
     verify_previous(case,root,support,tools,daemons,result,old,old_pid,started)
+   elif case=='rollback-lock-busy':
+    blocker.join(timeout=1);assert not blocker.is_alive()
+    assert result.returncode!=0 and (root/'rollback-lock-held').exists(),(case,result.stdout,result.stderr)
+    assert 'Recovery deferred: a service/transaction is still active.' in result.stderr
+    assert (root/'watchdog.loaded').exists(),(case,'deferred rollback lost its independent watchdog')
+    assert (tools/'local.tether.helper').read_bytes()==HELPER.read_bytes(),(case,'rolled files back without the lock')
+    assert not (root/'commands.log').exists(),(case,'busy rollback wrote power settings')
+    assert list((support/'upgrades').glob('helper-*')),(case,'lost rollback backup')
+    assert 'Helper update verified.' not in result.stdout
+    fcntl.flock(holder,fcntl.LOCK_UN)
    elif case in ['success','owned-recovery','writer-old-boot',*LOG_SUCCESS_CASES,*UPGRADE_SUCCESS_CASES] or case.startswith('schema-'):
     assert result.returncode==0,(result.stdout,result.stderr,(root/'helper.log').read_text() if (root/'helper.log').exists() else 'helper did not start')
     migrated=json.loads((support/'control.json').read_text())
@@ -657,6 +689,19 @@ def run_case(case):
    if case=='owned-watchdog-failure':
     assert not (support/'power-ownership.json').exists(), 'Rollback replayed an already-consumed lease'
     assert (root/'commands.log').read_text().count('pmset -a disablesleep 0') == 1
+   if case=='lock-busy-loaded-services':
+    assert (root/'legacy-helper.loaded').exists() and (root/'watchdog.loaded').exists(),(case,'lost recovery service registrations')
+    assert (support/'power-ownership.json').read_bytes()==ownership_before,(case,'busy lock changed the recovery lease')
+    for name in ['local.tether.helper','local.tether.watchdog']:
+     assert (tools/name).read_text()=='legacy-'+name,(case,'replaced original service')
+     assert (daemons/(name+'.plist')).read_text()=='legacy-plist-'+name,(case,'changed original registration')
+    calls=(root/'launchctl.log').read_text()
+    assert 'bootstrap system ' in calls and 'original service registrations retained/restored' in result.stderr
+    assert not (root/'commands.log').exists(),(case,'busy lock caused an unjournaled power write')
+    # Registrations survive release too; no successful upgrade was claimed.
+    fcntl.flock(holder,fcntl.LOCK_UN)
+    assert (root/'legacy-helper.loaded').exists() and (root/'watchdog.loaded').exists()
+    assert 'Helper update verified.' not in result.stdout
    if case in ['writer-unresolved','writer-future','writer-corrupt']:assert (support/'power-writer.json').exists()
    if case=='writer-old-boot':assert not (support/'power-writer.json').exists()
    if case in LOG_CASES:verify_log_fixture(case,root,logs,log_before,active_log,result)
@@ -680,6 +725,7 @@ CASES += ['readiness-current','readiness-old-contract','readiness-previous-contr
 CASES += ['metadata-version','metadata-version-flags']
 CASES += LOG_CASES
 CASES += UPGRADE_SUCCESS_CASES+UPGRADE_UNSAFE_CASES
+CASES += ['lock-busy-loaded-services','rollback-lock-busy']
 if PREVIOUS:CASES += ['actual-previous-off-success','actual-previous-active-success','actual-previous-detach-success',
                      'actual-previous-watchdog-failure','actual-previous-active-watchdog-failure','actual-previous-bootstrap-failure','actual-previous-paused-stop',
                      'actual-previous-missing-daemon-success','actual-previous-missing-daemon-watchdog-failure','actual-previous-missing-daemon-bootstrap-failure']

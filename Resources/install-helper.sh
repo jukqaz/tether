@@ -81,14 +81,39 @@ for name in "$LABEL" "$WATCHDOG"; do
 done
 settingsReady=false
 committed=false
+componentsReplaced=false
+previousHelperLoaded=false
+previousWatchdogLoaded=false
+restore_registration() {
+  launchctl print "system/$1" >/dev/null 2>&1 && return 0
+  [ -f "$DAEMONS/$1.plist" ] || return 1
+  launchctl bootstrap system "$DAEMONS/$1.plist"
+}
 rollback() {
   echo 'Helper upgrade failed; restoring previous helper and settings.' >&2
   if [ "$lockHeld" = true ]; then recovery_lock_release; lockHeld=false; fi
+  if [ "$componentsReplaced" != true ]; then
+    # No executable/registration has changed. Re-loading the original services
+    # requires no rollback file writes and must not depend on the busy writer
+    # lock. Their own recovery checks still govern any later power operation.
+    if [ "$previousHelperLoaded" = true ]; then restore_registration "$LABEL" || true; fi
+    if [ "$previousWatchdogLoaded" = true ]; then restore_registration "$WATCHDOG" || true; fi
+    echo "Recovery deferred: original service registrations retained/restored. Backup retained: $BACKUP" >&2
+    return
+  fi
   launchctl bootout "system/$WATCHDOG" 2>/dev/null || true
   launchctl bootout "system/$LABEL" 2>/dev/null || true
   i=0
   while { launchctl print "system/$LABEL" >/dev/null 2>&1 || launchctl print "system/$WATCHDOG" >/dev/null 2>&1; } && [ "$i" -lt 50 ]; do sleep 0.1; i=$((i + 1)); done
   if launchctl print "system/$LABEL" >/dev/null 2>&1 || launchctl print "system/$WATCHDOG" >/dev/null 2>&1 || ! recovery_lock_acquire 2; then
+    # A candidate writer can outlive its stopped helper. Keep a verified,
+    # independently scheduled recovery path while file rollback is deferred.
+    RECOVERY_EXECUTOR="$TOOLS/$RECOVERY_TOOL"
+    if [ -f "$TOOLS/$WATCHDOG" ] && [ ! -L "$TOOLS/$WATCHDOG" ] &&
+       [ -f "$TOOLS/$LOCK_LIBRARY" ] && [ ! -L "$TOOLS/$LOCK_LIBRARY" ] &&
+       recovery_executor_capable; then
+      restore_registration "$WATCHDOG" || true
+    fi
     echo "Recovery deferred: a service/transaction is still active. Backup retained: $BACKUP" >&2
     return
   fi
@@ -114,6 +139,8 @@ rollback() {
   echo "Recovery backup: $BACKUP" >&2
 }
 require_install_target
+if launchctl print "system/$LABEL" >/dev/null 2>&1; then previousHelperLoaded=true; fi
+if launchctl print "system/$WATCHDOG" >/dev/null 2>&1; then previousWatchdogLoaded=true; fi
 trap 'status=$?; trap - 0; if [ "$committed" != true ]; then rollback; fi; exit "$status"' 0
 trap 'exit 1' HUP INT TERM
 # Let the old helper release its own settings when it stops. A missing helper's
@@ -137,6 +164,7 @@ if [ -f "$OWNERSHIP" ] && [ "$(plutil -extract owned raw -o - "$OWNERSHIP" 2>/de
   printf '%s\n' "$restored" | grep -q '"SleepDisabled" = No' || { echo 'Sleep restoration not confirmed; recovery journal retained.' >&2; exit 1; }
   rm -f "$OWNERSHIP"
 fi
+componentsReplaced=true
 mkdir -p "$TOOLS" "$DAEMONS"
 for pair in "tether-helper:$LABEL" "tether-watchdog.sh:$WATCHDOG"; do
   source=${pair%%:*}; target=${pair#*:}
