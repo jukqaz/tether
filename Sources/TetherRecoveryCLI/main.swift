@@ -16,6 +16,9 @@ if arguments == [arguments[0], "--gate-capability"] {
 if arguments.count == 4, arguments[1] == "--prepare-logs", arguments[2] == "--support" {
     exit(PowerRecoveryCommand.prepareLogs(support: arguments[3]))
 }
+if arguments.count == 4, arguments[1] == "--prepare-upgrades", arguments[2] == "--support" {
+    exit(PowerRecoveryCommand.prepareUpgradeStorage(support: arguments[3]))
+}
 if arguments.dropFirst().first == "--writer-gate" {
     guard let support = value("--support"), let transaction = value("--transaction") else { exit(64) }
     exit(PowerWriterGate.perform(support: support, transaction: transaction))

@@ -20,6 +20,10 @@ LOG_UNSAFE_CASES=['logs-active-symlink','logs-active-hardlink','logs-active-fifo
                   'logs-rotated-symlink','logs-rotated-acl','logs-directory-symlink','logs-directory-file',
                   'logs-directory-unsafe','logs-parent-unsafe']
 LOG_CASES=LOG_SUCCESS_CASES+['logs-watchdog-rollback']+LOG_UNSAFE_CASES
+UPGRADE_SUCCESS_CASES=['legacy-support-mode','upgrade-private-mode']
+UPGRADE_UNSAFE_CASES=['upgrade-support-acl','upgrade-directory-acl','upgrade-inherited-acl',
+                      'upgrade-directory-symlink','upgrade-directory-file','upgrade-directory-unsafe',
+                      'upgrade-parent-symlink']
 MOCK=r'''#!/usr/bin/env python3
 import os,sys,hashlib,json,subprocess,signal,time
 from pathlib import Path
@@ -509,6 +513,37 @@ def run_case(case):
   # A desktop has no clamshell key. Refusal must happen at the hardware probe,
   # instead of turning a missing key into an instruction to open a MacBook.
   if case in ['target-desktop','target-ups']:env['TETHER_TEST_LID']='unknown'
+  upgrade_before={}
+  if case in UPGRADE_SUCCESS_CASES+UPGRADE_UNSAFE_CASES:
+   upgrades=support/'upgrades'
+   paths=[support,upgrades]
+   if case=='legacy-support-mode':
+    # /tmp inherits wheel on macOS; model the executor's allowed legacy group.
+    os.chown(support,-1,os.getegid());support.chmod(0o775)
+   elif case=='upgrade-private-mode':upgrades.mkdir(mode=0o755)
+   elif case=='upgrade-support-acl':
+    subprocess.run(['/bin/chmod','+a','everyone allow write',str(support)],check=True)
+   elif case=='upgrade-directory-file':upgrades.write_bytes(b'not a directory')
+   elif case=='upgrade-directory-symlink':
+    victim=root/'outside-upgrades';victim.mkdir();sentinel=victim/'sentinel';sentinel.write_bytes(b'keep')
+    upgrades.symlink_to(victim,target_is_directory=True);paths += [victim,sentinel]
+   elif case=='upgrade-parent-symlink':
+    parent=support.parent;original=root/'original-support-parent';parent.rename(original)
+    parent.symlink_to(original,target_is_directory=True);paths += [parent,original]
+   else:
+    upgrades.mkdir(mode=0o700)
+    if case=='upgrade-directory-unsafe':upgrades.chmod(0o777)
+    else:
+     acl='everyone allow write' if case=='upgrade-directory-acl' else 'everyone allow add_file,add_subdirectory,delete_child,file_inherit,directory_inherit'
+     subprocess.run(['/bin/chmod','+a',acl,str(upgrades)],check=True)
+     if case=='upgrade-inherited-acl':
+      # Reproduce the old mode-only assumption without root or a live service:
+      # chmod 0700 does not remove ACLs, and new backup directories inherit them.
+      upgrades.chmod(0o700)
+      probe=upgrades/'inheritance-probe';probe.mkdir(mode=0o700)
+      assert log_path_state(probe)['acl'],'ACL inheritance reproduction did not execute'
+      probe.rmdir()
+   upgrade_before={path:log_path_state(path) for path in paths}
   try:
    if previous_case:
     subprocess.run([str(mock/'launchctl'),'bootstrap','system',str(daemons/'local.tether.helper.plist')],env=env,check=True)
@@ -550,7 +585,7 @@ def run_case(case):
                          umask=0o077 if case=='logs-new-umask077' else -1)
    if previous_case:
     verify_previous(case,root,support,tools,daemons,result,old,old_pid,started)
-   elif case in ['success','owned-recovery','writer-old-boot',*LOG_SUCCESS_CASES] or case.startswith('schema-'):
+   elif case in ['success','owned-recovery','writer-old-boot',*LOG_SUCCESS_CASES,*UPGRADE_SUCCESS_CASES] or case.startswith('schema-'):
     assert result.returncode==0,(result.stdout,result.stderr,(root/'helper.log').read_text() if (root/'helper.log').exists() else 'helper did not start')
     migrated=json.loads((support/'control.json').read_text())
     assert migrated['schemaVersion']==CURRENT_SCHEMA and migrated['enabled'] is False
@@ -588,7 +623,10 @@ def run_case(case):
      assert (support/'control.json').read_bytes()==current_bytes,'Restart changed the migrated choices'
      assert list((support/'migrations').glob('control-*.json'))==backups,'Restart repeated migration'
     if case=='owned-recovery': assert 'pmset -a disablesleep 0' in (root/'commands.log').read_text()
-
+    if case in UPGRADE_SUCCESS_CASES:
+     assert stat.S_IMODE(support.stat().st_mode)==0o755
+     assert stat.S_IMODE((support/'upgrades').stat().st_mode)==0o700
+     assert not log_path_state(support)['acl'] and not log_path_state(support/'upgrades')['acl']
    else:
     assert result.returncode!=0,(case,result.stdout,result.stderr)
     assert (support/'control.json').read_bytes()==raw,(case,'original changed')
@@ -596,6 +634,12 @@ def run_case(case):
      assert (tools/name).read_text()=='legacy-'+name
      assert (daemons/(name+'.plist')).read_text()=='legacy-plist-'+name
     if case in ['future-schema','corrupt-settings','lid-closed','lid-unknown','lid-closes-after-validation','writer-unresolved','writer-future','writer-corrupt','recovery-executor-missing','recovery-executor-unsafe']:assert not (root/'commands.log').exists()
+    if case in UPGRADE_UNSAFE_CASES:
+     assert 'Unsafe helper upgrade paths. Nothing was replaced.' in result.stderr,(case,result.stdout,result.stderr)
+     assert {path:log_path_state(path) for path in upgrade_before}==upgrade_before,(case,'unsafe storage was modified')
+     assert not (root/'launchctl.log').exists(),(case,'touched a service before storage verification')
+     assert not (root/'commands.log').exists(),(case,'issued a power command')
+     assert not list((support/'upgrades').glob('helper-*')),(case,'created a backup under unsafe storage')
     if case.startswith('target-'):
      assert not (root/'commands.log').exists(), (case,'issued a power command')
      assert not (root/'launchctl.log').exists(), (case,'touched a service before target verification')
@@ -635,6 +679,7 @@ CASES += ['readiness-current','readiness-old-contract','readiness-previous-contr
           'readiness-sleep-events-unavailable','readiness-previous-schema']
 CASES += ['metadata-version','metadata-version-flags']
 CASES += LOG_CASES
+CASES += UPGRADE_SUCCESS_CASES+UPGRADE_UNSAFE_CASES
 if PREVIOUS:CASES += ['actual-previous-off-success','actual-previous-active-success','actual-previous-detach-success',
                      'actual-previous-watchdog-failure','actual-previous-active-watchdog-failure','actual-previous-bootstrap-failure','actual-previous-paused-stop',
                      'actual-previous-missing-daemon-success','actual-previous-missing-daemon-watchdog-failure','actual-previous-missing-daemon-bootstrap-failure']

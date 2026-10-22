@@ -46,6 +46,57 @@ public enum PowerRecoveryCommand {
         return result.status == 0 && result.terminationConfirmed && !result.timedOut ? 0 : 1
     }
 
+    /// Keep rollback inputs below a directory that cannot inherit caller ACLs.
+    /// A legacy root:admin 0775 support directory may be narrowed, but an
+    /// attacker-owned or ACL-bearing upgrades directory is never adopted.
+    public static func prepareUpgradeStorage(support: String) -> Int32 {
+        let library = installLibrary(support: support)
+        guard library >= 0 else { return 1 }
+        defer { close(library) }
+        var entry = stat()
+        guard fstat(library, &entry) == 0, safeLogDirectory(entry), noLogACL(library) else { return 1 }
+        let applicationSupport = openLogDirectory("Application Support", at: library)
+        guard applicationSupport >= 0 else { return 1 }
+        defer { close(applicationSupport) }
+        if fstatat(applicationSupport, "Tether", &entry, AT_SYMLINK_NOFOLLOW) != 0 {
+            guard errno == ENOENT, mkdirat(applicationSupport, "Tether", 0o755) == 0 else { return 1 }
+        }
+        let folder = openat(applicationSupport, "Tether", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+        guard folder >= 0 else { return 1 }
+        defer { close(folder) }
+        var folderEntry = stat()
+        let legacyGroup = geteuid() == 0 ? (getgrnam("admin")?.pointee.gr_gid ?? 80) : getegid()
+        guard fstat(folder, &folderEntry) == 0, folderEntry.st_mode & S_IFMT == S_IFDIR,
+              folderEntry.st_uid == geteuid(), folderEntry.st_mode & 0o002 == 0,
+              folderEntry.st_mode & 0o020 == 0 || folderEntry.st_gid == legacyGroup,
+              noLogACL(folder) else { return 1 }
+
+        var upgrades = openat(folder, "upgrades", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+        defer { if upgrades >= 0 { close(upgrades) } }
+        var upgradeEntry = stat()
+        if upgrades >= 0 {
+            guard fstat(upgrades, &upgradeEntry) == 0, safeLogDirectory(upgradeEntry),
+                  noLogACL(upgrades) else { return 1 }
+        } else if errno != ENOENT { return 1 }
+
+        // Validate both existing directories before changing either. Seal the
+        // legacy parent, then prove the opened child is still the named child.
+        guard fchmod(folder, 0o755) == 0,
+              geteuid() != 0 || fchown(folder, 0, 0) == 0 else { return 1 }
+        if upgrades >= 0 {
+            guard fstatat(folder, "upgrades", &entry, AT_SYMLINK_NOFOLLOW) == 0,
+                  entry.st_dev == upgradeEntry.st_dev, entry.st_ino == upgradeEntry.st_ino else { return 1 }
+        } else {
+            guard mkdirat(folder, "upgrades", 0o700) == 0 else { return 1 }
+            upgrades = openat(folder, "upgrades", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+            guard upgrades >= 0, fstat(upgrades, &upgradeEntry) == 0,
+                  safeLogDirectory(upgradeEntry), noLogACL(upgrades) else { return 1 }
+        }
+        guard fchmod(upgrades, 0o700) == 0,
+              geteuid() != 0 || fchown(upgrades, 0, 0) == 0 else { return 1 }
+        return 0
+    }
+
     private static func installLibrary(support: String) -> Int32 {
         if geteuid() == 0 {
             guard support == "/Library/Application Support/Tether" else { return -1 }

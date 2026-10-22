@@ -49,10 +49,9 @@ DAEMONS="$PREFIX/Library/LaunchDaemons"
 "$RECOVERY_EXECUTOR" --prepare-logs --support "$SUPPORT" || {
   echo 'Unsafe helper log paths. Nothing was replaced.' >&2; exit 1;
 }
-[ ! -L "$SUPPORT" ] || exit 1
-mkdir -p "$SUPPORT"
-if [ -z "$PREFIX" ]; then chown root:wheel "$SUPPORT"; fi
-chmod 755 "$SUPPORT"
+"$RECOVERY_EXECUTOR" --prepare-upgrades --support "$SUPPORT" || {
+  echo 'Unsafe helper upgrade paths. Nothing was replaced.' >&2; exit 1;
+}
 FILES='control.json control.json.backup status.json usage.json helper-state.json suite-state.json protection-state.json migration-report.json power-ownership.json watchdog-status.json'
 # Writer journal is checked by the recovery guard and must never be copied back as
 # a rollback setting after its process has stopped. It belongs to a transaction.
@@ -70,10 +69,8 @@ if [ -f "$SUPPORT/control.json" ]; then
   "$RES/tether-helper" --validate-settings --control "$SUPPORT/control.json"
 fi
 # Keep both binaries and settings until the new service reports the expected version/schema.
-[ ! -L "$SUPPORT/upgrades" ] || exit 1
-mkdir -p "$SUPPORT/upgrades"
-if [ -z "$PREFIX" ]; then chown root:wheel "$SUPPORT/upgrades"; fi
-chmod 700 "$SUPPORT/upgrades"
+# The independent executor verified owner/mode/ACL through directory descriptors
+# before any service was stopped. This private parent cannot inherit a legacy ACL.
 BACKUP=$(mktemp -d "$SUPPORT/upgrades/helper-XXXXXXXX")
 mkdir "$BACKUP/tools" "$BACKUP/daemons" "$BACKUP/settings"
 for name in "$LABEL" "$WATCHDOG" "$LOCK_LIBRARY" "$RECOVERY_TOOL"; do
