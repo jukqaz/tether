@@ -36,8 +36,8 @@ struct GeneralPage: View {
                 }
                 if model.showsLidOptions {
                     SettingsToggle(title: L("Continue with the lid closed", "덮개를 닫아도 계속 사용"),
-                        isOn: Binding(get: { model.v3Settings.allowClosedLid }, set: { model.setAllowClosedLid($0) }))
-                        .disabled(settingsControlsDisabled || !model.helperSetupConfirmed)
+                        isOn: lidBinding)
+                        .disabled(lidControlDisabled)
                         .accessibilityIdentifier("closed-lid-allow-toggle")
                     if model.v3Settings.allowClosedLid {
                         closedLidDisplayControls
@@ -218,6 +218,14 @@ struct GeneralPage: View {
         disclosures?.closedLidDisplay ?? $closedLidDisplayExpanded
     }
 
+    var lidAvailability: LidOptionAvailability { LidOptionAvailability(model: model) }
+    var lidControlDisabled: Bool { lidAvailability.isDisabled }
+    var lidBinding: Binding<Bool> {
+        Binding(get: { model.v3Settings.allowClosedLid }, set: { value in
+            guard lidAvailability.permits(value) else { return }
+            model.setAllowClosedLid(value)
+        })
+    }
     private var settingsControlsDisabled: Bool { !model.acceptingUserCommands || model.commandPending }
     private var workRulesExpansion: Binding<Bool> { disclosures?.workRules ?? $workRulesExpanded }
     private var protectionExpansion: Binding<Bool> { disclosures?.protectionRules ?? $protectionExpanded }

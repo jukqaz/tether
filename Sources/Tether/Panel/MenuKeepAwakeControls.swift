@@ -1,6 +1,35 @@
 import SwiftUI
 import TetherCore
 
+/// Helper readiness is required to grant lid permission, never to revoke a
+/// saved grant. Both settings and the menu use this presentation-only guard.
+struct LidOptionAvailability {
+    let showsLidOptions: Bool
+    let acceptingUserCommands: Bool
+    let commandPending: Bool
+    let isSelected: Bool
+    let helperSetupConfirmed: Bool
+
+    private var commandsAvailable: Bool {
+        showsLidOptions && acceptingUserCommands && !commandPending
+    }
+    var isDisabled: Bool { !commandsAvailable || (!isSelected && !helperSetupConfirmed) }
+    func permits(_ selected: Bool) -> Bool {
+        commandsAvailable && (!selected || helperSetupConfirmed)
+    }
+}
+
+extension LidOptionAvailability {
+    @MainActor
+    init(model: AppModel) {
+        self.init(showsLidOptions: model.showsLidOptions,
+                  acceptingUserCommands: model.acceptingUserCommands,
+                  commandPending: model.commandPending,
+                  isSelected: model.v3Settings.allowClosedLid,
+                  helperSetupConfirmed: model.helperSetupConfirmed)
+    }
+}
+
 /// Quick access to the same permissions used by General Settings. Selecting a
 /// permission never clears a stop/protection latch or starts a new work request.
 struct MenuKeepAwakeControls: View {
@@ -8,7 +37,8 @@ struct MenuKeepAwakeControls: View {
     var openHelperSetup: () -> Void = {}
 
     var controlsDisabled: Bool { !model.acceptingUserCommands || model.commandPending }
-    var lidControlDisabled: Bool { controlsDisabled || !model.helperSetupConfirmed }
+    var lidAvailability: LidOptionAvailability { LidOptionAvailability(model: model) }
+    var lidControlDisabled: Bool { lidAvailability.isDisabled }
 
     var displayBinding: Binding<Bool> {
         Binding(get: { model.v3Settings.keepDisplayAwake }, set: { value in
@@ -19,7 +49,7 @@ struct MenuKeepAwakeControls: View {
 
     var lidBinding: Binding<Bool> {
         Binding(get: { model.v3Settings.allowClosedLid }, set: { value in
-            guard model.showsLidOptions, !lidControlDisabled else { return }
+            guard lidAvailability.permits(value) else { return }
             model.setAllowClosedLid(value)
         })
     }
