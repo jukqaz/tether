@@ -67,9 +67,15 @@ extension AppModel {
     }
 
     var canUseZeroBrightness: Bool { closedLidDisplaySupport.canAttemptZeroBrightness }
-    var closedLidDisplayRecoveryPending: Bool { closedLidDisplayDriver?.hasRecoveryDebt == true }
+    var closedLidDisplayRecoveryPending: Bool {
+        guard let driver = closedLidDisplayDriver, driver.hasRecoveryDebt else { return false }
+        // Healthy brightness-zero work also owns a restoration journal. That is
+        // not a failed/inherited recovery and must not offer an early restore.
+        if case .recoveryPending = driver.state { return true }
+        return false
+    }
     func retryClosedLidDisplayRecovery() {
-        guard hasCoordinatorAuthority else { return }
+        guard hasCoordinatorAuthority, closedLidDisplayRecoveryPending else { return }
         closedLidDisplayDriver?.retryRecovery()
         if let driver = closedLidDisplayDriver { publishClosedLidDisplayState(driver.state) }
     }

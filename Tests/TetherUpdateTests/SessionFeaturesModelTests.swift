@@ -129,6 +129,27 @@ private final class SessionFeaturesFixture {
 /// Model-to-driver wiring only. All assertions, brightness values and journals are injected.
 final class SessionFeaturesModelTests: XCTestCase {
     @MainActor
+    func testHealthyZeroBrightnessOwnershipNeverOffersOrRunsEarlyRecovery() throws {
+        let fixture = try SessionFeaturesFixture(startWork: true, helperMode: .zeroBrightness)
+        defer { fixture.close() }
+        let panel = TetherPanel(model: fixture.model)
+        XCTAssertEqual(fixture.model.closedLidDisplayState, .brightnessZero)
+        XCTAssertTrue(fixture.driver.hasRecoveryDebt, "Healthy work retains the original brightness journal")
+        XCTAssertFalse(fixture.model.closedLidDisplayRecoveryPending)
+        XCTAssertFalse(panel.showsDisplayRecoveryWarning)
+        XCTAssertFalse(panel.canRetryDisplayRecovery)
+        let requestID = fixture.controller.manualRequestID
+        let journal = fixture.journal.record
+        panel.retryDisplayRecovery()
+        fixture.model.retryClosedLidDisplayRecovery()
+        XCTAssertEqual(fixture.brightness.writes, [0])
+        XCTAssertEqual(fixture.model.closedLidDisplayState, .brightnessZero)
+        XCTAssertEqual(fixture.journal.record, journal)
+        XCTAssertEqual(fixture.controller.manualRequestID, requestID)
+        XCTAssertTrue(fixture.controller.status.holding)
+    }
+
+    @MainActor
     func testMenuShowsAndRetriesBrightnessRecoveryWithoutStartingWorkOrChangingSettings() throws {
         let fixture = try SessionFeaturesFixture(unsupportedIssue: .externalDisplayPresent, recoveryOriginal: 0.8)
         defer { fixture.close() }

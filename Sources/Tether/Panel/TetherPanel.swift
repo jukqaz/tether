@@ -149,7 +149,9 @@ struct TetherPanel: View {
     var showsCurrentWork: Bool { actionVisibility.showsCurrentWork }
 
     var showsDisplayRecoveryWarning: Bool { model.closedLidDisplayRecoveryPending }
-    var canRetryDisplayRecovery: Bool { model.hasCoordinatorAuthority && !model.commandPending }
+    var canRetryDisplayRecovery: Bool {
+        showsDisplayRecoveryWarning && model.hasCoordinatorAuthority && !model.commandPending
+    }
 
     func retryDisplayRecovery() {
         guard canRetryDisplayRecovery else { return }
