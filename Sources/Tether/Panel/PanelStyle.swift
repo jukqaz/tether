@@ -41,6 +41,11 @@ extension View {
     func workSessionMenuSurface() -> some View {
         modifier(WorkSessionMenuSurface())
     }
+
+    /// A shared sampling group for nearby native glass controls; it adds no fill.
+    func workSessionGlassControls() -> some View {
+        modifier(WorkSessionGlassControls())
+    }
 }
 
 /// Adjacent accessory controls share one surface, including the readable fallback.
@@ -79,13 +84,15 @@ private struct WorkSessionControlSurface: ViewModifier {
 
 private struct WorkSessionWindowSurface: ViewModifier {
     func body(content: Content) -> some View {
-        // The menu's explanatory text must not pick up changing desktop colors.
-        content.background(Color.tetherBackground).foregroundStyle(Color.tetherPrimary)
+        // Reading content follows the system window palette; the native toolbar
+        // and popover chrome keep their own Liquid Glass treatment.
+        content.background(Color.tetherBackground)
     }
 }
 
-/// The menu is one related control group, with one glass layer and native buttons.
-/// Offscreen previews and accessibility preferences retain the opaque reading surface.
+/// MenuBarExtra supplies the popup's native material. Adding another full-panel
+/// glass layer darkens it and makes every reading row look like a floating control.
+/// Only offscreen/accessibility fallbacks need an explicit opaque popup surface.
 private struct WorkSessionMenuSurface: ViewModifier {
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.tetherContrastOverride) private var contrastOverride
@@ -96,15 +103,25 @@ private struct WorkSessionMenuSurface: ViewModifier {
         let preferences = WorkSessionVisualPreferences(contrast: contrastOverride ?? contrast,
             reduceTransparency: transparencyOverride ?? reduceTransparency)
         if !preferences.usesOpaqueControls, #available(macOS 26.0, *), DesignKey.glassOn {
-            content.glassEffect(.regular, in: .rect(cornerRadius: 14))
+            content
         } else {
-            content.background(Color.tetherBackground, in: .rect(cornerRadius: 14))
+            content.background(Color(nsColor: .windowBackgroundColor), in: .rect(cornerRadius: 14))
                 .overlay {
                     RoundedRectangle(cornerRadius: 14)
                         .strokeBorder(preferences.usesOpaqueControls ? Color.tetherControlBorder : Color.tetherDivider,
                                       lineWidth: preferences.borderWidth)
                         .accessibilityHidden(true)
                 }
+        }
+    }
+}
+
+private struct WorkSessionGlassControls: ViewModifier {
+    @ViewBuilder func body(content: Content) -> some View {
+        if #available(macOS 26.0, *), DesignKey.glassOn {
+            GlassEffectContainer(spacing: 8) { content }
+        } else {
+            content
         }
     }
 }
@@ -131,18 +148,27 @@ private struct WorkSessionCardSurface: ViewModifier {
 
 private struct WorkSessionActionStyle: ViewModifier {
     let prominent: Bool
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.tetherContrastOverride) private var contrastOverride
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.tetherReduceTransparencyOverride) private var transparencyOverride
+
     @ViewBuilder func body(content: Content) -> some View {
-        if prominent {
-            // Text-bearing primary actions use the measured opaque blue. Native button
-            // styling still supplies hover, keyboard focus and disabled presentation.
-            content.buttonStyle(.borderedProminent).tint(.tetherAction)
-                .foregroundStyle(.white).font(TetherTypography.body.weight(.medium))
+        let preferences = WorkSessionVisualPreferences(contrast: contrastOverride ?? contrast,
+            reduceTransparency: transparencyOverride ?? reduceTransparency)
+        if !preferences.usesOpaqueControls, #available(macOS 26.0, *), DesignKey.glassOn {
+            if prominent {
+                content.buttonStyle(.glassProminent).tint(.accentColor)
+                    .font(TetherTypography.body.weight(.medium))
+            } else {
+                content.buttonStyle(.glass)
+                    .font(TetherTypography.body)
+            }
+        } else if prominent {
+            content.buttonStyle(.borderedProminent).tint(.accentColor)
+                .font(TetherTypography.body.weight(.medium))
         } else {
-            // A gray-tinted Glass button produced a bright fill behind white
-            // 13pt labels in native captures. Keep text actions on the readable
-            // native control surface; Glass remains in navigation and chrome.
-            content.buttonStyle(.bordered)
-                .foregroundStyle(Color.tetherPrimary)
+            content.buttonStyle(.bordered).font(TetherTypography.body)
         }
     }
 }

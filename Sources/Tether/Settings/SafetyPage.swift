@@ -12,9 +12,9 @@ struct SafetyPage: View {
         SettingsForm {
             SettingsContentGroup(L("Start automatically when", "자동으로 시작할 조건")) {
                 SettingsToggle(title: L("Allow automatic start", "자동 시작 허용"),
-                    isOn: Binding(get: { model.automaticEnabled }, set: { model.setAutomaticEnabled($0) }))
+                    isOn: Binding(get: { model.automaticEnabled }, set: { model.setAutomaticEnabled($0) }),
+                    identifier: "automatic-ac-toggle")
                     .disabled(settingsControlsDisabled)
-                    .accessibilityIdentifier("automatic-ac-toggle")
                 PowerConditionPicker(selection: Binding(get: { model.v3Settings.condition },
                     set: { model.setPowerCondition($0) }), choices: model.hasInternalBattery ? PowerCondition.allCases : [.ac])
                     .disabled(settingsControlsDisabled)
@@ -38,13 +38,6 @@ struct SafetyPage: View {
 
             automaticCondition
 
-            HStack(spacing: 8) {
-                Button(L("Edit conditions…", "조건 편집…")) { showAdvancedRules = true }
-                    .actionButton()
-                    .disabled(settingsControlsDisabled)
-                    .accessibilityIdentifier("settings-automatic-rules")
-            }
-
             SettingsDisclosure(title: L("How automatic work runs", "자동 시작 동작 방식"),
                 summary: model.v3Settings.condition.title, isExpanded: connectionsExpansion) {
                 VStack(alignment: .leading, spacing: 8) {
@@ -63,31 +56,38 @@ struct SafetyPage: View {
     }
 
     private var automaticCondition: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text(model.v4Settings.automaticMode == .acConnected ? model.v3Settings.condition.title : model.v4RuleSummary)
-                    .font(TetherTypography.section)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 8)
-                Text(model.automaticPauseActive ? L("Resting", "잠깐 쉬는 중")
-                    : model.automaticEnabled ? L("Automatic start on", "자동 시작 켬") : L("Automatic start off", "자동 시작 꺼짐"))
-                    .font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
+        Section {
+            VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Text(model.v4Settings.automaticMode == .acConnected ? model.v3Settings.condition.title : model.v4RuleSummary)
+                            .font(TetherTypography.section)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 8)
+                        Text(model.automaticPauseActive ? L("Resting", "잠깐 쉬는 중")
+                            : model.automaticEnabled ? L("Automatic start on", "자동 시작 켬") : L("Automatic start off", "자동 시작 꺼짐"))
+                            .font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Text(model.v4Settings.automaticMode == .acConnected
+                        ? model.disconnectPolicyDetail
+                        : L("Keep awake when the selected conditions and power range match. Unplugging follows your selected end policy.", "선택한 조건과 전원 범위를 충족하면 잠자기를 방지합니다. 전원 분리는 선택한 종료 규칙을 따릅니다."))
+                        .font(TetherTypography.body).foregroundStyle(Color.tetherSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("settings-automatic-condition-summary")
+                Button(L("Edit conditions…", "조건 편집…")) { showAdvancedRules = true }
+                    .actionButton()
+                    .disabled(settingsControlsDisabled)
+                    .accessibilityIdentifier("settings-automatic-rules")
+                if model.v4Settings.automaticMode == .advanced {
+                    Button(L("Use power connection only", "전원 연결 조건만 사용")) { model.setV4BasicAutomaticMode() }
+                        .buttonStyle(.link).disabled(settingsControlsDisabled)
+                }
             }
-            Text(model.v4Settings.automaticMode == .acConnected
-                ? model.disconnectPolicyDetail
-                : L("Keep awake when the selected conditions and power range match. Unplugging follows your selected end policy.", "선택한 조건과 전원 범위를 충족하면 잠자기를 방지합니다. 전원 분리는 선택한 종료 규칙을 따릅니다."))
-                .font(TetherTypography.body).foregroundStyle(Color.tetherSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-            if model.v4Settings.automaticMode == .advanced {
-                Button(L("Use power connection only", "전원 연결 조건만 사용")) { model.setV4BasicAutomaticMode() }
-                    .buttonStyle(.link).disabled(settingsControlsDisabled)
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .workSessionCardSurface()
-        .accessibilityIdentifier("settings-automatic-condition-summary")
     }
 
     private var settingsControlsDisabled: Bool { !model.acceptingUserCommands || model.commandPending }

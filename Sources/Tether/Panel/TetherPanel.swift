@@ -27,13 +27,14 @@ struct TetherPanel: View {
     var body: some View {
         VStack(spacing: 0) {
             header.padding(.horizontal, WorkSessionMetrics.panelInset)
-                .padding(.vertical, 12)
+                .padding(.vertical, 10)
                 .background { chromeMeasurement }
             Divider()
             // Reserve the measured chrome, including wrapped footer text.
             MenuPanelBody(maximumHeight: max(1, (maximumHeight ?? screenHeightLimit) - chromeHeight)) {
-                panelContent.padding(.horizontal, WorkSessionMetrics.panelInset).padding(.top, 6).padding(.bottom, 12)
+                panelContent.padding(.horizontal, WorkSessionMetrics.panelInset).padding(.vertical, 10)
             }
+            .background(Color(nsColor: .windowBackgroundColor))
             Divider()
             footer.padding(.horizontal, WorkSessionMetrics.panelInset).padding(.vertical, 8)
                 .background { chromeMeasurement }
@@ -42,10 +43,10 @@ struct TetherPanel: View {
         // Constrain the stack as well as its measured body budget. Native controls
         // can round their intrinsic height between passes; the body must absorb it.
         .frame(maxHeight: maximumHeight ?? screenHeightLimit)
+        .workSessionGlassControls()
         .font(TetherTypography.body)
-        .foregroundStyle(Color.tetherPrimary)
         .tint(.tetherAccent)
-        // A single menu surface; native controls do not add nested custom glass.
+        // The native popup owns its chrome; the content owns only its reading surface.
         .workSessionMenuSurface()
         .fixedSize(horizontal: false, vertical: true)
         .onPreferenceChange(MenuPanelChromeHeight.self) { measured in
@@ -61,7 +62,7 @@ struct TetherPanel: View {
 
     private var header: some View {
         HStack(alignment: .top, spacing: 10) {
-            StateIcon(icon: model.presentation.icon, size: 17)
+            StateIcon(icon: model.presentation.icon, size: 15)
                 .foregroundStyle(model.presentation.color)
                 .frame(width: 24, height: 24).padding(.top, 2)
                 .accessibilityHidden(true)
@@ -79,7 +80,7 @@ struct TetherPanel: View {
     }
 
     private var panelContent: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             if model.v4ACDrainWarning {
                 Text(L("Battery charge continues to decrease while connected to power.",
                        "전원 연결 중 배터리 잔량이 계속 줄고 있습니다."))
@@ -404,9 +405,10 @@ struct TetherPanel: View {
             if actionVisibility.showsStopAll || actionVisibility.showsResume { stopAllControl }
             Spacer(minLength: 6)
             if model.userCommandsArePreview { PreviewIndicator() }
-            Button(L("Settings…", "설정…"), action: showSettings)
-                .font(TetherTypography.secondary)
-                .buttonStyle(.borderless).controlSize(.small).foregroundStyle(Color.tetherPrimary)
+            Button(action: showSettings) {
+                Label(L("Settings…", "설정…"), systemImage: "gearshape")
+            }
+                .actionButton().controlSize(.small)
                 .accessibilityLabel(L("Settings", "설정"))
                 .accessibilityIdentifier("panel-open-settings")
                 .keyboardShortcut(",", modifiers: .command)
@@ -458,8 +460,8 @@ struct TetherPanel: View {
             Image(systemName: "ellipsis").frame(width: 18, height: 18)
         }
         .menuStyle(.button).menuIndicator(.hidden).fixedSize()
-        .buttonStyle(.borderless).controlSize(.small)
-        .font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
+        .actionButton().controlSize(.small)
+        .font(TetherTypography.secondary)
         .accessibilityLabel(L("More actions", "다른 동작"))
         .accessibilityIdentifier("panel-more-actions")
     }

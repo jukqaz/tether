@@ -145,7 +145,7 @@ private final class NativeUITestFixture {
         model = AppModel(preview: true,
             capabilities: MacCapabilities(supportedPlatform: true, internalBattery: portable, lid: portable),
             previewSession: controller, previewDefaults: defaults)
-        Localization.current = environment["TETHER_UI_TEST_LANGUAGE"] == "en" ? .english : .korean
+        model.language = environment["TETHER_UI_TEST_LANGUAGE"] == "en" ? .english : .korean
         if scenario != "desktopBatteryCondition" { model.setAutomaticEnabled(true) }
         model.selectManualDuration(1800)
         if scenario == "lidSetup" { model.setAllowClosedLid(true) }

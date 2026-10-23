@@ -42,30 +42,22 @@ enum SettingsMetrics {
     }
 }
 
-/// An opaque reading surface with native controls. Only the options scroll;
-/// the heading and native tabs remain fixed outside this viewport.
+/// One native grouped Form owns scrolling; nested settings groups do not add
+/// their own backgrounds or scroll containers over the system reading surface.
 struct SettingsForm<Content: View>: View {
     @ViewBuilder var content: Content
     @Environment(\.tetherSettingsScrollToEnd) private var scrollToEnd
 
     var body: some View {
-        GeometryReader { geometry in
-            ScrollView {
-                VStack(alignment: .leading, spacing: SettingsMetrics.sectionSpacing) { content }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, SettingsMetrics.scrollContentInset(in: geometry.size.width))
-                    .padding(.top, 10)
-                    .padding(.bottom, 14)
-            }
-                .font(TetherTypography.body)
-                .foregroundStyle(Color.tetherPrimary)
-                .toggleStyle(.switch)
-                .controlSize(.small)
-                .scrollEdgeEffectHidden(true, for: .top)
-                .defaultScrollAnchor(scrollToEnd ? .bottom : .top)
-                .background(Color.tetherBackground)
-        }
-        .clipped()
+        Form { content }
+            .formStyle(.grouped)
+            .font(TetherTypography.body)
+            .toggleStyle(.switch)
+            .controlSize(.small)
+            .defaultScrollAnchor(scrollToEnd ? .bottom : .top)
+            .frame(maxWidth: SettingsMetrics.contentWidth + SettingsMetrics.gutter * 2,
+                   maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -126,20 +118,21 @@ struct SettingsSection<Content: View>: View {
     var footer: String? = nil
     @ViewBuilder var content: Content
     var body: some View {
-        VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
-            SettingsSectionHeading(title: title, symbol: symbol)
+        Section {
             content
+        } header: {
+            SettingsSectionHeading(title: title, symbol: symbol)
+        } footer: {
             if let footer {
-                Text(footer).font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
-                    .lineSpacing(2).fixedSize(horizontal: false, vertical: true)
+                Text(footer).font(TetherTypography.secondary)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
-/// Compact, plain section chrome keeps emphasis on the actual native controls.
-/// One shared separator establishes the same rhythm on every settings page.
+/// Native sections supply the macOS preference grouping and row separators.
 struct SettingsContentGroup<Content: View>: View {
     let title: String
     @ViewBuilder var content: Content
@@ -150,16 +143,13 @@ struct SettingsContentGroup<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
+        Section {
+            content
+        } header: {
             Text(title).font(TetherTypography.section)
-                .foregroundStyle(Color.tetherPrimary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
-                .padding(.bottom, 2)
-            content
-            Divider().overlay(Color.tetherDivider).padding(.top, 6)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -167,29 +157,35 @@ struct SettingsDisclosure<Content: View>: View {
     let title: String
     var summary: String? = nil
     @Binding var isExpanded: Bool
+    var groupsSection = true
     @ViewBuilder var content: Content
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            DisclosureGroup(isExpanded: $isExpanded) {
-                content.padding(.top, 10).padding(.bottom, 2)
-            } label: {
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    Text(title).font(TetherTypography.body)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 8)
-                    if let summary {
-                        Text(summary).font(TetherTypography.secondary)
-                            .foregroundStyle(Color.tetherSecondary)
-                            .multilineTextAlignment(.trailing)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                .frame(minHeight: SettingsMetrics.rowHeight)
-            }
-            .accessibilityElement(children: .contain)
-            Divider().overlay(Color.tetherDivider).padding(.top, 8)
+    @ViewBuilder var body: some View {
+        if groupsSection {
+            Section { disclosure }
+        } else {
+            disclosure
         }
+    }
+
+    private var disclosure: some View {
+        DisclosureGroup(isExpanded: $isExpanded) {
+            content.padding(.top, 6).padding(.bottom, 2)
+        } label: {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(title).font(TetherTypography.body)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                if let summary {
+                    Text(summary).font(TetherTypography.secondary)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.trailing)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(minHeight: SettingsMetrics.rowHeight)
+        }
+        .accessibilityElement(children: .contain)
     }
 }
 
@@ -286,13 +282,26 @@ struct SettingsToggle: View {
     var detail: String? = nil
     var hint: String? = nil
     @Binding var isOn: Bool
+    var identifier: String? = nil
     var body: some View {
         SettingRow(title: title, detail: detail, showsAccessibleTitle: false) {
-            Toggle(title, isOn: $isOn).labelsHidden().toggleStyle(.switch)
-                .tint(.tetherAccent)
-                .accessibilityLabel(title)
-                .accessibilityHint(hint ?? detail ?? "")
+            identifiedToggle
         }
+    }
+
+    @ViewBuilder private var identifiedToggle: some View {
+        if let identifier {
+            nativeToggle.accessibilityIdentifier(identifier)
+        } else {
+            nativeToggle
+        }
+    }
+
+    private var nativeToggle: some View {
+        Toggle(title, isOn: $isOn).labelsHidden().toggleStyle(.switch)
+            .tint(.tetherAccent)
+            .accessibilityLabel(title)
+            .accessibilityHint(hint ?? detail ?? "")
     }
 }
 

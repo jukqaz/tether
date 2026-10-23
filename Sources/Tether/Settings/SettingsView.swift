@@ -1,7 +1,8 @@
 import SwiftUI
 import TetherCore
 
-/// Fixed native tabs and a single reading viewport keep compact settings clear.
+/// macOS owns tab placement, toolbar material and the scroll-edge treatment.
+/// Page and disclosure selections remain presentation state of this window.
 struct SettingsView: View {
     @ObservedObject var model: AppModel
     var screenshot = false
@@ -14,96 +15,51 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        GeometryReader { geometry in
-            VStack(spacing: 0) {
-                navigation
-                    // Honor actual safe area only. The old split-view-specific
-                    // 28pt fallback left an extra empty header above these tabs.
-                    .padding(.top, screenshot ? 0 : geometry.safeAreaInsets.top)
-                Divider().overlay(Color.tetherDivider)
-                detail
-            }
-        }
-        .font(TetherTypography.body).controlSize(.small)
-        .tint(.tetherAccent)
-        .frame(minWidth: WorkSessionMetrics.settingsMinimum.width,
-               minHeight: WorkSessionMetrics.settingsMinimum.height)
-        .background { if !screenshot { SettingsWindowBridge() } }
-        .sheet(isPresented: $model.showActivityReview, onDismiss: {
-            if !model.showActivityReview { model.activityReviewPresentationOrigin = .unknown }
-        }) {
-            ActivityReviewView(model: model, sample: model.userCommandsArePreview || model.developmentService,
-                presentationOrigin: model.activityReviewPresentationOrigin)
-        }
-    }
-
-    private var navigation: some View {
-        ZStack {
-            SettingsNavigation(selection: $model.settingsPage, snapshot: screenshot)
-                .frame(maxWidth: 380)
-            if model.userCommandsArePreview {
-                HStack {
-                    Spacer(minLength: 0)
-                    PreviewIndicator()
+        SettingsNavigation(model: model, disclosures: $disclosures)
+            .tint(.tetherAccent)
+            .frame(minWidth: WorkSessionMetrics.settingsMinimum.width,
+                   minHeight: WorkSessionMetrics.settingsMinimum.height)
+            .background { if !screenshot { SettingsWindowBridge() } }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if model.userCommandsArePreview {
+                    HStack {
+                        Spacer()
+                        PreviewIndicator()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 6)
+                    .background(Color(nsColor: .windowBackgroundColor))
                 }
             }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, SettingsMetrics.gutter)
-        .padding(.vertical, 10)
-        .background(.bar)
-    }
-
-    private var detail: some View {
-        GeometryReader { geometry in
-            VStack(spacing: 0) {
-                PageHeading(title: model.settingsPage.title, subtitle: model.settingsPage.subtitle, compact: true)
-                    .accessibilityIdentifier("settings-page-heading")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, SettingsMetrics.scrollContentInset(in: geometry.size.width))
-                    .padding(.top, 12)
-                    .padding(.bottom, 8)
-                    .background(Color.tetherBackground)
-                model.settingsPage.page(model: model, disclosures: $disclosures)
-                    .id(model.settingsPage)
-                    .accessibilityIdentifier("settings-page-\(model.settingsPage.rawValue)")
+            .sheet(isPresented: $model.showActivityReview, onDismiss: {
+                if !model.showActivityReview { model.activityReviewPresentationOrigin = .unknown }
+            }) {
+                ActivityReviewView(model: model, sample: model.userCommandsArePreview || model.developmentService,
+                    presentationOrigin: model.activityReviewPresentationOrigin)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.tetherBackground)
-        }
     }
-
-
 }
 
 struct SettingsNavigation: View {
-    @Binding var selection: SettingsPage
-    var snapshot = false
+    @ObservedObject var model: AppModel
+    @Binding var disclosures: SettingsDisclosureState
 
     var body: some View {
-        Picker(L("Settings pages", "설정 페이지"), selection: Binding(
-            get: { selection }, set: { value in
-                guard selection != value else { return }
-                // Commit the native segment selection before replacing the page.
-                DispatchQueue.main.async {
-                    if selection != value { selection = value }
-                }
-            })) {
+        TabView(selection: $model.settingsPage) {
             ForEach(SettingsPage.allCases) { page in
-                Label(page.shortTitle, systemImage: page.symbol)
-                    .font(TetherTypography.body)
-                    .fixedSize(horizontal: false, vertical: true)
+                page.page(model: model, disclosures: $disclosures)
                     .tag(page)
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel(page.title)
-                    .accessibilityIdentifier("settings-tab-\(page.rawValue)")
+                    .tabItem {
+                        Image(systemName: page.symbol)
+                            .accessibilityLabel(page.title)
+                            .accessibilityIdentifier("settings-tab-\(page.rawValue)")
+                        Text(page.shortTitle)
+                    }
+                    .accessibilityIdentifier("settings-page-\(page.rawValue)")
             }
         }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .controlSize(.small)
+        .tabViewStyle(.automatic)
         .accessibilityLabel(L("Settings pages", "설정 페이지"))
-        .accessibilityIdentifier("settings-navigation")
     }
 }
 
@@ -139,8 +95,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .system: L("App settings", "앱 설정")
         }
     }
-    /// Navigation stays compact in the three native tabs. The heading and
-    /// accessibility label retain the full page name.
+    /// Native preference tabs retain a short visible title and the full accessible name.
     var shortTitle: String {
         switch self {
         case .general, .safety, .system: title
@@ -208,9 +163,8 @@ struct SettingsWindowBridge: NSViewRepresentable {
             observers.append(center.addObserver(forName: NSWindow.didBecomeKeyNotification, object: window,
                                                 queue: .main) { [weak window] _ in
                 MainActor.assumeIsolated {
-                    // The Settings host restores its automatic toolbar each
-                    // time a retained window opens. Apply the same layout after
-                    // that native presentation, not just on first attachment.
+                    // Keep only the window affordances that Settings may reset.
+                    // SwiftUI retains ownership of its native tabs and toolbar.
                     DispatchQueue.main.async { [weak window] in
                         guard let window else { return }
                         Self.configureChrome(window, allowsResizing: resize)
@@ -225,8 +179,8 @@ struct SettingsWindowBridge: NSViewRepresentable {
             })
             if resize {
                 // The Settings host can restore its fixed style after the first
-                // key-window callback, without becoming key again. Reconcile
-                // only this window's changed chrome after a native update.
+                // key-window callback. Reconcile resizing without replacing the
+                // toolbar, titlebar or system material.
                 observers.append(center.addObserver(forName: NSWindow.didUpdateNotification, object: window,
                                                     queue: .main) { [weak window] _ in
                     DispatchQueue.main.async { [weak window] in
@@ -278,17 +232,8 @@ struct SettingsWindowBridge: NSViewRepresentable {
 
         private static func configureChrome(_ window: NSWindow, allowsResizing: Bool) {
             let buttons = [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton]
-            guard window.toolbar?.isVisible == true || window.titlebarAppearsTransparent
-                || window.titleVisibility != .visible || window.styleMask.contains(.fullSizeContentView)
-                || (allowsResizing && !window.styleMask.contains(.resizable))
+            guard (allowsResizing && !window.styleMask.contains(.resizable))
                 || buttons.contains(where: { window.standardWindowButton($0)?.isHidden == true }) else { return }
-            // Navigation lives in the fixed tab strip; there are no commands in
-            // Settings' automatic icon toolbar. Keep the native title and close
-            // affordance rather than hiding the whole window toolbar in SwiftUI.
-            window.toolbar?.isVisible = false
-            window.titlebarAppearsTransparent = false
-            window.titleVisibility = .visible
-            window.styleMask.remove(.fullSizeContentView)
             if allowsResizing { enableResizing(window) }
             for button in buttons {
                 window.standardWindowButton(button)?.isHidden = false

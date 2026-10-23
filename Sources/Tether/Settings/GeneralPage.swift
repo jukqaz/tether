@@ -43,7 +43,7 @@ struct GeneralPage: View {
                         closedLidDisplayControls
                     } else {
                         SettingsDisclosure(title: L("Saved built-in display choice", "저장된 내장 화면 선택"),
-                            summary: closedLidDisplayTitle, isExpanded: closedLidDisplayExpansion) {
+                            summary: closedLidDisplayTitle, isExpanded: closedLidDisplayExpansion, groupsSection: false) {
                             closedLidDisplayControls
                         }.accessibilityIdentifier("settings-closed-lid-display-details")
                     }

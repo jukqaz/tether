@@ -40,6 +40,7 @@ struct ManualSessionControls: View {
                     Spacer(minLength: 2)
                     Button(L("End timer", "타이머 끝내기")) { model.endManualSession() }
                         .actionButton().controlSize(.small)
+                        .fixedSize(horizontal: true, vertical: false)
                         .accessibilityIdentifier("panel-end-manual")
                         .accessibilityHint(model.manualEndingDetail)
                         .disabled(model.commandPending)
@@ -57,6 +58,7 @@ struct ManualSessionControls: View {
                         if model.selectedManualMinutes == 0 { model.startUntimedSession() }
                         else { model.startManualSession(minutes: model.selectedManualMinutes) }
                     }.actionButton(prominent: prominentStart)
+                        .controlSize(.regular)
                         .fixedSize(horizontal: true, vertical: false)
                         .layoutPriority(1)
                         .accessibilityLabel(L("Start manual session", "타이머 직접 시작"))
@@ -95,16 +97,18 @@ struct ManualSessionControls: View {
         let hint = reason ?? L("Adds \(minutes) minutes to this timer without restarting it.",
                                "현재 타이머를 다시 시작하지 않고 \(minutes)분을 더합니다.")
         return VStack(alignment: .leading, spacing: 4) {
-            Button { model.extendManualSession(by: minutes) } label: {
-                Text(L("Add \(minutes) min", "\(minutes)분 추가"))
-                    .frame(maxWidth: .infinity)
+            HStack {
+                Button { model.extendManualSession(by: minutes) } label: {
+                    Label(L("Add \(minutes) min", "\(minutes)분 추가"), systemImage: "plus")
+                }
+                    .actionButton().controlSize(.small)
+                    .disabled(reason != nil)
+                    .help(hint)
+                    .accessibilityLabel(L("Extend manual work by \(minutes) minutes", "수동 유지 \(minutes)분 연장"))
+                    .accessibilityHint(hint)
+                    .accessibilityIdentifier("panel-extend-manual-\(minutes)")
+                Spacer(minLength: 0)
             }
-                .actionButton().controlSize(.small)
-                .disabled(reason != nil)
-                .help(hint)
-                .accessibilityLabel(L("Extend manual work by \(minutes) minutes", "수동 유지 \(minutes)분 연장"))
-                .accessibilityHint(hint)
-                .accessibilityIdentifier("panel-extend-manual-\(minutes)")
             if let reason {
                 Text(reason).font(TetherTypography.body)
                     .foregroundStyle(Color.tetherSecondary)

@@ -132,9 +132,10 @@ final class LiveUIBindingTests: XCTestCase {
         XCTAssertTrue(window.firstResponder === keyboardTarget,
             "Layout reattachment must preserve the user's later keyboard target")
 
-        // Settings restores its empty toolbar and host style on a retained
-        // window's next presentation. Recreate that observed reopening state.
-        window.toolbar = NSToolbar(identifier: "settings-reopen-regression")
+        // SwiftUI owns native tab/toolbar glass and titlebar layout. Reopening
+        // must preserve that host chrome while restoring resize affordances.
+        let nativeToolbar = NSToolbar(identifier: "settings-reopen-regression")
+        window.toolbar = nativeToolbar
         window.toolbar?.isVisible = true
         window.styleMask.insert(.fullSizeContentView)
         window.styleMask.remove(.resizable)
@@ -142,10 +143,11 @@ final class LiveUIBindingTests: XCTestCase {
         await withCheckedContinuation { continuation in
             DispatchQueue.main.async { continuation.resume() }
         }
-        XCTAssertEqual(window.toolbar?.isVisible, false,
-            "Reopening must not restore a second, empty navigation header")
-        XCTAssertFalse(window.styleMask.contains(.fullSizeContentView),
-            "The fixed page heading must remain below the native titlebar")
+        XCTAssertTrue(window.toolbar === nativeToolbar)
+        XCTAssertEqual(window.toolbar?.isVisible, true,
+            "Reopening must preserve the native toolbar's Liquid Glass")
+        XCTAssertTrue(window.styleMask.contains(.fullSizeContentView),
+            "The bridge must leave SwiftUI's native titlebar layout intact")
         XCTAssertTrue(window.styleMask.contains(.resizable))
         XCTAssertEqual(window.contentMinSize, WorkSessionMetrics.settingsMinimum)
         XCTAssertTrue(window.firstResponder === keyboardTarget,
@@ -161,7 +163,8 @@ final class LiveUIBindingTests: XCTestCase {
         }
         XCTAssertTrue(window.styleMask.contains(.resizable),
             "A late Settings host update must not disable resizing after initial presentation")
-        XCTAssertEqual(window.toolbar?.isVisible, false)
+        XCTAssertTrue(window.toolbar === nativeToolbar)
+        XCTAssertEqual(window.toolbar?.isVisible, true)
         XCTAssertEqual(window.frame.size, frameBeforeNativeUpdate.size,
             "Restoring the resize affordance must not resize the user's window")
         XCTAssertTrue(window.firstResponder === keyboardTarget)
