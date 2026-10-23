@@ -298,6 +298,41 @@ final class LiveUIBindingTests: XCTestCase {
     }
 
     @MainActor
+    func testSpentAutomaticBatteryBudgetUsesEndedTitleAndExplanationInBothLanguages() throws {
+        let previous = Localization.current
+        defer { Localization.current = previous }
+        for language in [Language.english, .korean] {
+            Localization.current = language
+            let defaults = LiveUIDefaults()
+            var settings = IdleSessionSettings()
+            settings.legacyRootConfigurationPending = false
+            settings.automaticEnabled = true
+            settings.automaticPowerCondition = .battery
+            settings.runtimeMarkers = .init(automaticActivation:
+                .init(condition: .battery, batteryConsumed: true, batteryExpired: true, batteryLimit: .thirtyMinutes))
+            defaults.set(try JSONEncoder().encode(settings), forKey: UserSessionController.preferenceKey)
+            let controller = UserSessionController(defaults: defaults, backend: LiveUIAssertion(),
+                displayBackend: LiveUIAssertion(), guiProbe: nil, environmentProbe: nil, boot: "ui-fixture")
+            defer { _ = controller.end() }
+            controller.update(power: .battery, thermal: 0, fullWake: true, controllingUser: true,
+                now: ContinuousTime.now, batteryPercent: 80)
+            let model = AppModel(preview: true, capabilities: .init(supportedPlatform: true, internalBattery: true, lid: true),
+                previewSession: controller, previewDefaults: defaults)
+            let panel = TetherPanel(model: model)
+            let saved = defaults.data(forKey: UserSessionController.preferenceKey)
+            XCTAssertTrue(model.automaticBatteryEnded)
+            XCTAssertEqual(panel.statusTitle, L("Automatic battery session ended", "자동 배터리 유지 종료"))
+            XCTAssertEqual(panel.statusDetail, model.presentation.subtitle)
+            XCTAssertFalse(model.workSessionHolding)
+            XCTAssertEqual(defaults.data(forKey: UserSessionController.preferenceKey), saved)
+            XCTAssertTrue(controller.start(duration: 1800))
+            XCTAssertFalse(model.automaticBatteryEnded)
+            XCTAssertEqual(panel.statusTitle, L("Timer active", "타이머 실행 중"),
+                "A new manual timer must take precedence over the spent automatic marker")
+        }
+    }
+
+    @MainActor
     func testPreparedLidPreviewTogglePreservesRequestDisplayAndStopStateUsingOnlyRenderHelper() async throws {
         let scenarios = [
             ["--sample", "--prepared-lid", "--display-on"],

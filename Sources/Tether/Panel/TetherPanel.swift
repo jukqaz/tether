@@ -271,7 +271,7 @@ struct TetherPanel: View {
         if model.workProtectionReason != nil || model.workPaused
             || model.userSessionStatus?.ownReleasePending == true
             || model.userSessionStatus?.observationLimited == true
-            || model.userSessionStatus?.error != nil {
+            || model.userSessionStatus?.error != nil || model.automaticBatteryEnded {
             return model.presentation.title
         }
         if model.manualSessionActive && model.automaticWorkReasonActive {
@@ -284,9 +284,10 @@ struct TetherPanel: View {
         return L("Keep-awake off", "잠자기 방지 꺼짐")
     }
 
-    private var statusDetail: String? {
+    var statusDetail: String? {
         if model.problem != nil { return nil }
         if model.workProtectionReason != nil { return model.presentation.subtitle }
+        if model.automaticBatteryEnded { return model.presentation.subtitle }
         if model.userSessionStatus?.observationLimited == true {
             return L("New starts and extensions are unavailable", "새 시작과 시간 추가를 기다려 주세요")
         }
