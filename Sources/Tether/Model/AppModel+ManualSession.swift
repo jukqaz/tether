@@ -67,6 +67,63 @@ extension AppModel {
         return SessionDuration.presets.contains(minutes)
             ? duration : L("\(duration) · Saved", "\(duration) · 기존 설정")
     }
+    /// Read-only explanation for the shipping extension gate. Never recreate
+    /// its policy or infer permission from a saved default or a visible deadline.
+    func manualExtensionUnavailableReason(by minutes: Int) -> String? {
+        guard !canExtendManual(by: minutes) else { return nil }
+        if commandPending {
+            return L("Wait for the previous request to be confirmed before extending.",
+                     "이전 요청을 확인한 뒤 연장할 수 있습니다.")
+        }
+        if v4ManualApprovalPending || userSession?.manualExtensionPending == true
+            || userSessionStatus?.manualApprovalPending == true {
+            return L("A manual request or extension is still being confirmed.",
+                     "수동 유지의 승인·연장을 확인 중입니다.")
+        }
+        if let reason = workProtectionReason { return protectionReason(reason) }
+        if workPaused {
+            return L("Keep-awake is paused. Resume before reviewing an extension.",
+                     "유지가 중지되어 있습니다. 다시 허용한 뒤 확인하세요.")
+        }
+        guard manualSessionActive, manualSessionUntil != nil else {
+            return L("There is no active finite timer to extend.", "연장할 실행 중인 유한 타이머가 없습니다.")
+        }
+        if v4AcquisitionBlocked {
+            return L("Extensions are unavailable while preparing an update installation.",
+                     "업데이트 설치를 준비하는 동안에는 연장할 수 없습니다.")
+        }
+        if !acceptingUserCommands {
+            return L("Confirm the current Tether session before extending.",
+                     "현재 Tether 실행 권한을 확인해야 연장할 수 있습니다.")
+        }
+        if snapshot.power == .unknown {
+            return L("Extensions wait until the power source is confirmed.",
+                     "전원 상태가 확인될 때까지 연장할 수 없습니다.")
+        }
+        if userSessionStatus?.observationLimited == true {
+            return L("Extensions wait for the required power and protection observations.",
+                     "전원·보호 관측이 확인될 때까지 연장할 수 없습니다.")
+        }
+        if userSession?.hasConfirmedSessionAuthority != true {
+            return L("Confirm the logged-in session and wake state before extending.",
+                     "로그인 세션·깨움 상태를 확인해야 연장할 수 있습니다.")
+        }
+        if manualFeaturesNeedHelper && !canAcquireManualFeatures {
+            return L("Confirm the closed-lid helper and its current observations before extending.",
+                     "덮개 도우미의 연결·관측을 확인해야 연장할 수 있습니다.")
+        }
+        if snapshot.power == .battery,
+           let request = userSession?.v4ManualSnapshot,
+           let limit = request.batteryTimeLimit, limit != .unlimited {
+            // The captured request limit is authoritative, not today's default.
+            // Do not duplicate deadline arithmetic or claim which gate failed.
+            return L("The full \(minutes)-minute extension is unavailable. Review this request's battery limit and original deadline.",
+                     "\(minutes)분 전체를 연장할 수 없습니다. 이 요청의 배터리 한도와 원래 마감을 확인하세요.")
+        }
+        return L("The full \(minutes)-minute extension is not confirmed for the current timer, power and protection state.",
+                 "현재 타이머의 기한·전원·보호 상태에서 \(minutes)분 전체 연장이 확인되지 않습니다.")
+    }
+
     var manualEndingDetail: String {
         if automaticWorkReasonActive {
             return L("Ending this session leaves automatic keep-awake active.", "끝내도 자동 유지는 계속됩니다.")

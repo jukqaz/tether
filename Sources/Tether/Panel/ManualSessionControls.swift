@@ -44,7 +44,7 @@ struct ManualSessionControls: View {
                         .accessibilityHint(model.manualEndingDetail)
                         .disabled(model.commandPending)
                 }
-                if model.manualSessionUntil != nil {
+                if showsTimedExtension {
                     extensionButton(30)
                 }
                 Text(model.manualEndingDetail).font(TetherTypography.secondary)
@@ -86,16 +86,34 @@ struct ManualSessionControls: View {
         return Texts.countdown(remaining)
     }
 
-    private func extensionButton(_ minutes: Int) -> some View {
-        Button { model.extendManualSession(by: minutes) } label: {
-            Text(L("Add \(minutes) min", "\(minutes)분 추가"))
-                .frame(maxWidth: .infinity)
-        }
-            .actionButton().controlSize(.small)
-            .disabled(!model.canExtendManual(by: minutes) || model.commandPending)
-            .accessibilityLabel(L("Extend manual work by \(minutes) minutes", "수동 유지 \(minutes)분 연장"))
-            .accessibilityIdentifier("panel-extend-manual-\(minutes)")
+    var showsTimedExtension: Bool {
+        model.manualSessionActive && model.manualSessionUntil != nil
     }
+
+    private func extensionButton(_ minutes: Int) -> some View {
+        let reason = model.manualExtensionUnavailableReason(by: minutes)
+        let hint = reason ?? L("Adds \(minutes) minutes to this timer without restarting it.",
+                               "현재 타이머를 다시 시작하지 않고 \(minutes)분을 더합니다.")
+        return VStack(alignment: .leading, spacing: 4) {
+            Button { model.extendManualSession(by: minutes) } label: {
+                Text(L("Add \(minutes) min", "\(minutes)분 추가"))
+                    .frame(maxWidth: .infinity)
+            }
+                .actionButton().controlSize(.small)
+                .disabled(reason != nil)
+                .help(hint)
+                .accessibilityLabel(L("Extend manual work by \(minutes) minutes", "수동 유지 \(minutes)분 연장"))
+                .accessibilityHint(hint)
+                .accessibilityIdentifier("panel-extend-manual-\(minutes)")
+            if let reason {
+                Text(reason).font(TetherTypography.secondary)
+                    .foregroundStyle(Color.tetherSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("panel-extend-manual-reason-\(minutes)")
+            }
+        }
+    }
+
 }
 
 struct ManualDurationPicker: View {
