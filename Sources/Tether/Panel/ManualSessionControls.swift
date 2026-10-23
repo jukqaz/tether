@@ -101,24 +101,42 @@ struct ManualSessionControls: View {
 struct ManualDurationPicker: View {
     @ObservedObject var model: AppModel
     /// Keep a previously saved choice visible without advertising six redundant presets.
-    private var durationChoices: [Int] {
-        model.manualDurationChoices.filter { [30, 60, 120].contains($0) || $0 == model.selectedManualMinutes }
+    /// Zero belongs to the same list as every finite tag so the current selection
+    /// remains representable when battery work explicitly allows unlimited time.
+    var durationChoices: [Int] {
+        let finite = model.manualDurationChoices.filter {
+            [30, 60, 120].contains($0) || $0 == model.selectedManualMinutes
+        }
+        let permitsUnlimited = model.snapshot.power == .ac
+            || (model.snapshot.power == .battery && model.v3Settings.batteryTimeLimit == .unlimited)
+        // Unknown power cannot accept a new choice, but a saved unlimited
+        // selection still needs its own tag while the disabled picker waits.
+        return finite + (permitsUnlimited || model.selectedManualMinutes == 0 ? [0] : [])
+    }
+    var controlsDisabled: Bool {
+        !model.acceptingUserCommands || model.commandPending || model.manualSessionActive
+            || model.snapshot.power == .unknown
+    }
+    var durationSelection: Binding<Int> {
+        Binding(get: { model.selectedManualMinutes }, set: { minutes in
+            // Recheck after an open menu's power state changes; a stale unlimited
+            // item must not save an unavailable battery choice.
+            guard !controlsDisabled, durationChoices.contains(minutes) else { return }
+            model.selectManualDuration(minutes == 0 ? nil : Double(minutes) * 60)
+        })
     }
     var body: some View {
-        Picker(L("Next manual duration", "직접 시작 시간"), selection: Binding(
-            get: { model.selectedManualMinutes }, set: { minutes in
-                model.selectManualDuration(minutes == 0 ? nil : Double(minutes) * 60)
-            })) {
+        Picker(L("Next manual duration", "직접 시작 시간"), selection: durationSelection) {
             ForEach(durationChoices, id: \.self) { minutes in
-                Text(model.durationChoiceTitle(minutes)).tag(minutes)
+                Text(minutes == 0 ? L("Until turned off", "끄기 전까지") : model.durationChoiceTitle(minutes))
+                    .tag(minutes)
             }
-            if model.snapshot.power == .ac { Text(L("Until turned off", "끄기 전까지")).tag(0) }
         }.labelsHidden().pickerStyle(.menu).controlSize(.small)
             .buttonSizing(.flexible)
             .frame(maxWidth: .infinity, alignment: .leading)
             .foregroundStyle(Color.tetherPrimary)
             .accessibilityIdentifier("manual-duration-picker")
             .accessibilityHint(L("Use Start to begin", "직접 시작을 눌러야 유지가 시작됩니다"))
-            .disabled(!model.acceptingUserCommands || model.commandPending || model.manualSessionActive)
+            .disabled(controlsDisabled)
     }
 }
