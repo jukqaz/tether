@@ -129,6 +129,28 @@ private final class SessionFeaturesFixture {
 /// Model-to-driver wiring only. All assertions, brightness values and journals are injected.
 final class SessionFeaturesModelTests: XCTestCase {
     @MainActor
+    func testMenuShowsAndRetriesBrightnessRecoveryWithoutStartingWorkOrChangingSettings() throws {
+        let fixture = try SessionFeaturesFixture(unsupportedIssue: .externalDisplayPresent, recoveryOriginal: 0.8)
+        defer { fixture.close() }
+        let panel = TetherPanel(model: fixture.model)
+        let saved = fixture.defaults.data(forKey: UserSessionController.preferenceKey)
+        XCTAssertTrue(panel.showsDisplayRecoveryWarning)
+        XCTAssertTrue(panel.canRetryDisplayRecovery)
+        panel.retryDisplayRecovery()
+        XCTAssertTrue(panel.showsDisplayRecoveryWarning, "A failed retry must retain the recovery warning")
+        XCTAssertTrue(fixture.brightness.writes.isEmpty)
+        fixture.brightness.unsupportedIssue = nil
+        panel.retryDisplayRecovery()
+        XCTAssertFalse(panel.showsDisplayRecoveryWarning)
+        XCTAssertEqual(fixture.brightness.writes, [0.8])
+        XCTAssertNil(fixture.journal.record)
+        XCTAssertFalse(fixture.controller.status.holding)
+        XCTAssertEqual(fixture.system.creates, 0)
+        XCTAssertEqual(fixture.display.creates, 0)
+        XCTAssertEqual(fixture.defaults.data(forKey: UserSessionController.preferenceKey), saved)
+    }
+
+    @MainActor
     func testLostCoordinatorCannotRestoreOverANewOwnersBrightness() throws {
         let folder = URL(fileURLWithPath: "/tmp/tbd-\(UUID().uuidString.prefix(8))", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false,

@@ -108,6 +108,7 @@ struct TetherPanel: View {
                               "일반 잠자기 방지와 덮개 설정 복구 결과는 별도로 확인합니다."),
                     color: .tetherWarning, destination: .system)
             }
+            if showsDisplayRecoveryWarning { displayRecoveryAttention }
             if actionVisibility.showsCurrentWork {
                 currentWork
                 Divider()
@@ -146,6 +147,32 @@ struct TetherPanel: View {
 
     var actionVisibility: MenuActionVisibility { MenuActionVisibility(model: model) }
     var showsCurrentWork: Bool { actionVisibility.showsCurrentWork }
+
+    var showsDisplayRecoveryWarning: Bool { model.closedLidDisplayRecoveryPending }
+    var canRetryDisplayRecovery: Bool { model.hasCoordinatorAuthority && !model.commandPending }
+
+    func retryDisplayRecovery() {
+        guard canRetryDisplayRecovery else { return }
+        model.retryClosedLidDisplayRecovery()
+    }
+
+    private var displayRecoveryAttention: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(L("Display brightness still needs recovery", "화면 밝기 복구가 남아 있습니다"))
+                .foregroundStyle(Color.tetherWarning)
+            Text(L("The previous brightness has not been restored. Retry without starting a keep-awake session.",
+                   "이전 밝기를 아직 되돌리지 못했습니다. 유지를 시작하지 않고 복구만 다시 시도합니다."))
+                .foregroundStyle(Color.tetherSecondary)
+            Button(L("Retry brightness restoration", "밝기 복구 다시 시도"), action: retryDisplayRecovery)
+                .buttonStyle(.link)
+                .disabled(!canRetryDisplayRecovery)
+                .accessibilityIdentifier("panel-retry-brightness-restoration")
+        }
+        .font(TetherTypography.body)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("panel-brightness-recovery")
+    }
 
     var needsLidReview: Bool {
         model.showsLidOptions && model.v3Settings.allowClosedLid
