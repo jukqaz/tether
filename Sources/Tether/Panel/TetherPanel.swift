@@ -175,8 +175,11 @@ struct TetherPanel: View {
     }
 
     var needsLidReview: Bool {
-        model.showsLidOptions && model.v3Settings.allowClosedLid
-            && (!model.helperSetupConfirmed || (model.workSessionHolding && !model.lidSupportConfirmed))
+        guard model.showsLidOptions, model.v3Settings.allowClosedLid else { return false }
+        // A saved permission is not a demand from every current request. In
+        // particular, a manual timer may have captured closedLid=false.
+        if model.workSessionHolding, model.userSession?.v4LidRequested == false { return false }
+        return !model.helperSetupConfirmed || (model.workSessionHolding && !model.lidSupportConfirmed)
     }
 
     private var currentWork: some View {

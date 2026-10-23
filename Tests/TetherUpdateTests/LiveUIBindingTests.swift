@@ -273,6 +273,31 @@ final class LiveUIBindingTests: XCTestCase {
     }
 
     @MainActor
+    func testLidWarningFollowsCapturedManualOptionInsteadOfNextRequestDefaults() throws {
+        for requested in [false, true] {
+            let (model, controller, _) = fixture()
+            defer { _ = controller.end() }
+            controller.setAllowClosedLid(true)
+            var options = controller.settings.v4
+            options.nextManualOptions.closedLid = requested
+            XCTAssertTrue(controller.setV4Settings(options))
+            XCTAssertTrue(controller.start(duration: 1800))
+            let requestID = controller.manualRequestID
+            let deadline = controller.status.manualContinuousDeadline
+            XCTAssertTrue(model.workSessionHolding)
+            XCTAssertFalse(model.helperSetupConfirmed)
+            XCTAssertEqual(controller.v4LidRequested, requested)
+            XCTAssertEqual(TetherPanel(model: model).needsLidReview, requested)
+            options.nextManualOptions.closedLid = !requested
+            XCTAssertTrue(controller.setV4Settings(options))
+            XCTAssertEqual(TetherPanel(model: model).needsLidReview, requested,
+                "Editing the next request cannot change the current timer's lid demand")
+            XCTAssertEqual(controller.manualRequestID, requestID)
+            XCTAssertEqual(controller.status.manualContinuousDeadline, deadline)
+        }
+    }
+
+    @MainActor
     func testPreparedLidPreviewTogglePreservesRequestDisplayAndStopStateUsingOnlyRenderHelper() async throws {
         let scenarios = [
             ["--sample", "--prepared-lid", "--display-on"],
