@@ -11,7 +11,9 @@ import math
 import os
 from pathlib import Path
 import socket
+import stat
 import struct
+import subprocess
 import sys
 import tempfile
 import threading
@@ -19,17 +21,28 @@ import time
 import uuid
 
 
+def process_executable(pid):
+    """Use the same kernel identity as ProcessIdentity.capture, not a Python launcher."""
+    path = ctypes.create_string_buffer(4096)
+    proc_pidpath = ctypes.CDLL('/usr/lib/libproc.dylib').proc_pidpath
+    proc_pidpath.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_uint32]
+    proc_pidpath.restype = ctypes.c_int
+    assert proc_pidpath(pid, path, len(path)) > 0, 'Cannot inspect fixture process executable: ' + str(pid)
+    return os.fsdecode(path.value)
+
+
 def diagnostic_environment(helper, *, session=None):
     """Even report-only CLI calls must never discover the installed app socket."""
     return dict(os.environ, TETHER_SERVICE_SOCKET=session.helper_socket if session else helper.sock,
                 TETHER_USER_SESSION_SOCKET=session.socket if session else str(helper.folder / 'absent-app.sock'),
-                TETHER_USER_SESSION_SERVER_EXECUTABLE=str(Path(sys.executable).resolve()))
+                TETHER_USER_SESSION_SERVER_EXECUTABLE=session.server_executable if session else process_executable(os.getpid()))
 
 
 class RecordingSessionFixture:
     def __init__(self, helper, executable, *, confirms_recording=True):
         self.helper = helper
         self.executable = Path(executable)
+        self.server_executable = process_executable(os.getpid())
         self.build = helper.ok('snapshot')['status']['build']
         self.temp = tempfile.TemporaryDirectory(prefix='recording-', dir=helper.folder)
         folder = Path(self.temp.name)
@@ -46,6 +59,8 @@ class RecordingSessionFixture:
         self.finishes = []
         self.root_actions = []
         self.errors = []
+        self.accepted = []
+        self.user_frames = 0
         self.confirms_recording = confirms_recording
         self.lock = threading.RLock()
         self.started = threading.Event()
@@ -82,16 +97,19 @@ class RecordingSessionFixture:
         assert libc.getpeereid(connection.fileno(), ctypes.byref(uid), ctypes.byref(gid)) == 0
         assert uid.value == os.getuid()
         pid = struct.unpack('i', connection.getsockopt(0, 2, 4))[0]  # Darwin SOL_LOCAL / LOCAL_PEERPID.
-        path = ctypes.create_string_buffer(4096)
-        libproc = ctypes.CDLL('/usr/lib/libproc.dylib')
-        assert pid > 1 and libproc.proc_pidpath(pid, path, len(path)) > 0
-        assert os.path.samefile(os.fsdecode(path.value), self.executable)
+        assert pid > 1 and os.path.samefile(process_executable(pid), self.executable)
 
     def _listen(self, path, handle, *, authenticate=False):
+        folder = os.lstat(Path(path).parent)
+        assert stat.S_ISDIR(folder.st_mode) and folder.st_uid == os.geteuid() and folder.st_mode & 0o077 == 0, (
+            path, folder.st_uid, oct(stat.S_IMODE(folder.st_mode)))
+        assert len(os.fsencode(path)) < 104, 'Private Darwin socket path is too long: ' + path
         listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.listeners.append(listener)
         listener.bind(path)
         os.chmod(path, 0o600)
+        endpoint = os.lstat(path)
+        assert stat.S_ISSOCK(endpoint.st_mode) and endpoint.st_uid == os.geteuid() and endpoint.st_mode & 0o077 == 0
         listener.listen(8)
         listener.settimeout(.1)
 
@@ -99,6 +117,7 @@ class RecordingSessionFixture:
             while not self.stopped.is_set():
                 try:
                     connection, _ = listener.accept()
+                    self.accepted.append(path)
                 except socket.timeout:
                     continue
                 except OSError:
@@ -148,6 +167,7 @@ class RecordingSessionFixture:
 
     def _user_reply(self, request):
         with self.lock:
+            self.user_frames += 1
             assert request['version'] == 1 and request['build'] == self.build
             uuid.UUID(request['id'])
             assert request['command'] == {'status': {}}
@@ -188,6 +208,33 @@ class RecordingSessionFixture:
                 reply['recordingUntil'] = self.until - 978307200
             reply['commonActivity'] = copy.deepcopy(self.entries)
             return reply
+
+    def wait_for_start(self, cli, timeout=5):
+        if self.started.wait(timeout):
+            return
+        # Preserve the CLI's original failure instead of terminating a process
+        # waiting at readLine and discarding its diagnostic stderr.
+        poll = cli.poll()
+        try:
+            stdout, stderr = cli.communicate('\n', timeout=10)
+        except subprocess.TimeoutExpired:
+            cli.terminate()
+            try:
+                stdout, stderr = cli.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                cli.kill()
+                stdout, stderr = cli.communicate(timeout=5)
+        endpoints = {}
+        for path in (str(Path(self.socket).parent), self.socket, self.helper_socket):
+            info = os.lstat(path)
+            endpoints[path] = dict(uid=info.st_uid, mode=oct(stat.S_IMODE(info.st_mode)))
+        raise AssertionError(json.dumps(dict(
+            failure='CLI recording start timeout', pid=cli.pid, poll_before_cleanup=poll,
+            returncode=cli.returncode, stdout=stdout, stderr=stderr,
+            server_executable=self.server_executable, python_executable=sys.executable,
+            python_resolved=str(Path(sys.executable).resolve()), endpoints=endpoints,
+            accepted_connections={path:self.accepted.count(path) for path in (self.socket,self.helper_socket)},
+            user_frames=self.user_frames, server_errors=self.errors), indent=2))
 
     def assert_healthy(self):
         assert not self.errors, self.errors

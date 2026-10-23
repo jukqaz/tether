@@ -327,7 +327,7 @@ with Fixture(control={'enabled':False}) as f:
             cli=subprocess.Popen([str(BIN/'TetherCLI'),'diagnose',*options,'--out',str(report)],env=env,
                                  stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
             try:
-                assert session.started.wait(5),session.errors
+                session.wait_for_start(cli)
                 session.assert_healthy()
                 assert len(session.starts)==1,session.starts
                 requested=session.starts[0]
