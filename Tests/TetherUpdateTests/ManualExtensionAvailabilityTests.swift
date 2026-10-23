@@ -39,6 +39,10 @@ final class ManualExtensionAvailabilityTests: XCTestCase {
                 let (model, controller, backend) = try fixture(power: power)
                 defer { _ = controller.end() }
                 model.startManualSession(minutes: 30)
+                // Automatic-only rest requires an enabled automatic rule. The
+                // fixture starts it off so unrelated tests own no automatic work.
+                model.setAutomaticEnabled(true)
+                XCTAssertTrue(model.automaticEnabled)
                 let controls = ManualSessionControls(model: model, clock: model.clock)
                 XCTAssertTrue(controls.showsTimedExtension)
                 XCTAssertTrue(controller.canExtendManual(by: 30))
@@ -47,7 +51,8 @@ final class ManualExtensionAvailabilityTests: XCTestCase {
                 let before = controller.status
                 let saved = model.defaults.data(forKey: UserSessionController.preferenceKey)
                 let creates = backend.creates
-                XCTAssertTrue(model.pauseAutomatic(for: 15 * 60))
+                // The shipping automatic-pause presets are 30 and 60 minutes.
+                XCTAssertTrue(model.pauseAutomatic(for: 30 * 60))
                 XCTAssertTrue(model.automaticPauseActive)
                 XCTAssertTrue(model.canExtendManual(by: 30), "Automatic-only rest must not block manual extension")
                 for _ in 0..<3 { XCTAssertNil(model.manualExtensionUnavailableReason(by: 30)) }
@@ -108,12 +113,14 @@ final class ManualExtensionAvailabilityTests: XCTestCase {
         try await MainActor.run {
             let previous = Localization.current; defer { Localization.current = previous }
             Localization.current = .korean
-            let scenarios: [(PowerSource, Int?, Bool?, String)] = [
-                (.unknown, 0, true, "전원 상태"),
-                (.ac, nil, true, "전원·보호 관측"),
-                (.ac, 0, nil, "전원·보호 관측")
+            let scenarios: [(PowerSource, Int?, Bool?, Bool, String)] = [
+                (.unknown, 0, true, true, "전원 상태"),
+                (.ac, nil, true, true, "전원·보호 관측"),
+                // Missing full-wake confirmation fails session authority. It
+                // does not enter the power/thermal carry-existing-permission path.
+                (.ac, 0, nil, false, "로그인 세션·깨움 상태")
             ]
-            for (power, thermal, fullWake, expected) in scenarios {
+            for (power, thermal, fullWake, limited, expected) in scenarios {
                 let (model, controller, backend) = try fixture(power: .ac)
                 defer { _ = controller.end() }
                 model.startManualSession(minutes: 30)
@@ -123,7 +130,11 @@ final class ManualExtensionAvailabilityTests: XCTestCase {
                     now: ContinuousTime.now, batteryPercent: 80)
                 XCTAssertTrue(model.manualSessionActive, "Unconfirmed observations do not create a new request")
                 XCTAssertTrue(ManualSessionControls(model: model, clock: model.clock).showsTimedExtension)
-                XCTAssertTrue(try assertReadOnlyBlockedReason(model, controller, backend).contains(expected))
+                XCTAssertEqual(controller.status.observationLimited, limited)
+                XCTAssertEqual(controller.hasConfirmedSessionAuthority, fullWake == true)
+                let reason = try assertReadOnlyBlockedReason(model, controller, backend)
+                XCTAssertTrue(reason.contains(expected),
+                    "power=\(power), thermal=\(String(describing: thermal)), fullWake=\(String(describing: fullWake)): \(reason)")
                 XCTAssertEqual(controller.manualRequestID, request)
                 XCTAssertEqual(controller.status.manualContinuousDeadline, deadline)
             }

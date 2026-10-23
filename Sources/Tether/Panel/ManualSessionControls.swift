@@ -106,7 +106,7 @@ struct ManualSessionControls: View {
                 .accessibilityHint(hint)
                 .accessibilityIdentifier("panel-extend-manual-\(minutes)")
             if let reason {
-                Text(reason).font(TetherTypography.secondary)
+                Text(reason).font(TetherTypography.body)
                     .foregroundStyle(Color.tetherSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("panel-extend-manual-reason-\(minutes)")
