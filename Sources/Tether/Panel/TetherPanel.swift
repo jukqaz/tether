@@ -182,6 +182,17 @@ struct TetherPanel: View {
         return !model.helperSetupConfirmed || (model.workSessionHolding && !model.lidSupportConfirmed)
     }
 
+    var currentAutomaticSummary: String {
+        guard model.automaticWorkReasonActive,
+              let condition = model.v3Settings.runtimeMarkers?.automaticActivation?.condition else {
+            return model.v4RuleSummary
+        }
+        // Power scope belongs to this activation. Editing the next default is
+        // not a new activation and must not relabel work that is still running.
+        return model.v4Settings.usesAdvancedAutomaticConditions
+            ? condition.title + " · " + model.v4RuleSummary : condition.title
+    }
+
     private var currentWork: some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionTitle(L("Current work", "현재 작업"))
@@ -190,12 +201,12 @@ struct TetherPanel: View {
                     HStack(spacing: 8) {
                         Text(L("Automatic keep-awake", "자동 잠자기 방지")).font(TetherTypography.body.weight(.medium))
                         Spacer(minLength: 4)
-                        Text(model.v4RuleSummary).font(TetherTypography.secondary)
+                        Text(currentAutomaticSummary).font(TetherTypography.secondary)
                             .foregroundStyle(Color.tetherSecondary).fixedSize()
                     }
                     VStack(alignment: .leading, spacing: 3) {
                         Text(L("Automatic keep-awake", "자동 잠자기 방지")).font(TetherTypography.body.weight(.medium))
-                        Text(model.v4RuleSummary).font(TetherTypography.secondary)
+                        Text(currentAutomaticSummary).font(TetherTypography.secondary)
                             .foregroundStyle(Color.tetherSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }

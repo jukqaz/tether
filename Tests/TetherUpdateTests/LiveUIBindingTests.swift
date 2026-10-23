@@ -333,6 +333,34 @@ final class LiveUIBindingTests: XCTestCase {
     }
 
     @MainActor
+    func testCurrentAutomaticSummaryKeepsCapturedPowerWhenNextConditionChanges() throws {
+        let previous = Localization.current
+        defer { Localization.current = previous }
+        for language in [Language.english, .korean] {
+            Localization.current = language
+            for captured in [PowerCondition.ac, .any] {
+                let (model, controller, backend) = fixture()
+                defer { _ = controller.end() }
+                model.setPowerCondition(captured)
+                model.setAutomaticEnabled(true)
+                XCTAssertTrue(model.automaticWorkReasonActive)
+                let activation = try XCTUnwrap(controller.runtimeMarkers.automaticActivation).id
+                model.setPowerCondition(.battery)
+                XCTAssertEqual(model.v3Settings.condition, .battery)
+                XCTAssertTrue(model.automaticWorkReasonActive)
+                let saved = model.defaults.data(forKey: UserSessionController.preferenceKey)
+                let creates = backend.creates
+                let panel = TetherPanel(model: model)
+                XCTAssertEqual(panel.currentAutomaticSummary, captured.title)
+                XCTAssertNotEqual(panel.currentAutomaticSummary, model.v4RuleSummary)
+                XCTAssertEqual(controller.runtimeMarkers.automaticActivation?.id, activation)
+                XCTAssertEqual(backend.creates, creates)
+                XCTAssertEqual(model.defaults.data(forKey: UserSessionController.preferenceKey), saved)
+            }
+        }
+    }
+
+    @MainActor
     func testPreparedLidPreviewTogglePreservesRequestDisplayAndStopStateUsingOnlyRenderHelper() async throws {
         let scenarios = [
             ["--sample", "--prepared-lid", "--display-on"],
