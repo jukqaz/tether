@@ -21,6 +21,7 @@ def passed(label):
     print('PASS', label, flush=True)
 
 from service_fixture import Fixture
+from user_session_recording_fixture import RecordingSessionFixture, diagnostic_environment
 
 # Keep all power/lid combinations and native coexistence on the actual service path.
 for lid in ['open','closed']:
@@ -259,7 +260,7 @@ with Fixture() as f:
     saved=f.control.read_bytes();backup=f.folder/'control.json.backup';backup.unlink(missing_ok=True);backup.mkdir();before=f.ok('snapshot')
     assert f.rpc('configure',control=before['control']|{'enabled':True},epoch=before['epoch'],revision=before['revision'])['error']=='writeFailed'
     assert f.control.read_bytes()==saved;backup.rmdir();passed('backup failure preserves original settings')
-    env=dict(os.environ,TETHER_SERVICE_SOCKET=f.sock)
+    env=diagnostic_environment(f)
     result=subprocess.run([str(BIN/'TetherCLI'),'status','--json'],env=env,capture_output=True,text=True,timeout=10)
     assert result.returncode==0 and json.loads(result.stdout)['protection']['dryRun'];passed('CLI real service status')
     for command in ['session','rules','agent','mcp','profile','events']:
@@ -301,7 +302,7 @@ with Fixture(control={'enabled':False}) as f:
     f.config(debugLog=True,debugLogUntil=None);f.stop();f.start()
     assert '(legacy manual stop)' in f.logs()
     passed('legacy explicit continuous recording survives restart')
-    env=dict(os.environ,TETHER_SERVICE_SOCKET=f.sock)
+    env=diagnostic_environment(f)
     report=f.folder/'diagnostic.md'
     result=subprocess.run([str(BIN/'TetherCLI'),'diagnose','--hours','6','--out',str(report)],env=env,capture_output=True,text=True,timeout=10)
     assert result.returncode==0,result.stderr
@@ -314,30 +315,67 @@ with Fixture(control={'enabled':False}) as f:
         assert result.returncode==2,(option,value,result)
     passed('CLI rejects nonfinite or out-of-range diagnostic durations')
     f.config(debugLog=False,debugLogUntil=None)
-    cli=subprocess.Popen([str(BIN/'TetherCLI'),'diagnose','--record-minutes','1','--out',str(report)],env=env,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
-    try:
-        for _ in range(100):
-            if f.ok('snapshot')['control'].get('debugLogUntil'):break
-            time.sleep(.03)
-        assert f.ok('snapshot')['control']['debugLogUntil']>time.time()
-        stdout,stderr=cli.communicate('\n',timeout=10)
-        assert cli.returncode==0,(stdout,stderr)
-        r=f.ok('snapshot')['control'];assert r.get('debugLog') is False and r.get('debugLogUntil') is None
-        passed('CLI recording restores its previous detailed logging choice after export')
-    finally:
-        if cli.poll() is None:cli.terminate();cli.wait(timeout=5)
-    cli=subprocess.Popen([str(BIN/'TetherCLI'),'diagnose','--record-minutes','1','--out',str(report)],env=env,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
-    try:
-        for _ in range(100):
-            if f.ok('snapshot')['control'].get('debugLogUntil'):break
-            time.sleep(.03)
-        newer=time.time()+3600;f.config(debugLog=True,debugLogUntil=newer)
-        stdout,stderr=cli.communicate('\n',timeout=10)
-        assert cli.returncode==0,(stdout,stderr)
-        assert f.ok('snapshot')['control']['debugLogUntil']==newer
-        passed('CLI export preserves a newer recording choice made by another client')
-    finally:
-        if cli.poll() is None:cli.terminate();cli.wait(timeout=5)
+    # This private Python responder tests the actual CLI's wire/receipt/finish
+    # contract, not AppModel policy. The real app recording implementation is
+    # covered by UserSessionCommandTests.testActualCLIDiagnose* in Swift.
+    for choice,initial,newer in [('fresh',None,None),('existing GUI',30,None),('newer GUI',None,30)]:
+        before=f.ok('snapshot')['control']
+        with RecordingSessionFixture(f, BIN/'TetherCLI') as session:
+            original=session.select_gui_recording(initial) if initial else None
+            env=diagnostic_environment(f,session=session)
+            options=['--record'] if choice=='fresh' else ['--record-minutes','1']
+            cli=subprocess.Popen([str(BIN/'TetherCLI'),'diagnose',*options,'--out',str(report)],env=env,
+                                 stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+            try:
+                assert session.started.wait(5),session.errors
+                session.assert_healthy()
+                assert len(session.starts)==1,session.starts
+                requested=session.starts[0]
+                minutes=requested['recording']['start']['minutes']
+                assert minutes==(15 if choice=='fresh' else 1)
+                assert session.until and session.until>time.time()
+                if original is not None:
+                    assert session.until==original,'CLI replaced an existing recording deadline'
+                else:
+                    assert minutes*60-5<session.until-time.time()<=minutes*60
+                preserved=session.select_gui_recording(newer) if newer else original
+                stdout,stderr=cli.communicate('\n',timeout=10)
+                assert cli.returncode==0,(stdout,stderr)
+                assert "Couldn't start" not in stderr and '상세 기록을 켜지 못했습니다' not in stderr,stderr
+                session.assert_healthy()
+                assert len(session.finishes)==1,session.finishes
+                assert session.finishes[0]['recording']['finish']['recordingID'].lower()==requested['id'].lower()
+                content=report.read_text()
+                for expected in ['SIMULATED dry-run','## Common work activity','event=recordingStarted','event=detail','thermal=1']:
+                    assert expected in content,expected
+                assert session.until==preserved,(session.until,preserved)
+                assert ('event=recordingEnded' in content)==(preserved is None)
+                assert f.ok('snapshot')['control']==before,'Recording changed privileged helper configuration'
+            finally:
+                if cli.poll() is None:cli.terminate();cli.wait(timeout=5)
+        passed('CLI protocol fixture: '+choice+' recording receipt, deadline, report and matching finish; no root.configure')
+    with RecordingSessionFixture(f, BIN/'TetherCLI',confirms_recording=False) as session:
+        # A same-build old app may return ok and a plausible deadline without a
+        # recording receipt. The CLI must export available logs without finish.
+        session.until=time.time()+900
+        result=subprocess.run([str(BIN/'TetherCLI'),'diagnose','--record','--out',str(report)],
+                              env=diagnostic_environment(f,session=session),input='\n',capture_output=True,text=True,timeout=10)
+        assert result.returncode==0,result.stderr
+        assert "Couldn't start detailed recording" in result.stderr or '상세 기록을 켜지 못했습니다' in result.stderr,result.stderr
+        assert len(session.starts)==1 and not session.finishes
+        assert 'event=recordingStarted' not in report.read_text()
+        session.assert_healthy()
+    passed('CLI protocol fixture rejects ok without a matching recording receipt')
+    with RecordingSessionFixture(f, BIN/'TetherCLI') as session:
+        env=diagnostic_environment(f,session=session)
+        env['TETHER_USER_SESSION_SERVER_EXECUTABLE']=str(BIN/'TetherCLI')
+        result=subprocess.run([str(BIN/'TetherCLI'),'diagnose','--record','--out',str(report)],
+                              env=env,input='\n',capture_output=True,text=True,timeout=10)
+        assert result.returncode==0,result.stderr
+        assert "Couldn't start detailed recording" in result.stderr or '상세 기록을 켜지 못했습니다' in result.stderr,result.stderr
+        assert not session.starts and not session.finishes,'CLI sent commands to an unexpected server executable'
+        session.assert_healthy()
+    passed('CLI protocol fixture rejects a mismatched server executable before sending a recording command')
 with Fixture(control={'enabled':False}) as f:
     f.stop()
     old=f.logs();inode=f.log.stat().st_ino
@@ -381,7 +419,7 @@ with Fixture(control={'limits':{'maxHoldHours':1.5}},manualClock=100) as f:
     assert f.ok('snapshot')['control']['automaticHoldMinutes']==45
     assert not f.ok('snapshot')['status'].get('batteryHoldUntil')
     passed('saved legacy duration metadata survives restart without restoring an automatic battery timer')
-    env=dict(os.environ,TETHER_SERVICE_SOCKET=f.sock)
+    env=diagnostic_environment(f)
     report=f.folder/'connection.md'
     result=subprocess.run([str(BIN/'TetherCLI'),'diagnose','--out',str(report)],env=env,capture_output=True,text=True,timeout=10)
     assert result.returncode==0 and 'authenticated service reply' in report.read_text()
