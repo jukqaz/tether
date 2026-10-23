@@ -37,11 +37,12 @@ private final class SessionFeaturesBrightness: ClosedLidDisplayBrightnessBackend
     var value: Float = 0.7
     var writes: [Float] = []
     var unsupportedIssue: ClosedLidDisplayIssue?
+    var readUnavailable = false
     var support: ClosedLidDisplaySupport {
         if let unsupportedIssue { return .init(availability: .unavailable, issue: unsupportedIssue) }
         return .init(availability: .candidateRequiresPhysicalValidation, target: target)
     }
-    func read(target: ClosedLidDisplayTarget) -> Float? { target == self.target ? value : nil }
+    func read(target: ClosedLidDisplayTarget) -> Float? { !readUnavailable && target == self.target ? value : nil }
     func write(_ brightness: Float, target: ClosedLidDisplayTarget) -> Bool {
         guard target == self.target else { return false }
         writes.append(brightness); value = brightness; return true
@@ -68,7 +69,8 @@ private final class SessionFeaturesFixture {
 
     init(startWork: Bool = false, helperMode: ClosedLidDisplayMode? = nil,
          unsupportedIssue: ClosedLidDisplayIssue? = nil,
-         recoveryOriginal: Float? = nil, coordinatorFolder: URL? = nil) throws {
+         recoveryOriginal: Float? = nil, recoveryReadUnavailable: Bool = false,
+         coordinatorFolder: URL? = nil) throws {
         var settings = IdleSessionSettings()
         settings.legacyRootConfigurationPending = false
         settings.automaticEnabled = false
@@ -76,6 +78,7 @@ private final class SessionFeaturesFixture {
         settings.closedLidDisplayMode = .zeroBrightness
         defaults.set(try JSONEncoder().encode(settings), forKey: UserSessionController.preferenceKey)
         brightness.unsupportedIssue = unsupportedIssue
+        brightness.readUnavailable = recoveryReadUnavailable
         if let recoveryOriginal {
             brightness.value = 0
             journal.record = .init(target: brightness.target, original: recoveryOriginal, phase: .applied)
@@ -151,7 +154,7 @@ final class SessionFeaturesModelTests: XCTestCase {
 
     @MainActor
     func testMenuShowsAndRetriesBrightnessRecoveryWithoutStartingWorkOrChangingSettings() throws {
-        let fixture = try SessionFeaturesFixture(unsupportedIssue: .externalDisplayPresent, recoveryOriginal: 0.8)
+        let fixture = try SessionFeaturesFixture(recoveryOriginal: 0.8, recoveryReadUnavailable: true)
         defer { fixture.close() }
         let panel = TetherPanel(model: fixture.model)
         let saved = fixture.defaults.data(forKey: UserSessionController.preferenceKey)
@@ -160,7 +163,7 @@ final class SessionFeaturesModelTests: XCTestCase {
         panel.retryDisplayRecovery()
         XCTAssertTrue(panel.showsDisplayRecoveryWarning, "A failed retry must retain the recovery warning")
         XCTAssertTrue(fixture.brightness.writes.isEmpty)
-        fixture.brightness.unsupportedIssue = nil
+        fixture.brightness.readUnavailable = false
         panel.retryDisplayRecovery()
         XCTAssertFalse(panel.showsDisplayRecoveryWarning)
         XCTAssertEqual(fixture.brightness.writes, [0.8])
