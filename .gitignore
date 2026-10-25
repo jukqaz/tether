@@ -1,0 +1,6 @@
+node_modules/
+prototype/node_modules/
+prototype/dist/
+.sites-runtime/
+.sites-checkout/
+*.tgz

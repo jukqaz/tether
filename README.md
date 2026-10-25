@@ -43,3 +43,12 @@ Sites에 게시하는 비공개 인터랙티브 시안입니다. 실제 Tether �
 `python3 -m http.server --bind 127.0.0.1 --directory dist`
 
 배포는 등록된 Sites source workflow를 사용합니다.
+
+
+## 2026-10-26 최신 시안
+
+- `/studio/`: 검수한 한글·영어, 시스템·밝게·어둡게 인터랙티브 시안.
+- `/studio/localization-board.html`: 4개 조합, 설정 3탭, 펼침·스크롤 끝 비교.
+- 실제 앱·시스템·업데이트 엔진을 제어하지 않습니다. 숫자·버전은 예시입니다.
+- 기존 루트·비교 페이지는 보존합니다. `prototype/`는 Product Design 원본 런타임을 유지하고 사이트 빌드는 `/studio/`용 base만 지정합니다.
+- `npm ci`, `npm run build`, `npm test`로 패키지와 배포 경로를 검증합니다.

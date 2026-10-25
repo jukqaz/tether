@@ -1,0 +1,13 @@
+{
+  "name": "tether-core-design-site",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "prototype"
+  ],
+  "scripts": {
+    "build": "npm run build:site --workspace=power-state-review && node scripts/assemble-site.mjs",
+    "test": "node --test tests/publish-assets.test.mjs && npm run test:sites --workspace=power-state-review"
+  }
+}

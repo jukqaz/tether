@@ -57,3 +57,14 @@ final result: passed
 - 밝은/어두운 보호 화면, 영어, 전체 펼친 네 탭을 캡처·시각 확인. 브라우저 오류·경고 없음. JS 구문 검사와 diff 공백 검사 통과.
 - 근거: `outputs/tether-studio-fixes-20261020/verification.json` 및 같은 폴더의 `protected-light.png`, `protected-dark.png`, `recovered-light.png`, `protected-english.png`, `overview-light.png` (작업 루트 아래).
 - 전원 동작이나 네이티브 앱은 수정·설치·시험하지 않았다.
+
+
+## 2026-10-26 /studio 배포 검수
+
+검수한 Product Design React 런타임을 prototype/에 보존하고 /studio/용 경로로 빌드했습니다. 같은 접근 권한과 기존 루트·비교 페이지를 유지합니다.
+
+- Vite 6.4.5 보안 패치, 설치 후 npm audit 0건.
+- 빌드 성공, 게시 자산 4개 및 템플릿 Worker 4개 검사 통과.
+- /studio/의 영어·다크 전환, 업데이트 상태 표시, 비교 보드 원본 이미지 4개 로딩을 실제 브라우저에서 확인. 콘솔 오류 없음.
+- 레거시 정적 파일 21개는 해시가 동일합니다.
+- 실제 Tether 앱·설치본·전원/잠금 설정과 업데이트 엔진은 변경하지 않았습니다.
