@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { CaretRightIcon } from '@phosphor-icons/react/dist/csr/CaretRight';
 import { ArrowClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowClockwise';
 import { CircleNotchIcon } from '@phosphor-icons/react/dist/csr/CircleNotch';
@@ -62,20 +62,26 @@ function EmptyExample({ children }) {
 }
 
 function UpdateCard({ model, onChange, copy: c, locale }) {
-  const [preparing, setPreparing] = useState(false);
+  const [notice, setNotice] = useState('');
   const blockerId = useId();
+  const confirmationId = useId();
+  const change = useRef(onChange);
+  change.current = onChange;
   const state = model.updateState ?? 'idle';
+  const preparation = model.updatePreparation ?? 'idle';
   const version = model.currentVersion ?? '1.0.0';
   const build = model.currentBuild ?? '100';
   const availableVersion = model.availableVersion ?? '1.0.1';
   const checking = state === 'checking';
   const available = state === 'available';
   const power = model.power ?? (model.state === 'automatic' || model.state === 'stopped' ? 'ac' : 'battery');
-  const blocker = model.state === 'protected' ? c.protectionBlock
-    : power !== 'ac' ? c.batteryBlock
-      : model.state === 'manual' || model.state === 'automatic' ? c.activeBlock
-        : model.recording ? c.recordingBlock
-          : model.state !== 'stopped' ? c.stoppedBlock : '';
+  const protectedState = model.state === 'protected';
+  const active = model.state === 'manual' || model.state === 'automatic';
+  const blocked = protectedState || power !== 'ac';
+  const blocker = protectedState ? c.protectionBlock : power !== 'ac' ? c.batteryBlock : '';
+  const context = useRef({ power, protectedState, channel: model.channel, version, availableVersion });
+  const phases = ['confirm', 'preparing', 'ready', 'error'];
+  const hasPreparation = available && phases.includes(preparation) && (preparation === 'confirm' || (model.state === 'stopped' && !model.recording));
   const states = {
     idle: [ArrowClockwiseIcon, c.idleTitle, c.idleDetail],
     checking: [CircleNotchIcon, c.checkingTitle, c.checkingDetail],
@@ -89,28 +95,64 @@ function UpdateCard({ model, onChange, copy: c, locale }) {
     ? new Intl.DateTimeFormat(locale === 'en' ? 'en-US' : 'ko-KR', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(lastCheckedDate)
     : c.notChecked;
 
-  useEffect(() => { setPreparing(false); }, [model.updateState, model.channel]);
+  useEffect(() => {
+    if (!checking) return undefined;
+    const timer = setTimeout(() => change.current({ updateState: 'available', lastChecked: Date.now(), updatePreparation: 'idle' }), 900);
+    return () => clearTimeout(timer);
+  }, [checking, model.channel]);
+
+  useEffect(() => {
+    const previous = context.current;
+    const safetyChanged = previous.power !== power || previous.protectedState !== protectedState;
+    const releaseChanged = previous.channel !== model.channel || previous.version !== version || previous.availableVersion !== availableVersion;
+    const sessionRestarted = ['preparing', 'ready', 'error'].includes(preparation) && (model.state !== 'stopped' || Boolean(model.recording));
+    context.current = { power, protectedState, channel: model.channel, version, availableVersion };
+    if (preparation !== 'idle' && (safetyChanged || releaseChanged || !available || sessionRestarted || blocker)) {
+      change.current('updatePreparation', 'idle');
+      setNotice(safetyChanged || blocker ? 'safety' : sessionRestarted ? 'session' : '');
+    }
+  }, [power, protectedState, model.channel, version, availableVersion, available, model.state, model.recording, preparation, blocked]);
+
+  useEffect(() => {
+    if (preparation !== 'preparing' || !available || blocker || model.state !== 'stopped') return undefined;
+    const timer = setTimeout(() => {
+      const current = context.current;
+      if (current.power === 'ac' && !current.protectedState) change.current('updatePreparation', model.updatePrepareFail ? 'error' : 'ready');
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [preparation, available, blocked, model.state, model.updatePrepareFail]);
 
   const commitChannel = (value) => {
-    onChange('returningToStable', model.channel === 'beta' && value === 'stable');
-    onChange('channel', value);
-    onChange('updateState', 'idle');
-    onChange('lastChecked', null);
-    onChange('updateChannelConfirm', false);
-    setPreparing(false);
+    change.current({ returningToStable: model.channel === 'beta' && value === 'stable', channel: value, updateState: 'idle', lastChecked: null, updateChannelConfirm: false, updatePreparation: 'idle' });
+    setNotice('');
   };
   const changeChannel = (value) => {
-    if (value === 'beta' && model.channel !== 'beta') onChange('updateChannelConfirm', true);
+    if (value === 'beta' && model.channel !== 'beta') change.current({ updateChannelConfirm: true, updatePreparation: 'idle' });
     else commitChannel(value);
   };
   const check = () => {
-    setPreparing(false);
-    onChange('updateState', 'checking');
+    setNotice('');
+    change.current({ updateState: 'checking', updatePreparation: 'idle' });
   };
+  const openConfirmation = () => {
+    if (blocker || !available || model.updateChannelConfirm) return;
+    setNotice('');
+    change.current('updatePreparation', 'confirm');
+  };
+  const confirmPreparation = () => {
+    if (blocker || !available || preparation !== 'confirm') return;
+    setNotice('');
+    change.current({ state: 'stopped', recording: false, remaining: 0, untimed: false, stopRequested: false, updatePreparation: 'preparing' });
+  };
+  const cancelPreparation = () => {
+    setNotice(preparation === 'confirm' ? '' : 'cancelled');
+    change.current('updatePreparation', 'idle');
+  };
+  const noticeText = notice === 'safety' ? c.safetyInvalidated : notice === 'session' ? c.sessionInvalidated : notice === 'cancelled' ? c.preparationCancelled : '';
 
   return (
     <div className="s-update-card">
-      <SelectRow label={c.updateChannel} value={model.channel} onChange={changeChannel} options={c.channelOptions} disabled={checking} />
+      <SelectRow label={c.updateChannel} value={model.channel} onChange={changeChannel} options={c.channelOptions} disabled={checking || preparation === 'preparing'} />
       <ToggleRow label={c.autoCheck} checked={model.autoCheck ?? true} onChange={(value) => onChange('autoCheck', value)} />
       {model.channel === 'stable' && model.returningToStable && <p className="s-update-channel-note">{c.stableWait}</p>}
       {model.updateChannelConfirm && (
@@ -125,29 +167,60 @@ function UpdateCard({ model, onChange, copy: c, locale }) {
       )}
       <div className={`s-update-status s-update-${state}`} role="status" aria-live="polite" aria-busy={checking}>
         <StatusIcon size={20} className={checking ? 's-update-spinner' : undefined} aria-hidden="true" />
-        <div>
-          <h3>{title}</h3>
-          <p>{detail}</p>
-        </div>
+        <div><h3>{title}</h3><p>{detail}</p></div>
       </div>
       <dl className="s-update-metadata">
         <div><dt>{c.currentVersion}</dt><dd>{c.versionBuild(version, build)}</dd></div>
         <div><dt>{c.lastChecked}</dt><dd>{lastChecked}</dd></div>
       </dl>
       {available && blocker && <p className="s-update-blocker" id={blockerId}>{blocker}</p>}
-      {available && preparing && !blocker && (
-        <div className="s-update-preparation">
-          <strong>{c.preparationTitle}</strong>
-          <p>{c.preparationDetail}</p>
-          <button type="button" className="s-button" onClick={() => setPreparing(false)}>{c.closePreparation}</button>
+      {noticeText && <p className="s-update-notice" role="status">{noticeText}</p>}
+      {hasPreparation && !blocker && (
+        <div className={`s-update-preparation s-preparation-${preparation}`} role="region" aria-labelledby={confirmationId} aria-live="polite" aria-busy={preparation === 'preparing'}>
+          <div className="s-preparation-heading">
+            {preparation === 'preparing' && <CircleNotchIcon size={16} className="s-update-spinner" aria-hidden="true" />}
+            {preparation === 'ready' && <CheckCircleIcon size={16} aria-hidden="true" />}
+            {preparation === 'error' && <WarningCircleIcon size={16} aria-hidden="true" />}
+            <h4 id={confirmationId}>{preparation === 'confirm' ? c.preparationTitle : preparation === 'preparing' ? c.preparingTitle : preparation === 'ready' ? c.readyTitle : c.preparationErrorTitle}</h4>
+          </div>
+          {preparation === 'confirm' ? (
+            <>
+              <dl className="s-update-version-change">
+                <div><dt>{c.fromVersion}</dt><dd>{version}</dd></div>
+                <div><dt>{c.toVersion}</dt><dd>{availableVersion}</dd></div>
+              </dl>
+              <div className="s-update-summary"><h5>{c.changeSummary}</h5><ul>{c.releaseChanges.map((item) => <li key={item}>{item}</li>)}</ul></div>
+              <div className="s-update-impact"><h5>{c.preparationImpact}</h5><ul>
+                <li>{active ? c.endSessionImpact : c.noSessionImpact}</li>
+                <li>{model.recording ? c.endRecordingImpact : c.noRecordingImpact}</li>
+                <li>{c.restartImpact}</li>
+              </ul></div>
+              <div className="s-update-actions">
+                <button type="button" className="s-button" onClick={cancelPreparation}>{c.cancel}</button>
+                <button type="button" className="s-button s-confirm-button" onClick={confirmPreparation}>{active ? c.endAndPrepare : c.continuePreparation}</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p>{preparation === 'preparing' ? c.preparingDetail : preparation === 'ready' ? c.readyDetail : c.preparationErrorDetail}</p>
+              <p className="s-preparation-retention">{c.noSessionRevival}</p>
+              <div className="s-update-actions">
+                <button type="button" className="s-button" onClick={cancelPreparation}>{preparation === 'ready' ? c.closePreparation : c.cancel}</button>
+                {preparation === 'error' && <button type="button" className="s-button" onClick={openConfirmation}>{c.retryPreparation}</button>}
+              </div>
+            </>
+          )}
         </div>
       )}
-      <div className="s-update-actions">
-        {available && <button type="button" className="s-button s-secondary-button" onClick={check} disabled={Boolean(model.updateChannelConfirm)}>{c.checkAgain}</button>}
-        {available
-          ? <button type="button" className="s-button" disabled={Boolean(blocker || model.updateChannelConfirm)} aria-describedby={blocker ? blockerId : undefined} onClick={() => setPreparing(true)}>{c.prepareUpdate}</button>
-          : <button type="button" className="s-button" disabled={checking || Boolean(model.updateChannelConfirm)} onClick={check}>{checking ? c.checking : state === 'error' ? c.retry : state === 'current' ? c.checkAgain : c.checkUpdates}</button>}
-      </div>
+      {!hasPreparation && (
+        <div className="s-update-actions">
+          {checking && <button type="button" className="s-button s-secondary-button" onClick={() => onChange('updateState', 'idle')}>{c.cancel}</button>}
+          {available && <button type="button" className="s-button s-secondary-button" onClick={check} disabled={Boolean(model.updateChannelConfirm)}>{c.checkAgain}</button>}
+          {available
+            ? <button type="button" className="s-button" disabled={Boolean(blocker || model.updateChannelConfirm)} aria-describedby={blocker ? blockerId : undefined} onClick={openConfirmation}>{c.prepareUpdate}</button>
+            : <button type="button" className="s-button" disabled={checking || Boolean(model.updateChannelConfirm)} onClick={check}>{checking ? c.checking : state === 'error' ? c.retry : state === 'current' ? c.checkAgain : c.checkUpdates}</button>}
+        </div>
+      )}
     </div>
   );
 }
@@ -157,7 +230,10 @@ export function SettingsContent({ tab, model, onChange, expandAll = false, local
   const [restOpen, setRestOpen] = useState(false);
   const resolvedLocale = locale === 'en' ? 'en' : 'ko';
   const c = settingsCopy[resolvedLocale];
-  const automaticFooter = !model.auto ? c.autoOff : model.autoRest ? c.autoPaused(model.autoRest) : c.autoOn;
+  const automaticFooter = !model.auto ? c.autoOff
+    : model.state === 'protected' ? c.autoProtected
+      : model.state === 'stopped' ? c.autoStopped
+        : model.autoRest ? c.autoPaused(model.autoRest) : c.autoOn;
   const durationOptions = (values) => values.map((value) => [String(value), c.durations[value]]);
 
   return (
@@ -218,9 +294,13 @@ export function SettingsContent({ tab, model, onChange, expandAll = false, local
               </div>
             </div>
           </Section>
-          <Section title={c.unplugged} footer={<>{c.disconnectDescriptions[model.disconnect]}<br />{model.sleepAction === 'system' ? c.systemSleepFooter : c.sleepFooter}</>}>
+          <Section title={c.unplugged} footer={model.sleepAction === 'system' ? c.systemSleepFooter : c.sleepFooter}>
             <div className="s-group">
               <SelectRow label={c.awake} value={model.disconnect} onChange={(value) => onChange('disconnect', value)} options={c.disconnectOptions} />
+              <div className="s-policy-preview" aria-live="polite">
+                <p>{c.disconnectDescriptions[model.disconnect]}</p>
+                {model.disconnect !== 'all' && <p className="s-policy-note">{c.continuedPolicyNote}</p>}
+              </div>
               <SelectRow label={c.lidClosed} value={model.sleepAction ?? 'sleep'} onChange={(value) => onChange('sleepAction', value)} options={c.sleepOptions} />
             </div>
           </Section>

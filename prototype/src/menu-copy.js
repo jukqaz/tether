@@ -1,4 +1,9 @@
 const en = {
+  '충분히 충전한 뒤 보호 상태를 확인하세요.':'Let the battery charge, then check the safety status.',
+  '전원 분리해 보기':'Try unplugging', '전원 연결해 보기':'Try connecting power',
+  '전원을 뺐어요. 허용된 타이머만 계속합니다.':'Unplugged. Your allowed timer continues.',
+  '전원 분리로 현재 작업을 끝냈어요.':'Unplugged. The active sessions have ended.',
+  '전원 분리 후':'After unplugging', '준비 실패 예시':'Simulate preparation failure',
   '자동 유지':'Automatic', '수동 유지':'Manual timer', '전원 분리':'Disconnected',
   '모두 중지':'Stop all', '보호 중지':'Safety pause', '대기':'Idle',
   '메뉴바 시안':'menu preview', '보호를 위해 중지했어요':'Paused for safety',

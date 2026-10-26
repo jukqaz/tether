@@ -1,4 +1,4 @@
-import { cpSync, copyFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { cpSync, copyFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -8,6 +8,11 @@ const built = path.join(prototype, 'dist/client');
 if (!existsSync(path.join(built, 'index.html'))) throw new Error('Build the retained prototype first.');
 const studio = path.join(root, 'dist/studio');
 mkdirSync(studio, { recursive: true });
+// Drop only obsolete generated bundles; retain legacy Site assets.
+const oldAssets = path.join(studio, 'assets');
+if (existsSync(oldAssets)) for (const name of readdirSync(oldAssets)) {
+  if (/^index-[A-Za-z0-9_-]+\.(js|css)$/.test(name) && !existsSync(path.join(built, 'assets', name))) unlinkSync(path.join(oldAssets, name));
+}
 cpSync(built, studio, { recursive: true });
 for (const name of ['localization-board.html', 'design-comparison.html']) {
   copyFileSync(path.join(prototype, name), path.join(studio, name));
