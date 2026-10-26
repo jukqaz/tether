@@ -8,6 +8,6 @@
   ],
   "scripts": {
     "build": "npm run build:site --workspace=power-state-review && node scripts/assemble-site.mjs",
-    "test": "node --test tests/publish-assets.test.mjs prototype/tests/power-preview.test.mjs && npm run test:sites --workspace=power-state-review"
+    "test": "node --test tests/publish-assets.test.mjs prototype/tests/power-preview.test.mjs prototype/tests/preview-state.test.mjs && npm run test:sites --workspace=power-state-review"
   }
 }

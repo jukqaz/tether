@@ -11,7 +11,6 @@ const en = {
   '자동 + 타이머 실행 중':'Automatic + timer', '타이머 실행 중':'Timer running',
   '자동 잠자기 방지 중':'Keeping awake automatically', '전원 분리로 종료':'Stopped after unplugging',
   '자동만 쉬는 중':'Automatic is paused', '잠자기 방지 꺼짐':'Keep awake is off',
-  '배터리 18% · 중지 기준 20%':'Battery 18% · Safety limit 20%',
   '다시 허용할 때까지 시작을 멈춥니다':'New starts are blocked until you allow them.',
   '전원 연결 중':'Power connected', '배터리 사용 중':'On battery power',
   '타이머 남은 시간':'Time remaining', '끄기 전까지':'Until turned off',
@@ -26,7 +25,7 @@ const en = {
   '끝난 타이머는 다시 시작하지 않습니다.':'Ended timers will not restart.',
   '보호 설정 보기':'Safety settings',
   '자동과 타이머를 끝냈어요. 새 타이머는 직접 시작할 수 있어요.':'Automatic and manual sessions ended. You can start a new timer.',
-  '직접 시작':'Start a timer', '유지 시간 선택':'Timer duration',
+  '유지 시간':'Timer duration', '직접 시작':'Start a timer', '유지 시간 선택':'Timer duration',
   '30분':'30 min', '1시간':'1 hr', '2시간':'2 hr',
   '다른 유지 시간':'More durations', '선택한 시간: 끄기 전까지':'Selected: until turned off',
   '자동 재개':'Resume automatic', '자동만 쉬기…':'Pause automatic…',
@@ -58,3 +57,13 @@ const en = {
 };
 
 export const menuText = (locale, text) => locale === 'en' ? (en[text] ?? text) : text;
+
+export function protectionCopy(locale, snapshot = {battery:18, threshold:20}, currentThreshold) {
+  const {battery, threshold} = snapshot;
+  return {
+    reason: locale === 'en' ? `At stop: battery ${battery}% · limit ${threshold}%` : `중지 당시: 배터리 ${battery}% · 기준 ${threshold}%`,
+    current: Number(currentThreshold) !== threshold
+      ? locale === 'en' ? `Current safety limit: ${currentThreshold}%` : `현재 중지 기준: ${currentThreshold}%`
+      : '',
+  };
+}

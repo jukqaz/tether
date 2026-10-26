@@ -62,11 +62,13 @@ function EmptyExample({ children }) {
 }
 
 function UpdateCard({ model, onChange, copy: c, locale }) {
-  const [notice, setNotice] = useState('');
+  const [cancelled, setCancelled] = useState(false);
   const blockerId = useId();
   const confirmationId = useId();
   const change = useRef(onChange);
   change.current = onChange;
+  const latestModel = useRef(model);
+  latestModel.current = model;
   const state = model.updateState ?? 'idle';
   const preparation = model.updatePreparation ?? 'idle';
   const version = model.currentVersion ?? '1.0.0';
@@ -79,7 +81,6 @@ function UpdateCard({ model, onChange, copy: c, locale }) {
   const active = model.state === 'manual' || model.state === 'automatic';
   const blocked = protectedState || power !== 'ac';
   const blocker = protectedState ? c.protectionBlock : power !== 'ac' ? c.batteryBlock : '';
-  const context = useRef({ power, protectedState, channel: model.channel, version, availableVersion });
   const phases = ['confirm', 'preparing', 'ready', 'error'];
   const hasPreparation = available && phases.includes(preparation) && (preparation === 'confirm' || (model.state === 'stopped' && !model.recording));
   const states = {
@@ -97,58 +98,56 @@ function UpdateCard({ model, onChange, copy: c, locale }) {
 
   useEffect(() => {
     if (!checking) return undefined;
-    const timer = setTimeout(() => change.current({ updateState: 'available', lastChecked: Date.now(), updatePreparation: 'idle' }), 900);
+    const timer = setTimeout(() => {
+      if (latestModel.current.updateState === 'checking') change.current({ updateState: 'available', lastChecked: Date.now(), updatePreparation: 'idle' });
+    }, 900);
     return () => clearTimeout(timer);
   }, [checking, model.channel]);
 
   useEffect(() => {
-    const previous = context.current;
-    const safetyChanged = previous.power !== power || previous.protectedState !== protectedState;
-    const releaseChanged = previous.channel !== model.channel || previous.version !== version || previous.availableVersion !== availableVersion;
-    const sessionRestarted = ['preparing', 'ready', 'error'].includes(preparation) && (model.state !== 'stopped' || Boolean(model.recording));
-    context.current = { power, protectedState, channel: model.channel, version, availableVersion };
-    if (preparation !== 'idle' && (safetyChanged || releaseChanged || !available || sessionRestarted || blocker)) {
-      change.current('updatePreparation', 'idle');
-      setNotice(safetyChanged || blocker ? 'safety' : sessionRestarted ? 'session' : '');
-    }
-  }, [power, protectedState, model.channel, version, availableVersion, available, model.state, model.recording, preparation, blocked]);
+    if (model.updatePreparationNotice || preparation !== 'idle') setCancelled(false);
+  }, [model.updatePreparationNotice, preparation]);
 
   useEffect(() => {
-    if (preparation !== 'preparing' || !available || blocker || model.state !== 'stopped') return undefined;
+    if (preparation !== 'preparing' || !available || blocked || model.state !== 'stopped' || model.recording) return undefined;
     const timer = setTimeout(() => {
-      const current = context.current;
-      if (current.power === 'ac' && !current.protectedState) change.current('updatePreparation', model.updatePrepareFail ? 'error' : 'ready');
+      const current = latestModel.current;
+      const currentPower = current.power ?? (current.state === 'automatic' || current.state === 'stopped' ? 'ac' : 'battery');
+      if (current.updatePreparation === 'preparing' && current.updateState === 'available' && currentPower === 'ac' && current.state === 'stopped' && !current.recording) {
+        change.current('updatePreparation', current.updatePrepareFail ? 'error' : 'ready');
+      }
     }, 1200);
     return () => clearTimeout(timer);
-  }, [preparation, available, blocked, model.state, model.updatePrepareFail]);
+  }, [preparation, available, blocked, model.state, model.recording, model.updatePrepareFail]);
 
   const commitChannel = (value) => {
-    change.current({ returningToStable: model.channel === 'beta' && value === 'stable', channel: value, updateState: 'idle', lastChecked: null, updateChannelConfirm: false, updatePreparation: 'idle' });
-    setNotice('');
+    change.current({ returningToStable: model.channel === 'beta' && value === 'stable', channel: value, updateState: 'idle', lastChecked: null, updateChannelConfirm: false, updatePreparation: 'idle', updatePreparationNotice: '' });
+    setCancelled(false);
   };
   const changeChannel = (value) => {
-    if (value === 'beta' && model.channel !== 'beta') change.current({ updateChannelConfirm: true, updatePreparation: 'idle' });
+    if (value === 'beta' && model.channel !== 'beta') change.current({ updateChannelConfirm: true, updatePreparation: 'idle', updatePreparationNotice: '' });
     else commitChannel(value);
   };
   const check = () => {
-    setNotice('');
-    change.current({ updateState: 'checking', updatePreparation: 'idle' });
+    setCancelled(false);
+    change.current({ updateState: 'checking', updatePreparation: 'idle', updatePreparationNotice: '' });
   };
   const openConfirmation = () => {
     if (blocker || !available || model.updateChannelConfirm) return;
-    setNotice('');
-    change.current('updatePreparation', 'confirm');
+    setCancelled(false);
+    change.current({ updatePreparation: 'confirm', updatePreparationNotice: '' });
   };
   const confirmPreparation = () => {
     if (blocker || !available || preparation !== 'confirm') return;
-    setNotice('');
-    change.current({ state: 'stopped', recording: false, remaining: 0, untimed: false, stopRequested: false, updatePreparation: 'preparing' });
+    setCancelled(false);
+    change.current({ state: 'stopped', recording: false, remaining: 0, untimed: false, stopRequested: false, updatePreparation: 'preparing', updatePreparationNotice: '' });
   };
   const cancelPreparation = () => {
-    setNotice(preparation === 'confirm' ? '' : 'cancelled');
-    change.current('updatePreparation', 'idle');
+    setCancelled(preparation !== 'confirm');
+    change.current({ updatePreparation: 'idle', updatePreparationNotice: '' });
   };
-  const noticeText = notice === 'safety' ? c.safetyInvalidated : notice === 'session' ? c.sessionInvalidated : notice === 'cancelled' ? c.preparationCancelled : '';
+  const notice = model.updatePreparationNotice;
+  const noticeText = notice === 'safety' ? c.safetyInvalidated : notice === 'session' ? c.sessionInvalidated : notice === 'release' ? c.releaseInvalidated : cancelled ? c.preparationCancelled : '';
 
   return (
     <div className="s-update-card">
@@ -228,6 +227,7 @@ function UpdateCard({ model, onChange, copy: c, locale }) {
 export function SettingsContent({ tab, model, onChange, expandAll = false, locale = 'ko' }) {
   const displayModeName = useId();
   const [restOpen, setRestOpen] = useState(false);
+  useEffect(() => { setRestOpen(false); }, [model.auto, model.autoRest, tab]);
   const resolvedLocale = locale === 'en' ? 'en' : 'ko';
   const c = settingsCopy[resolvedLocale];
   const automaticFooter = !model.auto ? c.autoOff
@@ -282,7 +282,7 @@ export function SettingsContent({ tab, model, onChange, expandAll = false, local
               <ToggleRow label={c.auto} checked={model.auto} onChange={(value) => onChange('auto', value)} />
               <div className="s-row s-rest-row" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setRestOpen(false); }} onKeyDown={(event) => { if (event.key === 'Escape') setRestOpen(false); }}>
                 <span>{c.automaticSession}</span>
-                <button type="button" className="s-button" disabled={!model.auto && !model.autoRest} aria-haspopup={model.autoRest ? undefined : 'menu'} aria-expanded={Boolean(restOpen && model.auto && !model.autoRest)} onClick={() => {
+                <button type="button" className="s-button" disabled={!model.auto} aria-haspopup={model.autoRest ? undefined : 'menu'} aria-expanded={Boolean(restOpen && model.auto && !model.autoRest)} onClick={() => {
                   if (model.autoRest) { onChange('autoRest', false); setRestOpen(false); }
                   else setRestOpen((value) => !value);
                 }}>{model.autoRest ? c.resumeAuto : c.restAuto}</button>

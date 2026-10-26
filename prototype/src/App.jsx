@@ -10,7 +10,8 @@ import { StopIcon } from '@phosphor-icons/react/dist/csr/Stop';
 import { ShieldWarningIcon } from '@phosphor-icons/react/dist/csr/ShieldWarning';
 import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowCounterClockwise';
 import { SettingsContent } from './SettingsContent';
-import { menuText } from './menu-copy';
+import { menuText, protectionCopy } from './menu-copy';
+import { reconcilePreview } from './preview-state';
 import { disconnectPreview, connectPreview } from './power-preview';
 import './settings.css';
 
@@ -58,14 +59,15 @@ function Menu({model,onChange,onSettings,locale,instance='main'}) {
   };
   const allow=()=>{if(!protectedState)onChange('state',autoActive?'automatic':'waiting')};
   const title=protectedState?'보호를 위해 중지했어요':stopped?'모두 중지됨':manual?(model.untimed?'직접 유지 중':autoActive?'자동 + 타이머 실행 중':'타이머 실행 중'):automatic?'자동 잠자기 방지 중':state==='unplugged'?'전원 분리로 종료':model.autoRest?'자동만 쉬는 중':'잠자기 방지 꺼짐';
-  const detail=protectedState?'배터리 18% · 중지 기준 20%':stopped?'다시 허용할 때까지 시작을 멈춥니다':power==='ac'?'전원 연결 중':'배터리 사용 중';
+  const protection=protectionCopy(locale,model.protectionSnapshot,model.reserve);
+  const detail=protectedState?protection.reason:stopped?'다시 허용할 때까지 시작을 멈춥니다':power==='ac'?'전원 연결 중':'배터리 사용 중';
   const manualFooter=autoActive?'직접 시작한 유지가 끝나도 자동 유지는 계속됩니다.':model.autoRest?'자동은 잠시 쉬고 있어요.':model.auto?'자동은 전원 연결 대기 중':'자동 시작 꺼짐';
   return <section className={`mac-menu ${protectedState?'is-protected':''}`} data-testid={`menu-${instance}`} ref={root} aria-label={`${t(labelFor(state))} ${t('메뉴바 시안')}`}>
     <header className="menu-brand"><LinkIcon size={16} weight="bold"/><strong>Tether</strong><span className="power-source">{power==='ac'&&<PlugIcon size={12}/>} {t(power==='ac'?'전원 연결 중':'배터리 사용 중')}</span></header>
     <div className="menu-content">
       <div className="status-line">
         {protectedState?<ShieldWarningIcon size={19} weight="fill"/>:<span className={`status-dot ${automatic||manual?'active':''}`}/>}
-        <div><h2>{t(title)}</h2>{blocked&&<p>{t(detail)}</p>}</div>
+        <div><h2>{t(title)}</h2>{blocked&&<p>{t(detail)}</p>}{protectedState&&protection.current&&<p>{protection.current}</p>}</div>
       </div>
       {model.lastPowerEvent==='unplugged'&&manual&&<p className="power-event-note" role="status">{t(model.state==='manual'?'전원을 뺐어요. 허용된 타이머만 계속합니다.':'전원 분리로 현재 작업을 끝냈어요.')}</p>}
       {manual?<div className="timer-section">
@@ -81,14 +83,14 @@ function Menu({model,onChange,onSettings,locale,instance='main'}) {
         <p>{t(protectedState?(power==='ac'?'충분히 충전한 뒤 보호 상태를 확인하세요.':'전원을 연결한 뒤 다시 확인하세요.'):'끝난 타이머는 다시 시작하지 않습니다.')}</p>
         {protectedState&&<button className="text-button" onClick={()=>onSettings('keep')}>{t('보호 설정 보기')}<CaretRightIcon size={12}/></button>}
       </div>:<div className="manual-start">
-        <div className="section-label">{t('직접 시작')}</div>
+        <div className="section-label">{t('유지 시간')}</div>
         <div className="duration-row"><div className="segments" role="group" aria-label={t('유지 시간 선택')}>
           {[30,60,120].map(minutes=><button key={minutes} disabled={power==='battery'&&minutes>Number(model.batteryLimit)} aria-pressed={model.selectedDuration===minutes} onClick={()=>onChange('selectedDuration',minutes)}>{t(minutes===30?'30분':minutes===60?'1시간':'2시간')}</button>)}
         </div>{power==='ac'&&<div className="popup-anchor"><button className="icon-button more-time" aria-label={t('다른 유지 시간')} aria-expanded={timeMore} onClick={()=>setTimeMore(!timeMore)}><CaretDownIcon size={13}/></button>{timeMore&&<div className="native-popup time-popup" role="menu"><button role="menuitem" onClick={()=>{onChange('selectedDuration','untimed');setTimeMore(false)}}>{t('끄기 전까지')}</button></div>}</div>}</div>
         {model.selectedDuration==='untimed'&&<p className="subtle">{t('선택한 시간: 끄기 전까지')}</p>}
         <button className="primary-button" onClick={start}>{t('직접 시작')}</button>
       </div>}
-      {(autoActive||model.autoRest)&&!blocked&&<div className="rest-wrap popup-anchor"><button className="menu-row" aria-haspopup={model.autoRest?undefined:'menu'} aria-expanded={restOpen} onClick={()=>model.autoRest?onChange('autoRest',false):setRestOpen(!restOpen)}><span>{t(model.autoRest?'자동 재개':'자동만 쉬기…')}</span><CaretRightIcon size={14}/></button>{restOpen&&<div className="native-popup" role="menu">{['30분','1시간','직접 재개할 때까지'].map(duration=><button role="menuitem" key={duration} onClick={()=>{onChange('autoRest',duration);setRestOpen(false)}}>{t(duration)}</button>)}</div>}</div>}
+      {model.auto&&(autoActive||model.autoRest)&&!blocked&&<div className="rest-wrap popup-anchor"><button className="menu-row" aria-haspopup={model.autoRest?undefined:'menu'} aria-expanded={restOpen} onClick={()=>model.autoRest?onChange('autoRest',false):setRestOpen(!restOpen)}><span>{t(model.autoRest?'자동 재개':'자동만 쉬기…')}</span><CaretRightIcon size={14}/></button>{restOpen&&<div className="native-popup" role="menu">{['30분','1시간','직접 재개할 때까지'].map(duration=><button role="menuitem" key={duration} onClick={()=>{onChange('autoRest',duration);setRestOpen(false)}}>{t(duration)}</button>)}</div>}</div>}
       {blocked?<div className="saved-options"><p>{t('덮개·화면 설정은 그대로 보관됩니다.')}</p></div>:<div className="quick-options">
         {!manual&&!automatic&&<p className="section-label">{t('다음 작업에 적용할 설정')}</p>}
         <div className="toggle-row"><span>{t('덮개 닫아도 계속 사용')}</span><Toggle label={t('덮개 닫아도 계속 사용')} checked={model.lid} onChange={value=>onChange('lid',value)}/></div>
@@ -110,7 +112,8 @@ function SettingsWindow({model,onChange,tab,onTab,expandAll,compact,locale}) {
 }
 
 export function App() {
-  const [model,setModel]=useState({...INITIAL}), [tab,setTab]=useState('power'), [view,setView]=useState('workspace');
+  const [model,setModelRaw]=useState({...INITIAL}), [tab,setTab]=useState('power'), [view,setView]=useState('workspace');
+  const setModel=change=>setModelRaw(old=>reconcilePreview(old,typeof change==='function'?change(old):change));
   const [pair,setPair]=useState('running'), [expandAll,setExpandAll]=useState(false), [compact,setCompact]=useState(true);
   const [systemDark,setSystemDark]=useState(()=>window.matchMedia('(prefers-color-scheme: dark)').matches);
   const [systemLanguage,setSystemLanguage]=useState(()=>navigator.language.startsWith('ko')?'ko':'en');
@@ -125,14 +128,11 @@ export function App() {
   useEffect(()=>{document.documentElement.lang=locale;document.title=`Tether · ${t('상태·스크롤 시안')}`},[locale]);
   const update=(key,value)=>setModel(old=>{
     const next={...old,...(typeof key==='object'?key:{[key]:value})};
-    if(next.state==='stopped'){next.remaining=0;next.untimed=false;next.lastPowerEvent=null;}
     if(key==='state'&&value!==old.state)next.lastPowerEvent=null;
-    if(key==='autoRest'){if(value&&old.state==='automatic')next.state='waiting';else if(!value&&old.state==='waiting'&&old.power==='ac'&&old.auto)next.state='automatic'}
-    if(key==='auto'&&!value&&old.state==='automatic')next.state='waiting';else if(key==='auto'&&value&&old.state==='waiting'&&old.power==='ac'&&!old.autoRest)next.state='automatic';
     if(key==='batteryLimit'&&old.power==='battery')next.selectedDuration=Math.min(Number(old.selectedDuration)||30,Number(value));
     return next;
   });
-  const scenarioModel=(state,old)=>{const seed={...old,state,power:state==='manual'?'ac':statePower(state),auto:state==='automatic'?true:old.auto,remaining:['stopped','protected'].includes(state)?0:2700,batteryRemaining:Number(old.batteryLimit)*60,selectedDuration:30,untimed:false,stopRequested:false,autoRest:false,lastPowerEvent:null};return state==='unplugged'?disconnectPreview({...seed,state:'manual',power:'ac'}):seed};
+  const scenarioModel=(state,old)=>{const seed={...old,state,power:state==='manual'?'ac':statePower(state),auto:state==='automatic'?true:old.auto,remaining:['stopped','protected'].includes(state)?0:2700,batteryRemaining:Number(old.batteryLimit)*60,selectedDuration:30,untimed:false,stopRequested:false,autoRest:false,lastPowerEvent:null,protectionSnapshot:state==='protected'?{battery:Math.max(0,Number(old.reserve)-2),threshold:Number(old.reserve)}:old.protectionSnapshot};return state==='unplugged'?disconnectPreview({...seed,state:'manual',power:'ac'}):seed};
   const setScenario=state=>setModel(old=>scenarioModel(state,old));
   const showSettings=key=>{setTab(key);setView('workspace')};
   return <main className="prototype" data-theme={theme} data-locale={locale}>
