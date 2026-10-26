@@ -6,6 +6,7 @@ import { CheckCircleIcon } from '@phosphor-icons/react/dist/csr/CheckCircle';
 import { ArrowCircleDownIcon } from '@phosphor-icons/react/dist/csr/ArrowCircleDown';
 import { WarningCircleIcon } from '@phosphor-icons/react/dist/csr/WarningCircle';
 import { settingsCopy } from './settings-copy';
+import { disconnectChoice } from './power-preview';
 import './settings.css';
 
 function Section({ title, children, footer }) {
@@ -150,7 +151,7 @@ function UpdateCard({ model, onChange, copy: c, locale }) {
   const noticeText = notice === 'safety' ? c.safetyInvalidated : notice === 'session' ? c.sessionInvalidated : notice === 'release' ? c.releaseInvalidated : cancelled ? c.preparationCancelled : '';
 
   return (
-    <div className="s-update-card">
+    <div className="s-update-card" data-update-state={state}>
       <SelectRow label={c.updateChannel} value={model.channel} onChange={changeChannel} options={c.channelOptions} disabled={checking || preparation === 'preparing'} />
       <ToggleRow label={c.autoCheck} checked={model.autoCheck ?? true} onChange={(value) => onChange('autoCheck', value)} />
       {model.channel === 'stable' && model.returningToStable && <p className="s-update-channel-note">{c.stableWait}</p>}
@@ -164,13 +165,13 @@ function UpdateCard({ model, onChange, copy: c, locale }) {
           </div>
         </div>
       )}
-      <div className={`s-update-status s-update-${state}`} role="status" aria-live="polite" aria-busy={checking}>
+      {state !== 'idle' && <div className={`s-update-status s-update-${state}`} role="status" aria-live="polite" aria-busy={checking}>
         <StatusIcon size={20} className={checking ? 's-update-spinner' : undefined} aria-hidden="true" />
-        <div><h3>{title}</h3><p>{detail}</p></div>
-      </div>
+        <div><h3>{title}</h3>{(available || state === 'error') && <p>{detail}</p>}</div>
+      </div>}
       <dl className="s-update-metadata">
         <div><dt>{c.currentVersion}</dt><dd>{c.versionBuild(version, build)}</dd></div>
-        <div><dt>{c.lastChecked}</dt><dd>{lastChecked}</dd></div>
+        {lastCheckedDate && !Number.isNaN(lastCheckedDate.getTime()) && <div><dt>{c.lastChecked}</dt><dd>{lastChecked}</dd></div>}
       </dl>
       {available && blocker && <p className="s-update-blocker" id={blockerId}>{blocker}</p>}
       {noticeText && <p className="s-update-notice" role="status">{noticeText}</p>}
@@ -226,10 +227,9 @@ function UpdateCard({ model, onChange, copy: c, locale }) {
 
 export function SettingsContent({ tab, model, onChange, expandAll = false, locale = 'ko' }) {
   const displayModeName = useId();
-  const [restOpen, setRestOpen] = useState(false);
-  useEffect(() => { setRestOpen(false); }, [model.auto, model.autoRest, tab]);
   const resolvedLocale = locale === 'en' ? 'en' : 'ko';
   const c = settingsCopy[resolvedLocale];
+  const disconnect = disconnectChoice(model.disconnect);
   const automaticFooter = !model.auto ? c.autoOff
     : model.state === 'protected' ? c.autoProtected
       : model.state === 'stopped' ? c.autoStopped
@@ -257,13 +257,10 @@ export function SettingsContent({ tab, model, onChange, expandAll = false, local
               <ToggleRow label={c.screen} checked={model.screen} onChange={(value) => onChange('screen', value)} />
             </div>
           </Section>
-          <Section title={c.batteryUse} footer={c.batteryFooter}>
+          <Section title={c.batteryProtection} footer={c.criticalHeat}>
             <div className="s-group">
               <SelectRow label={c.batteryLimit} value={model.batteryLimit} onChange={(value) => onChange('batteryLimit', value)} options={durationOptions([30, 60, 120, 240])} />
-            </div>
-          </Section>
-          <Section title={c.protection} footer={c.criticalHeat}>
-            <div className="s-group">
+              <p className="s-group-note">{c.batteryFooter}</p>
               <Disclosure title={c.protectionDetails} expandAll={expandAll}>
                 <SelectRow label={c.reserve} value={model.reserve} onChange={(value) => onChange('reserve', value)} options={['10', '20', '30'].map((value) => [value, `${value}%`])} />
                 <ToggleRow label={c.hot} checked={model.hot} onChange={(value) => onChange('hot', value)} />
@@ -280,26 +277,13 @@ export function SettingsContent({ tab, model, onChange, expandAll = false, local
           <Section title={c.pluggedIn} footer={automaticFooter}>
             <div className="s-group">
               <ToggleRow label={c.auto} checked={model.auto} onChange={(value) => onChange('auto', value)} />
-              <div className="s-row s-rest-row" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setRestOpen(false); }} onKeyDown={(event) => { if (event.key === 'Escape') setRestOpen(false); }}>
-                <span>{c.automaticSession}</span>
-                <button type="button" className="s-button" disabled={!model.auto} aria-haspopup={model.autoRest ? undefined : 'menu'} aria-expanded={Boolean(restOpen && model.auto && !model.autoRest)} onClick={() => {
-                  if (model.autoRest) { onChange('autoRest', false); setRestOpen(false); }
-                  else setRestOpen((value) => !value);
-                }}>{model.autoRest ? c.resumeAuto : c.restAuto}</button>
-                {restOpen && model.auto && !model.autoRest && (
-                  <div className="s-rest-menu" role="menu" aria-label={c.restMenu}>
-                    {c.restOptions.map(([value, label]) => <button key={value} type="button" role="menuitem" onClick={() => { onChange('autoRest', value); setRestOpen(false); }}>{label}</button>)}
-                  </div>
-                )}
-              </div>
             </div>
           </Section>
           <Section title={c.unplugged} footer={model.sleepAction === 'system' ? c.systemSleepFooter : c.sleepFooter}>
             <div className="s-group">
-              <SelectRow label={c.awake} value={model.disconnect} onChange={(value) => onChange('disconnect', value)} options={c.disconnectOptions} />
+              <SelectRow label={c.awake} value={disconnect} onChange={(value) => onChange('disconnect', value)} options={c.disconnectOptions} />
               <div className="s-policy-preview" aria-live="polite">
-                <p>{c.disconnectDescriptions[model.disconnect]}</p>
-                {model.disconnect !== 'all' && <p className="s-policy-note">{c.continuedPolicyNote}</p>}
+                <p>{c.disconnectDescriptions[disconnect]}</p>
               </div>
               <SelectRow label={c.lidClosed} value={model.sleepAction ?? 'sleep'} onChange={(value) => onChange('sleepAction', value)} options={c.sleepOptions} />
             </div>
@@ -315,18 +299,19 @@ export function SettingsContent({ tab, model, onChange, expandAll = false, local
               <SelectRow label={c.menuText} value={model.menuText} onChange={(value) => onChange('menuText', value)} options={c.menuOptions} />
               <SelectRow label={c.language} value={model.language} onChange={(value) => onChange('language', value)} options={c.languageOptions} />
               <SelectRow label={c.appearance} value={model.appearance ?? 'system'} onChange={(value) => onChange('appearance', value)} options={c.appearanceOptions} />
+              <Disclosure title={c.notifications} expandAll={expandAll}>
+                <ToggleRow label={c.endNotify} checked={model.endNotify} onChange={(value) => onChange('endNotify', value)} />
+                <ToggleRow label={c.preNotify} checked={model.preNotify} onChange={(value) => onChange('preNotify', value)} />
+              </Disclosure>
             </div>
           </Section>
-          <Section title={c.notifications}>
-            <div className="s-group">
-              <ToggleRow label={c.endNotify} checked={model.endNotify} onChange={(value) => onChange('endNotify', value)} />
-              <ToggleRow label={c.preNotify} checked={model.preNotify} onChange={(value) => onChange('preNotify', value)} />
-            </div>
-          </Section>
+          <Section title={c.updates}><UpdateCard model={model} onChange={onChange} copy={c} locale={resolvedLocale} /></Section>
           <Section title={c.records}>
             <div className="s-group">
-              <Disclosure title={c.usage} expandAll={expandAll}><EmptyExample>{c.noUsage}</EmptyExample></Disclosure>
-              <Disclosure title={c.recent} expandAll={expandAll}><EmptyExample>{c.noRecent}</EmptyExample></Disclosure>
+              <Disclosure title={c.usageHistory} expandAll={expandAll}>
+                <div className="s-history-section"><h3>{c.usage}</h3><EmptyExample>{c.noUsage}</EmptyExample></div>
+                <div className="s-history-section"><h3>{c.recent}</h3><EmptyExample>{c.noRecent}</EmptyExample></div>
+              </Disclosure>
               <Disclosure title={c.appsHelpers} expandAll={expandAll}>
                 <EmptyExample>{c.noAppInfo}</EmptyExample>
                 <div className="s-info-row"><span>{c.otherApps}</span><span>—</span></div>
@@ -346,7 +331,6 @@ export function SettingsContent({ tab, model, onChange, expandAll = false, local
               </Disclosure>
             </div>
           </Section>
-          <Section title={c.updates}><UpdateCard model={model} onChange={onChange} copy={c} locale={resolvedLocale} /></Section>
         </>
       )}
     </div>

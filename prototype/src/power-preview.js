@@ -15,3 +15,6 @@ export function connectPreview(model) {
     : model.auto && !model.autoRest ? 'automatic' : 'waiting';
   return {...model, power: 'ac', state, lastPowerEvent: null};
 }
+
+// Legacy saved choices keep their value; the two equivalent choices share one control.
+export const disconnectChoice = value => value === 'allowed' ? 'automatic' : value;

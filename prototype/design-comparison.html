@@ -1,1 +1,72 @@
-<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tether · 메뉴와 설정 개선 비교</title><style>*{box-sizing:border-box}body{margin:0;padding:28px;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#eef1f6;color:#222b39}header,main,footer{max-width:1440px;margin:auto}header{margin-bottom:22px}h1{font-size:22px;margin:0 0 8px}p{line-height:1.7;color:#596474}a{color:#0068d9}main{display:grid;grid-template-columns:1fr 1fr;gap:22px}figure{margin:0}figcaption{font-weight:600;margin-bottom:10px}img{width:100%;display:block;border-radius:12px;border:1px solid #c5cedd}footer{margin-top:22px;line-height:1.8}@media(max-width:900px){main{grid-template-columns:1fr}body{padding:18px}}</style><header><h1>Tether · 이전 배포 화면과 개선 시안</h1><p>메뉴의 현재 작업·빠른 설정·전체 제어를 묶고 전원 탭의 빈 공간을 줄였습니다. 한글과 영어는 글자를 줄이지 않고 필요한 높이를 확보합니다.<br>두 화면은 전원 상태 예시가 다릅니다. 실제 절전·잠금 동작을 비교한 결과는 아닙니다.</p><a href="./">조작형 시안 열기 →</a></header><main><figure><figcaption>이전 배포 시안</figcaption><a href="./screens-i18n/before-review.jpg" target="_blank"><img src="./screens-i18n/before-review.jpg" alt="이전 메뉴와 설정 화면"></a></figure><figure><figcaption>개선 시안 · 2026-10-26</figcaption><a href="./screens-i18n/ko-light-power.jpg" target="_blank"><img src="./screens-i18n/ko-light-power.jpg" alt="개선 메뉴와 전원 설정 화면"></a></figure></main><footer><a href="./localization-board.html">한영 · 밝음/어두움 · 펼침과 스크롤 비교 →</a><p>전원 분리 결과와 업데이트 영향 확인은 조작형 시안에서 연결됩니다. 앱과 Mac 설정은 바꾸지 않습니다.</p></footer></html>
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Tether · 컴팩트 개선 시안 비교</title>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;padding:28px;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#eef1f6;color:#222b39}
+    header,nav,main,footer{max-width:1440px;margin:auto}
+    header{margin-bottom:20px}
+    h1{font-size:22px;margin:0 0 8px}
+    p{line-height:1.7;color:#596474}
+    a{color:#0068d9}
+    nav{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:20px}
+    button{padding:8px 12px;border:1px solid #cbd3df;border-radius:8px;background:#fff;color:#323d4d;font:inherit;cursor:pointer}
+    button[aria-pressed=true]{color:#fff;background:#0068d9;border-color:#0068d9}
+    button:focus-visible,a:focus-visible{outline:3px solid #0068d9;outline-offset:3px}
+    main{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px}
+    figure{margin:0;min-width:0}
+    figcaption{font-weight:600;margin-bottom:10px}
+    img{width:100%;height:auto;display:block;border-radius:12px;border:1px solid #c5cedd}
+    footer{margin-top:22px;line-height:1.8}
+    @media(max-width:900px){main{grid-template-columns:1fr}body{padding:18px}}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Tether · 컴팩트 개선 시안 비교</h1>
+    <p>같은 전원 연결(AC) · 타이머 45분 남음 예시로 메뉴와 설정 3개 탭을 비교합니다.<br>화면 구성의 전후 비교이며 실제 앱 동작이나 절전 성능을 비교한 결과는 아닙니다. 이미지를 누르면 원본 크기로 볼 수 있습니다.</p>
+    <a href="./">조작형 시안 열기 →</a>
+  </header>
+  <nav aria-label="비교할 설정 화면">
+    <button type="button" data-view="keep" aria-pressed="false" aria-controls="comparison-grid">잠자기 방지</button>
+    <button type="button" data-view="power" aria-pressed="true" aria-controls="comparison-grid">전원 동작</button>
+    <button type="button" data-view="general" aria-pressed="false" aria-controls="comparison-grid">앱 설정</button>
+  </nav>
+  <main id="comparison-grid" aria-label="전원 동작 전후 비교" aria-live="polite">
+    <figure>
+      <figcaption id="before-caption">정리 전 · 전원 동작</figcaption>
+      <a id="before-link" href="./screens-i18n/before-compact-power.jpg" target="_blank" rel="noopener"><img id="before-image" src="./screens-i18n/before-compact-power.jpg" alt="정리 전 메뉴와 전원 동작 설정 · 전원 연결 · 타이머 45분 남음 예시"></a>
+    </figure>
+    <figure>
+      <figcaption id="after-caption">컴팩트 개선 시안 · 전원 동작</figcaption>
+      <a id="after-link" href="./screens-i18n/ko-light-power.jpg" target="_blank" rel="noopener"><img id="after-image" src="./screens-i18n/ko-light-power.jpg" alt="컴팩트 개선 시안의 메뉴와 전원 동작 설정 · 전원 연결 · 타이머 45분 남음 예시"></a>
+    </figure>
+  </main>
+  <footer>
+    <a href="./localization-board.html">한영 · 밝음/어두움 · 펼침과 스크롤 비교 →</a>
+    <p>전원 분리 결과와 업데이트 영향 확인은 조작형 시안에서 살펴볼 수 있습니다. 실제 앱과 Mac 설정은 바꾸지 않습니다.</p>
+  </footer>
+  <script>
+    const views={keep:'잠자기 방지',power:'전원 동작',general:'앱 설정'};
+    const buttons=document.querySelectorAll('[data-view]');
+    function showView(view){
+      const label=views[view];
+      if(!label)return;
+      buttons.forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.view===view)));
+      document.getElementById('comparison-grid').setAttribute('aria-label',label+' 전후 비교');
+      for(const [side,prefix,caption] of [['before','before-compact-','정리 전'],['after','ko-light-','컴팩트 개선 시안']]){
+        const path='./screens-i18n/'+prefix+view+'.jpg';
+        document.getElementById(side+'-caption').textContent=caption+' · '+label;
+        document.getElementById(side+'-link').setAttribute('href',path);
+        const image=document.getElementById(side+'-image');
+        image.setAttribute('src',path);
+        image.setAttribute('alt',caption+' 메뉴와 '+label+' 설정 · 전원 연결 · 타이머 45분 남음 예시');
+      }
+    }
+    buttons.forEach(button=>button.addEventListener('click',()=>showView(button.dataset.view)));
+  </script>
+</body>
+</html>

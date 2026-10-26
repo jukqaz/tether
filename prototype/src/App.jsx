@@ -12,7 +12,7 @@ import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowC
 import { SettingsContent } from './SettingsContent';
 import { menuText, protectionCopy } from './menu-copy';
 import { reconcilePreview } from './preview-state';
-import { disconnectPreview, connectPreview } from './power-preview';
+import { disconnectPreview, connectPreview, disconnectChoice } from './power-preview';
 import './settings.css';
 
 const INITIAL = {
@@ -24,7 +24,7 @@ const INITIAL = {
   updateState:'idle', autoCheck:true, currentVersion:'1.0.0', currentBuild:'100', availableVersion:'1.0.1', lastChecked:null,
 };
 const SCENARIOS = [['automatic','자동 유지'],['manual','수동 유지'],['stopped','모두 중지'],['protected','보호 중지']];
-const POLICIES = [['all','모두 끝내기','자동과 타이머를 모두 종료'],['automatic','자동만 끝내기','배터리에서 허용된 수동 타이머는 계속'],['allowed','허용된 유지 계속','배터리에서 허용된 기존 작업만 계속']];
+const POLICIES = [['all','모두 끝내기','자동과 타이머를 모두 종료'],['automatic','타이머 계속','자동은 끝내고 허용된 수동 유지만 계속']];
 const TABS = [['keep','잠자기 방지',PowerIcon],['power','전원 동작',PlugIcon],['app','앱 설정',GearSixIcon]];
 const statePower = state => state==='automatic'||state==='stopped'?'ac':'battery';
 const labelFor = state => SCENARIOS.find(([key])=>key===state)?.[1] || '대기';
@@ -90,13 +90,13 @@ function Menu({model,onChange,onSettings,locale,instance='main'}) {
         {model.selectedDuration==='untimed'&&<p className="subtle">{t('선택한 시간: 끄기 전까지')}</p>}
         <button className="primary-button" onClick={start}>{t('직접 시작')}</button>
       </div>}
-      {model.auto&&(autoActive||model.autoRest)&&!blocked&&<div className="rest-wrap popup-anchor"><button className="menu-row" aria-haspopup={model.autoRest?undefined:'menu'} aria-expanded={restOpen} onClick={()=>model.autoRest?onChange('autoRest',false):setRestOpen(!restOpen)}><span>{t(model.autoRest?'자동 재개':'자동만 쉬기…')}</span><CaretRightIcon size={14}/></button>{restOpen&&<div className="native-popup" role="menu">{['30분','1시간','직접 재개할 때까지'].map(duration=><button role="menuitem" key={duration} onClick={()=>{onChange('autoRest',duration);setRestOpen(false)}}>{t(duration)}</button>)}</div>}</div>}
-      {blocked?<div className="saved-options"><p>{t('덮개·화면 설정은 그대로 보관됩니다.')}</p></div>:<div className="quick-options">
-        {!manual&&!automatic&&<p className="section-label">{t('다음 작업에 적용할 설정')}</p>}
+      {model.auto&&!blocked&&<div className="rest-wrap popup-anchor"><button className="menu-row" aria-haspopup={model.autoRest?undefined:'menu'} aria-expanded={restOpen} onClick={()=>model.autoRest?onChange('autoRest',false):setRestOpen(!restOpen)}><span>{t(model.autoRest?(power==='ac'?'자동 재개':'자동 쉬기 해제'):'자동만 쉬기…')}</span><CaretRightIcon size={14}/></button>{restOpen&&<div className="native-popup" role="menu">{['30분','1시간','직접 재개할 때까지'].map(duration=><button role="menuitem" key={duration} onClick={()=>{onChange('autoRest',duration);setRestOpen(false)}}>{t(duration)}</button>)}</div>}</div>}
+      {!blocked&&<div className="quick-options">
+        {!manual&&!automatic&&<p className="section-label">{t('다음 유지 설정')}</p>}
         <div className="toggle-row"><span>{t('덮개 닫아도 계속 사용')}</span><Toggle label={t('덮개 닫아도 계속 사용')} checked={model.lid} onChange={value=>onChange('lid',value)}/></div>
         <div className="toggle-row"><span>{t('열린 동안 화면 켜두기')}</span><Toggle label={t('열린 동안 화면 켜두기')} checked={model.screen} onChange={value=>onChange('screen',value)}/></div>
       </div>}
-      {!blocked&&<div className="popup-anchor policy-anchor"><button className="menu-row" aria-haspopup="menu" aria-expanded={policyOpen} aria-label={t('전원 분리 옵션')} onClick={()=>setPolicyOpen(!policyOpen)}><span>{t('전원을 빼면')}</span><span className="row-value">{t(POLICIES.find(([key])=>key===model.disconnect)?.[1])}<CaretRightIcon size={14}/></span></button>{policyOpen&&<div className="native-popup policy-popup" role="menu" aria-label={t('전원 분리 정책')}>{POLICIES.map(([key,label,description])=><button role="menuitemradio" aria-checked={model.disconnect===key} key={key} onClick={()=>{onChange('disconnect',key);setPolicyOpen(false)}}><span className="check-space">{model.disconnect===key&&<CheckIcon size={13} weight="bold"/>}</span><span><strong>{t(label)}</strong><small>{t(description)}</small></span></button>)}</div>}</div>}
+      {!blocked&&<div className="popup-anchor policy-anchor"><button className="menu-row" aria-haspopup="menu" aria-expanded={policyOpen} aria-label={t('전원 분리 옵션')} onClick={()=>setPolicyOpen(!policyOpen)}><span>{t('전원을 빼면')}</span><span className="row-value">{t(POLICIES.find(([key])=>key===disconnectChoice(model.disconnect))?.[1])}<CaretRightIcon size={14}/></span></button>{policyOpen&&<div className="native-popup policy-popup" role="menu" aria-label={t('전원 분리 정책')}>{POLICIES.map(([key,label,description])=><button role="menuitemradio" aria-checked={disconnectChoice(model.disconnect)===key} key={key} onClick={()=>{onChange('disconnect',key);setPolicyOpen(false)}}><span className="check-space">{disconnectChoice(model.disconnect)===key&&<CheckIcon size={13} weight="bold"/>}</span><span><strong>{t(label)}</strong><small>{t(description)}</small></span></button>)}</div>}</div>}
     </div>
     <footer className="menu-footer"><button disabled={protectedState&&model.stopRequested} className={`footer-action ${stopped?'primary-button':''}`} onClick={stopped?allow:()=>protectedState?onChange('stopRequested',true):onChange('state','stopped')}>{stopped?<ArrowCounterClockwiseIcon size={14}/>:<StopIcon size={12} weight="fill"/>}{t(stopped?'다시 허용':protectedState&&model.stopRequested?'모두 중지됨':'모두 중지')}</button><button className="footer-settings" onClick={()=>onSettings('keep')}><GearSixIcon size={16}/>{t('설정…')}</button></footer>
   </section>;
