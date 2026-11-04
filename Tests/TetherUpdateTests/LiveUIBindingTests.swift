@@ -193,19 +193,17 @@ final class LiveUIBindingTests: XCTestCase {
             Localization.current = .english
             XCTAssertEqual(SettingsPage.general.shortTitle, "Keep awake")
             XCTAssertEqual(SettingsPage.general.title, "Keep awake")
-            XCTAssertEqual(SettingsPage.safety.shortTitle, "Automatic start")
-            XCTAssertEqual(SettingsPage.safety.title, "Automatic start")
-            XCTAssertEqual(SettingsPage.system.shortTitle, "App settings")
+            XCTAssertEqual(SettingsPage.safety.shortTitle, "Power & automation")
+            XCTAssertEqual(SettingsPage.safety.title, "Power & automation")
+            XCTAssertEqual(SettingsPage.system.shortTitle, "App")
             XCTAssertEqual(SettingsPage.system.title, "App settings")
 
             Localization.current = .korean
             XCTAssertEqual(SettingsPage.general.title, "잠자기 방지")
-            XCTAssertEqual(SettingsPage.safety.title, "자동 시작")
+            XCTAssertEqual(SettingsPage.safety.title, "전원·자동화")
             XCTAssertEqual(SettingsPage.system.title, "앱 설정")
-            for page in SettingsPage.allCases {
-                XCTAssertEqual(page.shortTitle, page.title,
-                    "Korean page names already fit and must remain unchanged")
-            }
+            XCTAssertEqual(SettingsPage.allCases.map(\.shortTitle), ["유지", "전원·자동화", "앱"])
+            XCTAssertEqual(Set(SettingsPage.allCases.map(\.title)).count, 3)
         }
     }
 
@@ -306,32 +304,40 @@ final class LiveUIBindingTests: XCTestCase {
         defer { Localization.current = previous }
         for language in [Language.english, .korean] {
             Localization.current = language
-            let defaults = LiveUIDefaults()
-            var settings = IdleSessionSettings()
-            settings.legacyRootConfigurationPending = false
-            settings.automaticEnabled = true
-            settings.automaticPowerCondition = .battery
-            settings.runtimeMarkers = .init(automaticActivation:
-                .init(condition: .battery, batteryConsumed: true, batteryExpired: true, batteryLimit: .thirtyMinutes))
-            defaults.set(try JSONEncoder().encode(settings), forKey: UserSessionController.preferenceKey)
-            let controller = UserSessionController(defaults: defaults, backend: LiveUIAssertion(),
-                displayBackend: LiveUIAssertion(), guiProbe: nil, environmentProbe: nil, boot: "ui-fixture")
-            defer { _ = controller.end() }
-            controller.update(power: .battery, thermal: 0, fullWake: true, controllingUser: true,
-                now: ContinuousTime.now, batteryPercent: 80)
-            let model = AppModel(preview: true, capabilities: .init(supportedPlatform: true, internalBattery: true, lid: true),
-                previewSession: controller, previewDefaults: defaults)
-            let panel = TetherPanel(model: model)
-            let saved = defaults.data(forKey: UserSessionController.preferenceKey)
-            XCTAssertTrue(model.automaticBatteryEnded)
-            XCTAssertEqual(panel.statusTitle, L("Automatic battery session ended", "자동 배터리 유지 종료"))
-            XCTAssertEqual(panel.statusDetail, model.presentation.subtitle)
-            XCTAssertFalse(model.workSessionHolding)
-            XCTAssertEqual(defaults.data(forKey: UserSessionController.preferenceKey), saved)
-            XCTAssertTrue(controller.start(duration: 1800))
-            XCTAssertFalse(model.automaticBatteryEnded)
-            XCTAssertEqual(panel.statusTitle, L("Timer active", "타이머 실행 중"),
-                "A new manual timer must take precedence over the spent automatic marker")
+            for advanced in [false, true] {
+                let defaults = LiveUIDefaults()
+                var settings = IdleSessionSettings()
+                settings.legacyRootConfigurationPending = false
+                settings.automaticEnabled = true
+                settings.automaticPowerCondition = .battery
+                if advanced { settings.v4 = advancedFixtureRules(from: settings.v4) }
+                settings.runtimeMarkers = .init(automaticActivation:
+                    .init(condition: .battery, batteryConsumed: true, batteryExpired: true, batteryLimit: .thirtyMinutes))
+                defaults.set(try JSONEncoder().encode(settings), forKey: UserSessionController.preferenceKey)
+                let controller = UserSessionController(defaults: defaults, backend: LiveUIAssertion(),
+                    displayBackend: LiveUIAssertion(), guiProbe: nil, environmentProbe: nil, boot: "ui-fixture")
+                defer { _ = controller.end() }
+                controller.v4ConditionSource.queryOverride = { _, _ in (.notSatisfied, nil) }
+                controller.update(power: .battery, thermal: 0, fullWake: true, controllingUser: true,
+                    now: ContinuousTime.now, batteryPercent: 80)
+                let model = AppModel(preview: true, capabilities: .init(supportedPlatform: true, internalBattery: true, lid: true),
+                    previewSession: controller, previewDefaults: defaults)
+                let panel = TetherPanel(model: model)
+                let saved = defaults.data(forKey: UserSessionController.preferenceKey)
+                XCTAssertEqual(model.v3Settings.condition, .battery, "Legacy saved range is preserved in either mode")
+                XCTAssertEqual(model.automaticBatteryEnded, advanced,
+                    "A legacy battery marker is relevant to explicit advanced scope, not the AC-only basic mode")
+                XCTAssertEqual(panel.statusTitle, advanced
+                    ? L("Automatic battery session ended", "자동 배터리 유지 종료")
+                    : L("Waiting to start automatically", "자동 시작 대기 중"))
+                XCTAssertEqual(panel.statusDetail, advanced ? model.presentation.subtitle : nil)
+                XCTAssertFalse(model.workSessionHolding)
+                XCTAssertEqual(defaults.data(forKey: UserSessionController.preferenceKey), saved)
+                XCTAssertTrue(controller.start(duration: 1800))
+                XCTAssertFalse(model.automaticBatteryEnded)
+                XCTAssertEqual(panel.statusTitle, L("Timer active", "타이머 실행 중"),
+                    "A new manual timer must take precedence over the spent automatic marker")
+            }
         }
     }
 
@@ -341,26 +347,69 @@ final class LiveUIBindingTests: XCTestCase {
         defer { Localization.current = previous }
         for language in [Language.english, .korean] {
             Localization.current = language
-            for captured in [PowerCondition.ac, .any] {
-                let (model, controller, backend) = fixture()
-                defer { _ = controller.end() }
-                model.setPowerCondition(captured)
-                model.setAutomaticEnabled(true)
-                XCTAssertTrue(model.automaticWorkReasonActive)
-                let activation = try XCTUnwrap(controller.runtimeMarkers.automaticActivation).id
-                model.setPowerCondition(.battery)
-                XCTAssertEqual(model.v3Settings.condition, .battery)
-                XCTAssertTrue(model.automaticWorkReasonActive)
-                let saved = model.defaults.data(forKey: UserSessionController.preferenceKey)
-                let creates = backend.creates
-                let panel = TetherPanel(model: model)
-                XCTAssertEqual(panel.currentAutomaticSummary, captured.title)
-                XCTAssertNotEqual(panel.currentAutomaticSummary, model.v4RuleSummary)
-                XCTAssertEqual(controller.runtimeMarkers.automaticActivation?.id, activation)
-                XCTAssertEqual(backend.creates, creates)
-                XCTAssertEqual(model.defaults.data(forKey: UserSessionController.preferenceKey), saved)
+            for captured in [PowerCondition.ac, .battery, .any] {
+                for advanced in [false, true] {
+                    let power: PowerSource = advanced && captured == .battery ? .battery : .ac
+                    let (model, controller, backend) = fixture(power: power)
+                    defer { _ = controller.end() }
+                    model.setPowerCondition(captured)
+                    if advanced {
+                        controller.v4ConditionSource.queryOverride = { _, _ in (.satisfied, nil) }
+                        XCTAssertTrue(controller.setV4Settings(advancedFixtureRules(from: controller.v4Settings)))
+                    }
+                    model.setAutomaticEnabled(true)
+                    if advanced {
+                        // Provider observations use their own real timestamp;
+                        // advance this nonobserving fixture beyond that sample
+                        // before expecting the advanced gate to be satisfied.
+                        controller.update(power: power, thermal: 0, fullWake: true, controllingUser: true,
+                            now: ContinuousTime.now, batteryPercent: 80)
+                    }
+                    XCTAssertTrue(model.automaticWorkReasonActive, "captured=\(captured) advanced=\(advanced)")
+                    let effectiveCaptured: PowerCondition = advanced ? captured : .ac
+                    let activation = try XCTUnwrap(controller.runtimeMarkers.automaticActivation).id
+                    XCTAssertEqual(controller.runtimeMarkers.automaticActivation?.condition, effectiveCaptured)
+                    let next: PowerCondition = captured == .battery ? .ac : .battery
+                    model.setPowerCondition(next)
+                    XCTAssertEqual(model.v3Settings.condition, next)
+                    XCTAssertTrue(model.automaticWorkReasonActive)
+                    let saved = model.defaults.data(forKey: UserSessionController.preferenceKey)
+                    let creates = backend.creates
+                    let panel = TetherPanel(model: model)
+                    XCTAssertEqual(panel.currentAutomaticSummary, advanced
+                        ? effectiveCaptured.title + " · " + model.v4RuleSummary : effectiveCaptured.title)
+                    if advanced {
+                        XCTAssertNotEqual(panel.currentAutomaticSummary, model.v4RuleSummary,
+                            "The advanced summary must retain the current activation's captured power prefix")
+                    } else {
+                        XCTAssertEqual(model.v4RuleSummary, PowerCondition.ac.title,
+                            "Basic mode always reports effective AC, while retaining the saved advanced range")
+                    }
+                    XCTAssertEqual(controller.runtimeMarkers.automaticActivation?.id, activation)
+                    XCTAssertEqual(controller.runtimeMarkers.automaticActivation?.condition, effectiveCaptured)
+                    if advanced {
+                        XCTAssertTrue(model.activeWorkReasonSummary(at: Date())?.contains(effectiveCaptured.title) == true,
+                            "An advanced battery activation must not be described as adapter-connected work")
+                    }
+                    XCTAssertEqual(backend.creates, creates)
+                    XCTAssertEqual(model.defaults.data(forKey: UserSessionController.preferenceKey), saved)
+                }
             }
         }
+    }
+
+    /// Advanced scope is explicit; a stored battery/any value alone is not a
+    /// request to leave the AC-only basic mode. Providers remain memory fixtures.
+    @MainActor
+    private func advancedFixtureRules(from existing: V4Settings) -> V4Settings {
+        var settings = existing
+        let preset = V4Preset(id: UUID(), name: "Selected conditions",
+            groups: [V4RuleGroup(id: UUID(), conditions: [
+                V4Condition(id: UUID(), kind: .appRunning, target: "fixture.editor")
+            ])])
+        settings.automaticMode = .advanced
+        settings.presets = [preset]; settings.activePresetID = preset.id
+        return settings
     }
 
     @MainActor
@@ -850,16 +899,20 @@ final class LiveUIBindingTests: XCTestCase {
                             XCTAssertTrue(controller.setV4Settings(settings))
                         }
                         model.setAutomaticEnabled(true)
-                        XCTAssertEqual(model.automaticWorkReasonActive, sample.matches && !advanced,
-                            "Only an eligible basic rule may already be active")
+                        let effectiveCondition: PowerCondition = advanced ? sample.condition : .ac
+                        let powerMatches = advanced ? sample.matches : sample.power == .ac
+                        XCTAssertEqual(model.v3Settings.condition, sample.condition,
+                            "Displaying effective basic AC must not rewrite the saved advanced range")
+                        XCTAssertEqual(model.automaticWorkReasonActive, powerMatches && !advanced,
+                            "Only an eligible AC-only basic rule may already be active")
                         let panel = TetherPanel(model: model)
                         let before = controller.status
                         let saved = model.defaults.data(forKey: UserSessionController.preferenceKey)
                         let creates = backend.creates, releases = backend.releases
                         let expected: String?
-                        if sample.matches {
+                        if powerMatches {
                             expected = advanced ? L("Waiting for the selected conditions", "선택한 조건을 기다리는 중") : nil
-                        } else if sample.condition == .battery {
+                        } else if effectiveCondition == .battery {
                             expected = advanced
                                 ? L("Requires battery power and matching conditions", "배터리 사용과 선택한 조건을 모두 만족해야 시작합니다")
                                 : L("Starts when using battery power", "배터리 사용 시 시작합니다")

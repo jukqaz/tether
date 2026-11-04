@@ -280,7 +280,9 @@ public struct WorkSessionConfiguration: Codable, Equatable, Sendable {
     public var effectiveManualPowerCondition: PowerCondition { manualPowerCondition ?? .any }
     public init(settings: IdleSessionSettings) {
         enabled = settings.enabled; automaticEnabled = settings.automaticEnabled
-        condition = settings.condition; automaticMinutes = settings.automaticMinutes; limits = settings.limits
+        // Transport effective execution scope, not a dormant advanced choice.
+        // The original saved preference remains in IdleSessionSettings.
+        condition = settings.effectiveAutomaticCondition; automaticMinutes = settings.automaticMinutes; limits = settings.limits
         manualBatteryContinuationMinutes = settings.manualBatteryContinuationMinutes
         disconnectPolicy = settings.disconnectPolicy; batteryTimeLimit = settings.batteryTimeLimit
         manualPowerCondition = settings.manualPowerCondition

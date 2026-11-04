@@ -140,6 +140,7 @@ final class PowerWriterGUIAuthorityTests: XCTestCase {
         let permitID = UUID(), sessionID = UUID()
         var settings = IdleSessionSettings()
         settings.automaticEnabled = true; settings.automaticPowerCondition = .any
+        settings.v4.automaticMode = .advanced
         settings.disconnectPolicy = .continueEligible; settings.stopOnSeriousThermal = false
         var state = original; state.userSessionCoordinated = true; state.lidExecutionVersion = 3
         state.workSessionLease = WorkSessionLease(sessionID: sessionID, sequence: 1, power: .ac,

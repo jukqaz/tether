@@ -7,6 +7,9 @@ struct TetherPanel: View {
     /// Overrides only the viewport in layout tests; live panels follow their own screen.
     var maximumHeight: CGFloat? = nil
     var previewSettingsAction: (() -> Void)? = nil
+    /// An embedded sheet returns through its presenter instead of opening
+    /// settings behind an existing modal hierarchy.
+    var settingsNavigationAction: ((SettingsPage) -> Void)? = nil
     @Environment(\.openSettings) private var openSettings
     @Environment(\.dismiss) private var dismiss
     @State private var screenHeightLimit = WorkSessionMetrics.panelMaximumHeight
@@ -16,10 +19,11 @@ struct TetherPanel: View {
     @State private var problemDetailsExpanded = false
 
     init(model: AppModel, maximumHeight: CGFloat? = nil, previewSettingsAction: (() -> Void)? = nil,
-         expandedDetails: Bool = false) {
+         expandedDetails: Bool = false, settingsNavigationAction: ((SettingsPage) -> Void)? = nil) {
         self.model = model
         self.maximumHeight = maximumHeight
         self.previewSettingsAction = previewSettingsAction
+        self.settingsNavigationAction = settingsNavigationAction
         _workDetailsExpanded = State(initialValue: expandedDetails)
         _problemDetailsExpanded = State(initialValue: expandedDetails)
     }
@@ -138,7 +142,14 @@ struct TetherPanel: View {
             }
             if actionVisibility.showsWorkDetails { workDetails }
             if let summary = model.otherAppKeepAwakeSummary {
-                Button(summary) { model.showOtherAppKeepAwakeDetails() }
+                Button(summary) {
+                    if settingsNavigationAction != nil {
+                        model.otherAppDetailsRequested = true
+                        showSettings(page: .system)
+                    } else {
+                        model.showOtherAppKeepAwakeDetails()
+                    }
+                }
                     .buttonStyle(.link).font(TetherTypography.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("panel-other-app-requests")
@@ -243,7 +254,7 @@ struct TetherPanel: View {
                     .controlSize(.small)
                     .accessibilityLabel(L("Allow automatic starts", "자동 시작 허용"))
                     .accessibilityIdentifier("panel-automatic")
-                    .accessibilityHint(model.v3Settings.condition.title + ". " + L("Turning this off ends automatic work only.", "끄면 자동 유지만 종료합니다."))
+                    .accessibilityHint(model.v3Settings.effectiveAutomaticCondition.title + ". " + L("Turning this off ends automatic work only.", "끄면 자동 유지만 종료합니다."))
                     .disabled(!model.acceptingUserCommands || model.commandPending)
             }
             if actionVisibility.showsAutomaticRest {
@@ -265,7 +276,7 @@ struct TetherPanel: View {
         if model.snapshot.power == .unknown {
             return L("Checking power before evaluating automatic starts", "전원 상태를 확인한 뒤 자동 시작 조건을 확인합니다")
         }
-        let condition = model.v3Settings.condition
+        let condition = model.v3Settings.effectiveAutomaticCondition
         if condition.permits(model.snapshot.power) {
             return model.v4Settings.usesAdvancedAutomaticConditions
                 ? L("Waiting for the selected conditions", "선택한 조건을 기다리는 중") : nil
@@ -332,7 +343,7 @@ struct TetherPanel: View {
         DisclosureGroup(isExpanded: $workDetailsExpanded) {
             VStack(spacing: 0) {
                 workRow(title: L("Automatic power", "자동 시작 전원"),
-                        detail: model.v3Settings.condition.title, badge: "")
+                        detail: model.v3Settings.effectiveAutomaticCondition.title, badge: "")
                 if model.showsLidOptions {
                     Divider()
                     workRow(title: closedLidPolicySummary, detail: closedLidDisconnectDetail, badge: "")
@@ -407,8 +418,10 @@ struct TetherPanel: View {
             if model.userCommandsArePreview { PreviewIndicator() }
             Button(action: showSettings) {
                 Label(L("Settings…", "설정…"), systemImage: "gearshape")
+                    .labelStyle(.iconOnly)
             }
                 .actionButton().controlSize(.small)
+                .help(L("Settings", "설정"))
                 .accessibilityLabel(L("Settings", "설정"))
                 .accessibilityIdentifier("panel-open-settings")
                 .keyboardShortcut(",", modifiers: .command)
@@ -472,6 +485,7 @@ struct TetherPanel: View {
 
     private func showSettings(page: SettingsPage) {
         model.settingsPage = page
+        if let settingsNavigationAction { settingsNavigationAction(page); return }
         if model.userCommandsArePreview {
             if let previewSettingsAction { previewSettingsAction() }
             else if NativeUIAutomation.currentBundleIsFixture { NSApp.activate(); openSettings(); dismiss() }

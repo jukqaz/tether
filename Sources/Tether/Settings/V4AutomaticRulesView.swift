@@ -1,6 +1,5 @@
 import SwiftUI
 import TetherCore
-import UniformTypeIdentifiers
 import AppKit
 
 /// Edits persistent choices as a local draft; only the model can validate and apply them.
@@ -9,15 +8,13 @@ struct V4AutomaticRulesView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draft: V4Settings
     @State private var feedback: String?
-    @State private var showExport = false
-    @State private var showImport = false
-    @State private var importData: Data?
-    @State private var importSummary: String?
-    @State private var exportDocument = V4SettingsDocument()
 
-    init(model: AppModel, initialTemplate: V4RuleStarter? = nil) {
+    init(model: AppModel, initialTemplate: V4RuleStarter? = nil, startInAdvancedMode: Bool = false) {
         self.model = model
-        let settings = model.v4Settings
+        var settings = model.v4Settings
+        // Opening an explicitly chosen advanced editor changes only this draft.
+        // Providers and runtime settings wait for Confirm and apply.
+        if startInAdvancedMode { settings.automaticMode = .advanced }
         _draft = State(initialValue: initialTemplate?.adding(to: settings,
             nextManualMinutes: model.selectedManualMinutes == 0 ? nil : model.selectedManualMinutes) ?? settings)
     }
@@ -30,7 +27,9 @@ struct V4AutomaticRulesView: View {
                     Text(L("Additional conditions", "추가 조건")).tag(V4AutomaticMode.advanced)
                 }.pickerStyle(.segmented).labelsHidden()
                     .accessibilityIdentifier("automatic-mode-picker")
-                Text(L("Power: \(model.v3Settings.condition.title)", "전원: \(model.v3Settings.condition.title)"))
+                Text(draft.automaticMode == .acConnected
+                    ? L("Power: AC only", "전원: AC 전용")
+                    : L("Saved advanced power range: \(model.v3Settings.condition.title)", "저장된 고급 전원 범위: \(model.v3Settings.condition.title)"))
                     .font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
             }
             if draft.automaticMode != .advanced || selectedPresetIndex == nil {
@@ -64,18 +63,8 @@ struct V4AutomaticRulesView: View {
                            "보호와 화면·덮개의 전역 허용을 항상 따릅니다. 확인하지 못한 조건을 전원 조건만으로 대신 실행하지 않습니다."))
                 }.padding(.top, 4)
             }
-            Divider()
-            HStack(spacing: 12) {
-                Button(L("Export saved settings…", "저장된 설정 내보내기…")) {
-                    guard let data = model.exportV4Settings() else {
-                        feedback = L("Could not prepare an export.", "내보낼 설정을 준비하지 못했습니다."); return
-                    }
-                    exportDocument = V4SettingsDocument(data: data); showExport = true
-                }.actionButton()
-                Button(L("Review import…", "가져오기 검토…")) { showImport = true }.actionButton()
-            }
-            Note(L("Imports are reviewed and saved as inactive copies. Permissions, active work and recovery records are excluded.",
-                   "가져온 설정은 검토한 뒤 비활성 복사본으로 저장합니다. 권한·현재 유지·원복 기록은 포함하지 않습니다."))
+            Note(L("Import and export saved presets from App settings. Transferred copies stay inactive until separately selected and confirmed.",
+                   "저장된 프리셋은 앱 설정에서 옮길 수 있습니다. 가져온 복사본은 별도로 선택해 확인하기 전까지 비활성 상태입니다."))
             if let feedback { PolicyNote(feedback) }
         } actions: {
             Button(L("Cancel", "취소")) { dismiss() }.actionButton().keyboardShortcut(.cancelAction)
@@ -87,33 +76,6 @@ struct V4AutomaticRulesView: View {
                 .disabled(model.commandPending || !model.acceptingUserCommands || V4RuleStarter.needsTargetSelection(draft))
                 .accessibilityIdentifier("automatic-rules-apply")
         }
-        .fileExporter(isPresented: $showExport, document: exportDocument, contentType: .json,
-                      defaultFilename: "Tether-settings") { result in
-            if case .failure(let error) = result { feedback = error.localizedDescription }
-        }
-        .fileImporter(isPresented: $showImport, allowedContentTypes: [.json]) { result in
-            do {
-                let url = try result.get()
-                let scoped = url.startAccessingSecurityScopedResource()
-                defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-                let data = try Data(contentsOf: url)
-                guard let summary = model.previewV4Import(data) else {
-                    feedback = L("This settings file cannot be imported.", "이 설정 파일은 가져올 수 없습니다."); return
-                }
-                importData = data; importSummary = summary
-            } catch { feedback = error.localizedDescription }
-        }
-        .alert(L("Review imported settings", "가져올 설정 검토"), isPresented: Binding(
-            get: { importSummary != nil }, set: { if !$0 { importSummary = nil } })) {
-            Button(L("Save inactive copy", "비활성 복사본 저장")) {
-                if let importData, model.applyV4Import(importData) {
-                    draft = model.v4Settings
-                    feedback = L("Imported copy saved. Select and confirm it separately to enable it.", "가져온 복사본을 저장했습니다. 사용하려면 별도로 선택해 확인 적용하세요.")
-                } else { feedback = L("Import failed. Nothing was applied.", "가져오지 못했습니다. 적용한 설정은 없습니다.") }
-                importData = nil; importSummary = nil
-            }
-            Button(L("Cancel", "취소"), role: .cancel) { importData = nil; importSummary = nil }
-        } message: { Text(importSummary ?? "") }
         .accessibilityIdentifier("settings-automatic-rules-sheet")
     }
 
@@ -475,12 +437,4 @@ private extension V4ConditionKind {
         case .unsupported: L("Currently unsupported", "현재 미지원")
         }
     }
-}
-
-private struct V4SettingsDocument: FileDocument {
-    static var readableContentTypes: [UTType] { [.json] }
-    var data = Data()
-    init(data: Data = Data()) { self.data = data }
-    init(configuration: ReadConfiguration) throws { data = configuration.file.regularFileContents ?? Data() }
-    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper { FileWrapper(regularFileWithContents: data) }
 }

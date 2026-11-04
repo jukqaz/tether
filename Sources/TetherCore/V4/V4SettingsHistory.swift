@@ -135,6 +135,8 @@ public enum V4SettingsTransfer {
         if before.settings.notifyManualExpiry != after.settings.notifyManualExpiry
             || before.settings.notifyTaskEnd != after.settings.notifyTaskEnd
             || before.settings.expiryNoticeEnabled != after.settings.expiryNoticeEnabled
+            || before.settings.expiryNoticeMinutes != after.settings.expiryNoticeMinutes
+            || before.settings.notificationSound != after.settings.notificationSound
             || before.preferences.notifyHeat != after.preferences.notifyHeat
             || before.preferences.notifyBatteryProtection != after.preferences.notifyBatteryProtection { parts.insert(.notifications) }
         if before.preferences.allowDisplay != after.preferences.allowDisplay
@@ -168,6 +170,8 @@ public enum V4SettingsTransfer {
                 candidate.settings.notifyManualExpiry = source.settings.notifyManualExpiry
                 candidate.settings.notifyTaskEnd = source.settings.notifyTaskEnd
                 candidate.settings.expiryNoticeEnabled = source.settings.expiryNoticeEnabled
+                candidate.settings.expiryNoticeMinutes = source.settings.expiryNoticeMinutes
+                candidate.settings.notificationSound = source.settings.notificationSound
                 candidate.preferences.notifyHeat = source.preferences.notifyHeat
                 candidate.preferences.notifyBatteryProtection = source.preferences.notifyBatteryProtection
             case .globalFeatures:

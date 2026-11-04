@@ -17,19 +17,34 @@ enum TetherTypography {
     static let countdown = Font.system(size: countdownSize, weight: .medium)
 }
 
-/// macOS owns appearance, vibrancy, contrast and the user's accent color.
-/// Content does not paint over system navigation or popover glass.
+/// Approved graphite + blue palette. The native window/popover still owns its
+/// neutral material; a readable link and a prominent control use separate blues.
+enum TetherPalette {
+    static let accent = adaptive("TetherBlueInk", light: 0x175CB0, dark: 0x76ADFF)
+    static let action = adaptive("TetherBlueAction", light: 0x1762BD, dark: 0x1762BD)
+
+    private static func adaptive(_ name: String, light: UInt32, dark: UInt32) -> NSColor {
+        NSColor(name: NSColor.Name(name)) { appearance in
+            let value = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light
+            return NSColor(srgbRed: Double((value >> 16) & 0xff) / 255,
+                green: Double((value >> 8) & 0xff) / 255, blue: Double(value & 0xff) / 255, alpha: 1)
+        }
+    }
+}
+
+/// System reading colors and materials remain adaptive. Blue is an explicit
+/// app palette choice and never changes the user's macOS accent preference.
 extension Color {
     static let tetherBackground = Color(nsColor: .windowBackgroundColor)
     static let tetherControlSurface = Color(nsColor: .controlBackgroundColor)
     static let tetherPrimary = Color.primary
     static let tetherSecondary = Color(nsColor: .secondaryLabelColor)
     static let tetherChrome = Color(nsColor: .windowBackgroundColor)
-    static let tetherControlBorder = Color(nsColor: .secondaryLabelColor)
+    static let tetherControlBorder = Color(nsColor: .separatorColor)
     static let tetherDivider = Color(nsColor: .separatorColor)
     static let tetherError = Color(nsColor: .systemRed)
-    static let tetherAction = Color(nsColor: .controlAccentColor)
-    static let tetherAccent = Color(nsColor: .controlAccentColor)
+    static let tetherAction = Color(nsColor: TetherPalette.action)
+    static let tetherAccent = Color(nsColor: TetherPalette.accent)
     static let tetherControl = Color(nsColor: .systemGray)
 
     /// Warning text needs darker ink on light cards than the system orange.

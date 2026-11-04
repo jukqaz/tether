@@ -119,6 +119,7 @@ final class P0RecoveryTests: XCTestCase {
     func testFirstAutomaticBatteryAnchorUsesExplicitDualScopeWithoutRenewingGrant() {
         var settings = IdleSessionSettings()
         settings.automaticEnabled = true; settings.automaticPowerCondition = .any
+        settings.v4.automaticMode = .advanced
         settings.disconnectPolicy = .continueEligible
         let id = UUID()
         let permit = WorkSessionLidPermit(powerScopes: [.ac, .battery], batteryPermitID: id,

@@ -12,6 +12,9 @@ public struct V4Settings: Codable, Equatable, Sendable {
     public var notifyManualExpiry = false
     public var notifyTaskEnd = false
     public var expiryNoticeEnabled = false
+    public static let expiryNoticeMinuteChoices = [1, 2, 5, 10, 15]
+    public var expiryNoticeMinutes = 5
+    public var notificationSound = false
     public var stopOnLowPowerMode = false
     public var experimentalProvidersEnabled = false
     public var usesAdvancedAutomaticConditions: Bool { automaticMode == .advanced }
@@ -19,7 +22,7 @@ public struct V4Settings: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case version, generation, automaticMode, activePresetID, presets, nextManualOptions, notifyManualExpiry
-        case notifyTaskEnd, expiryNoticeEnabled, stopOnLowPowerMode, experimentalProvidersEnabled
+        case notifyTaskEnd, expiryNoticeEnabled, expiryNoticeMinutes, notificationSound, stopOnLowPowerMode, experimentalProvidersEnabled
     }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -33,6 +36,8 @@ public struct V4Settings: Codable, Equatable, Sendable {
         notifyManualExpiry = try c.decodeIfPresent(Bool.self, forKey: .notifyManualExpiry) ?? false
         notifyTaskEnd = try c.decodeIfPresent(Bool.self, forKey: .notifyTaskEnd) ?? false
         expiryNoticeEnabled = try c.decodeIfPresent(Bool.self, forKey: .expiryNoticeEnabled) ?? false
+        expiryNoticeMinutes = try c.decodeIfPresent(Int.self, forKey: .expiryNoticeMinutes) ?? 5
+        notificationSound = try c.decodeIfPresent(Bool.self, forKey: .notificationSound) ?? false
         stopOnLowPowerMode = try c.decodeIfPresent(Bool.self, forKey: .stopOnLowPowerMode) ?? false
         experimentalProvidersEnabled = try c.decodeIfPresent(Bool.self, forKey: .experimentalProvidersEnabled) ?? false
     }

@@ -50,10 +50,9 @@ struct SettingsNavigation: View {
                 page.page(model: model, disclosures: $disclosures)
                     .tag(page)
                     .tabItem {
-                        Image(systemName: page.symbol)
+                        Label(page.shortTitle, systemImage: page.symbol)
                             .accessibilityLabel(page.title)
                             .accessibilityIdentifier("settings-tab-\(page.rawValue)")
-                        Text(page.shortTitle)
                     }
                     .accessibilityIdentifier("settings-page-\(page.rawValue)")
             }
@@ -78,7 +77,7 @@ struct SettingsDisclosureState {
     var usageStatistics = false
     var otherAppRequests = false
     init(expanded: Bool = false) {
-        workRules = expanded; protectionAlerts = expanded; protectionRules = expanded
+        manualBattery = expanded; workRules = expanded; protectionAlerts = expanded; protectionRules = expanded
         diagnostics = expanded; updates = expanded; helper = expanded
         automaticConnections = expanded; closedLidDisplay = expanded
         usageStatistics = expanded; otherAppRequests = expanded
@@ -91,20 +90,22 @@ enum SettingsPage: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .general: L("Keep awake", "잠자기 방지")
-        case .safety: L("Automatic start", "자동 시작")
+        case .safety: L("Power & automation", "전원·자동화")
         case .system: L("App settings", "앱 설정")
         }
     }
     /// Native preference tabs retain a short visible title and the full accessible name.
     var shortTitle: String {
         switch self {
-        case .general, .safety, .system: title
+        case .general: L("Keep awake", "유지")
+        case .safety: L("Power & automation", "전원·자동화")
+        case .system: L("App", "앱")
         }
     }
     var subtitle: String {
         switch self {
         case .general: L("Display, closed-lid work and protection.", "화면·덮개 사용과 보호 기준을 정합니다.")
-        case .safety: L("Choose when to start automatically.", "자동으로 시작할 조건과 쉬는 시간을 정합니다.")
+        case .safety: L("Power connection, disconnection and optional rules.", "전원 연결·분리 동작과 선택적 자동 규칙을 정합니다.")
         case .system: L("Startup, helper, diagnostics and updates.", "시작 동작과 도우미, 진단, 업데이트를 관리합니다.")
         }
     }

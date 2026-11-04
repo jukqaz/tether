@@ -25,7 +25,9 @@ struct V4FeatureSheet<Content: View, Actions: View>: View {
                 .fixedSize(horizontal: false, vertical: true).layoutPriority(1)
         }.frame(width: 560, height: 448)
             .font(TetherTypography.body).controlSize(.small).tint(.tetherAccent)
-            .foregroundStyle(Color.tetherPrimary).background(Color.tetherBackground)
+            // Native buttons and links own their label styles. A blanket primary
+            // foreground here overrides link blue and prominent-button contrast.
+            .background(Color.tetherBackground)
             .accessibilityElement(children: .contain)
     }
 }

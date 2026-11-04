@@ -21,12 +21,14 @@ final class V4NotificationDelivery: NSObject, @preconcurrency UNUserNotification
             UNNotificationCategory(identifier: "tether-expiry-extend", actions: [extend, check], intentIdentifiers: [])
         ])
     }
-    func submit(_ token: V4ExpiryNoticeToken, automaticContinues: Bool) {
+    func submit(_ token: V4ExpiryNoticeToken, automaticContinues: Bool, sound: Bool = false) {
         let id = identifier(token)
         permittedSubmissions.insert(id)
         if let submitOverride { submitOverride(token, automaticContinues); return }
         let content = UNMutableNotificationContent()
-        content.title = L("Manual keep-awake ends in 5 minutes", "수동 유지가 5분 뒤 끝납니다")
+        let minutes = token.warningMinutes ?? 5
+        content.title = L("Manual keep-awake ends in \(minutes) minutes", "수동 유지가 \(minutes)분 뒤 끝납니다")
+        if sound { content.sound = .default }
         content.body = automaticContinues ? L("AC automatic keep-awake remains active. Check the current deadline before extending.", "AC 자동 유지는 계속됩니다. 연장 전에 현재 기한을 확인하세요.") : L("Check the current deadline or explicitly extend the session.", "현재 기한을 확인하거나 직접 연장할 수 있습니다.")
         content.categoryIdentifier = token.mayExtend15 ? "tether-expiry-extend" : "tether-expiry"
         guard let data = try? JSONEncoder().encode(token), let value = String(data: data, encoding: .utf8) else { return }

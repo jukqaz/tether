@@ -10,11 +10,27 @@ struct NotificationSettingsView: View {
         SettingsToggle(title: L("Manual deadline notification", "수동 유지 종료 알림"), isOn: Binding(
             get: { model.notifySessionEnd }, set: { model.setNotifySessionEnd($0) }))
             .disabled(!canConfigure)
-        SettingsToggle(title: L("Warn 5 minutes before expiry", "만료 5분 전 예고"),
-            detail: L("Off by default. Once per manual request; no catch-up alert when 5 minutes or less remain.",
-                      "기본 꺼짐. 수동 요청당 한 번이며, 남은 시간이 5분 이하면 지난 예고를 바로 보내지 않습니다."),
+        SettingsToggle(title: L("Linked work completion notification", "연동 작업 종료 알림"), isOn: Binding(
+            get: { model.notifyLinkedTaskEnd }, set: { model.setNotifyLinkedTaskEnd($0) }))
+            .disabled(!canConfigure)
+        SettingsToggle(title: L("Expiry warning", "만료 전 예고"),
+            detail: L("Once per manual request. Enabling this does not send a late reminder.",
+                      "수동 요청당 한 번입니다. 지나간 예고를 바로 보내지 않습니다."),
             isOn: Binding(get: { model.notifyExpiryWarning }, set: { model.setNotifyExpiryWarning($0) }))
             .disabled(!canConfigure)
+        SettingRow(title: L("Warn before expiry", "얼마 전에 알릴까요")) {
+            Picker(L("Warning time", "예고 시점"), selection: Binding(get: { model.v4Settings.expiryNoticeMinutes },
+                set: { model.setExpiryNoticeMinutes($0) })) {
+                ForEach(V4Settings.expiryNoticeMinuteChoices, id: \.self) { minutes in
+                    Text(L("\(minutes) min", "\(minutes)분")).tag(minutes)
+                }
+            }.labelsHidden().pickerStyle(.menu)
+                .disabled(!canConfigure || !model.notifyExpiryWarning)
+                .accessibilityIdentifier("settings-expiry-warning-minutes")
+        }
+        SettingsToggle(title: L("Expiry warning sound", "만료 예고 소리"), isOn: Binding(
+            get: { model.v4Settings.notificationSound }, set: { model.setNotificationSound($0) }))
+            .disabled(!canConfigure || !model.notifyExpiryWarning)
         Note(L("Deadline review is always available in the notice. +15 minutes appears only when the whole extension is allowed; ended work never restarts.",
                "예고에서 기한을 확인할 수 있습니다. 15분 전체 연장이 가능할 때만 +15분을 제공하며, 끝난 작업을 다시 시작하지 않습니다."))
         Divider()

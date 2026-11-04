@@ -28,6 +28,9 @@ public enum V4RuleEngine {
 
     public static func validate(_ settings: V4Settings) -> [String] {
         guard settings.version == V4Settings.currentVersion else { return ["unsupported-version"] }
+        guard V4Settings.expiryNoticeMinuteChoices.contains(settings.expiryNoticeMinutes) else {
+            return ["invalid-expiry-notice-minutes"]
+        }
         guard settings.presets.count <= maximumPresets else { return ["too-many-presets"] }
         var errors: [String] = []
         if let idle = settings.nextManualOptions.releaseDisplayAfterIdle, ![300.0, 600, 900, 1800].contains(idle) {
@@ -80,12 +83,14 @@ public enum V4RuleEngine {
                   conditions: conditions, satisfiedGroupIDs: [], options: .init())
         }
         guard settings.version == V4Settings.currentVersion else { return blocked("unsupported-settings") }
-        guard context.permitsAutomatic(at: now) else { return blocked("automatic-gate-blocked") }
+        guard context.permitsWork(at: now), context.automaticEnabled else { return blocked("automatic-gate-blocked") }
         if settings.automaticMode == .acConnected {
+            guard context.power == .ac else { return blocked("basic-mode-requires-ac") }
             return .init(gate: .init(isSatisfied: true, validUntil: context.validUntil,
-                                    reason: context.power == .ac ? "ac-connected" : "selected-battery-power"),
+                                    reason: "ac-connected"),
                          conditions: [], satisfiedGroupIDs: [], options: .init(display: true, closedLid: true))
         }
+        guard context.permitsAutomatic(at: now) else { return blocked("automatic-gate-blocked") }
         guard let preset = activePreset(settings), preset.enabled, !preset.groups.isEmpty else {
             return blocked("advanced-rules-unavailable")
         }

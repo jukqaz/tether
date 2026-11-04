@@ -10,8 +10,22 @@ extension AppModel {
     }
     var notifySessionEnd: Bool { v4Settings.notifyManualExpiry }
     var notifyExpiryWarning: Bool { v4Settings.expiryNoticeEnabled }
+    var notifyLinkedTaskEnd: Bool { v4Settings.notifyTaskEnd }
     func setNotifySessionEnd(_ value: Bool) {
-        var next = v4Settings; next.notifyManualExpiry = value; next.notifyTaskEnd = value
+        var next = v4Settings; next.notifyManualExpiry = value
+        _ = saveV4AutomaticRules(next)
+    }
+    func setNotifyLinkedTaskEnd(_ value: Bool) {
+        var next = v4Settings; next.notifyTaskEnd = value
+        _ = saveV4AutomaticRules(next)
+    }
+    func setExpiryNoticeMinutes(_ value: Int) {
+        guard V4Settings.expiryNoticeMinuteChoices.contains(value) else { return }
+        var next = v4Settings; next.expiryNoticeMinutes = value
+        _ = saveV4AutomaticRules(next)
+    }
+    func setNotificationSound(_ value: Bool) {
+        var next = v4Settings; next.notificationSound = value
         _ = saveV4AutomaticRules(next)
     }
     func setNotifyExpiryWarning(_ value: Bool) {
@@ -23,7 +37,7 @@ extension AppModel {
         _ = saveV4AutomaticRules(next)
     }
     var v4RuleSummary: String {
-        guard v4Settings.automaticMode == .advanced else { return v3Settings.condition.title }
+        guard v4Settings.automaticMode == .advanced else { return PowerCondition.ac.title }
         guard let preset = V4RuleEngine.activePreset(v4Settings), preset.enabled else {
             return L("Select an advanced preset", "고급 프리셋 선택 필요")
         }

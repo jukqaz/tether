@@ -399,6 +399,7 @@ final class UserSessionControllerTests: XCTestCase {
                     let subject = UserSessionController(defaults: defaults, backend: backend,
                         guiProbe: nil, environmentProbe: nil, boot: "fixture")
                     defer { _ = subject.end() }
+                    selectAdvancedPowerFixture(subject)
                     let base = ContinuousTime.now
                     subject.update(power: power, thermal: 0, fullWake: true, controllingUser: true,
                         now: base, batteryPercent: 80)
@@ -626,6 +627,7 @@ final class UserSessionControllerTests: XCTestCase {
                     defer { _ = subject.end() }
                     subject.update(power: .ac, thermal: 0, fullWake: true, controllingUser: true,
                         now: ContinuousTime.now, batteryPercent: 80)
+                    selectAdvancedPowerFixture(subject)
                     subject.setAutomatic(true)
                     if action == "manualEnd" { XCTAssertTrue(subject.start(duration: 600)) }
                     let original = try XCTUnwrap(subject.workLease())
@@ -750,6 +752,7 @@ final class UserSessionControllerTests: XCTestCase {
                 try withFixture { defaults, backend in
                     let subject = UserSessionController(defaults: defaults, backend: backend, guiProbe: nil, environmentProbe: nil, boot: "fixture")
                     defer { _ = subject.end() }
+                    selectAdvancedPowerFixture(subject)
                     let base = ContinuousTime.now
                     subject.update(power: .battery, thermal: 0, fullWake: true, controllingUser: true, now: base, batteryPercent: 80)
                     subject.setAllowClosedLid(true); subject.setAutomatic(true)
@@ -783,6 +786,7 @@ final class UserSessionControllerTests: XCTestCase {
                 try withFixture { defaults, backend in
                     let subject = UserSessionController(defaults: defaults, backend: backend, guiProbe: nil, environmentProbe: nil, boot: "fixture")
                     defer { _ = subject.end() }
+                    selectAdvancedPowerFixture(subject)
                     let base = ContinuousTime.now
                     subject.update(power: .battery, thermal: 0, fullWake: true, controllingUser: true, now: base, batteryPercent: 80)
                     subject.setAllowClosedLid(true); subject.setAutomatic(true)
@@ -2167,6 +2171,7 @@ extension UserSessionControllerTests {
                         boot: "fixture", wallClock: { wall })
                     defer { _ = clocked.end() }
                     clocked.update(power: .battery, thermal: 0, fullWake: true, controllingUser: true, now: base, batteryPercent: 80)
+                    selectAdvancedPowerFixture(clocked)
                     clocked.setPowerCondition(.battery); clocked.setAutomatic(true)
                     XCTAssertTrue(clocked.status.automaticActive)
                     let automaticDeadline = clocked.sessionDecision.automaticBatteryDeadline
@@ -2211,4 +2216,15 @@ extension UserSessionControllerTests {
             }
         }
     }
+}
+
+@MainActor
+private func selectAdvancedPowerFixture(_ controller: UserSessionController) {
+    var settings = controller.settings.v4
+    settings.automaticMode = .advanced
+    let preset = V4Preset(id: UUID(), name: "Explicit advanced power fixture",
+        groups: [.init(id: UUID(), conditions: [.init(id: UUID(), kind: .timeWindow,
+            timeWindow: .init(startMinute: 0, endMinute: 0))])])
+    settings.presets = [preset]; settings.activePresetID = preset.id
+    XCTAssertTrue(controller.setV4Settings(settings))
 }

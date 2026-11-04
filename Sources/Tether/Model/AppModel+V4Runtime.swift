@@ -27,10 +27,11 @@ extension AppModel {
         var manual = controller.v4ManualSnapshot
         if v4ManualApprovalPending { manual?.confirmed = false }
         let notice = v4ExpiryEngine.update(manual: manual, context: context, now: now,
-            enabled: v4Settings.expiryNoticeEnabled, notificationsAuthorized: notificationSettings.value.access == .allowed)
+            enabled: v4Settings.expiryNoticeEnabled, notificationsAuthorized: notificationSettings.value.access == .allowed,
+            warningMinutes: v4Settings.expiryNoticeMinutes)
         if !userCommandsArePreview {
             v4NotificationDelivery.remove(notice.invalidate)
-            if let token = notice.submit { v4NotificationDelivery.submit(token, automaticContinues: state.automaticActive) }
+            if let token = notice.submit { v4NotificationDelivery.submit(token, automaticContinues: state.automaticActive, sound: v4Settings.notificationSound) }
         }
         if let previous = v4PreviousManualID, previous != state.manualRequestID {
             let natural = state.manualEndReason == .time || state.manualEndReason == .batteryBudget || state.manualEndReason == .taskEnded
