@@ -90,7 +90,10 @@ final class TetherNativeUITests: XCTestCase {
         evidence("remaining-time-option-settings")
         try selectPage("safety", title: "Power & Lid")
         try expandSettingsDisclosure("settings-automatic-behavior-details")
-        try required("settings-automatic-rules").click()
+        let rules = try revealSettingsControl(try required("settings-automatic-rules"))
+        XCTAssertTrue(rules.isEnabled, "The actual advanced-rules editor entry must be enabled")
+        rules.click()
+        try required("settings-automatic-rules-sheet")
         try required("automatic-template-workHours").click()
         XCTAssertTrue(try required("automatic-rules-apply").exists)
         try waitForManualDeadline(deadline, requestID: requestID)
@@ -791,7 +794,20 @@ final class TetherNativeUITests: XCTestCase {
         try openMenu()
         let automatic = try required("panel-automatic")
         XCTAssertEqual(automatic.label, "Allow automatic starts")
-        XCTAssertGreaterThanOrEqual(automatic.frame.height, 16)
+        XCTAssertEqual(automatic.elementType, .checkBox, "Automatic starts uses the native small checkbox")
+        XCTAssertTrue(automatic.isEnabled && automatic.isHittable,
+                      "The actual automatic checkbox must remain enabled and reachable")
+        XCTAssertTrue(isLayoutFrame(automatic.frame), "The complete checkbox needs measured native bounds")
+        XCTAssertGreaterThanOrEqual(automatic.frame.height, 15,
+                                   "A native small checkbox has a 15pt accessibility control height")
+        let automaticPanel = try required(app.dialogs.containing(.any, identifier: "panel-automatic").firstMatch,
+                                          description: "Menu panel containing the complete automatic checkbox")
+        XCTAssertTrue(automaticPanel.frame.insetBy(dx: -1, dy: -1).contains(automatic.frame),
+                      "The checkbox and its complete label must fit inside the actual menu panel")
+        let automaticTextWidth = (automatic.label as NSString).size(withAttributes:
+            [.font: NSFont.systemFont(ofSize: 12)]).width
+        XCTAssertGreaterThanOrEqual(automatic.frame.width + 1, automaticTextWidth + 14,
+                                   "The checkbox must reserve room for its full label and native check indicator")
         try setAutomatic(false)
         try waitForState(["automatic": false, "manual": false, "holding": false])
 
@@ -1239,6 +1255,7 @@ final class TetherNativeUITests: XCTestCase {
     private struct SettingsGeometry {
         let frame: CGSize
         let contentRect: CGSize
+        let contentLayoutRect: CGRect
         let contentMinimum: CGSize
         let frameMinimum: CGSize
 
@@ -1249,9 +1266,12 @@ final class TetherNativeUITests: XCTestCase {
                   window["isResizable"] as? Bool == true, window["inLiveResize"] as? Bool == false,
                   let frame = Self.size(window["frame"]), frame.width > 0, frame.height > 0,
                   let contentRect = Self.size(window["contentRect"]), contentRect.width > 0, contentRect.height > 0,
+                  let contentLayoutRect = Self.rect(window["contentLayoutRect"]),
+                  contentLayoutRect.width > 0, contentLayoutRect.height > 0,
                   let contentMinimum = Self.size(window["contentMinSize"]),
                   let frameMinimum = Self.size(window["minSize"]) else { return nil }
             self.frame = frame; self.contentRect = contentRect
+            self.contentLayoutRect = contentLayoutRect
             self.contentMinimum = contentMinimum; self.frameMinimum = frameMinimum
         }
 
@@ -1260,6 +1280,21 @@ final class TetherNativeUITests: XCTestCase {
             // frame minimum can impose an additional bound; honor both readings.
             CGSize(width: max(frameMinimum.width, contentMinimum.width + max(0, frame.width - contentRect.width)),
                    height: max(frameMinimum.height, contentMinimum.height + max(0, frame.height - contentRect.height)))
+        }
+
+        /// AppKit reports this rectangle in window coordinates, with Y up.
+        /// Convert only after matching the fresh window dimensions to AX.
+        func contentLayoutFrame(in accessibilityFrame: CGRect) -> CGRect {
+            CGRect(x: accessibilityFrame.minX + contentLayoutRect.minX,
+                   y: accessibilityFrame.maxY - contentLayoutRect.maxY,
+                   width: contentLayoutRect.width, height: contentLayoutRect.height)
+        }
+
+        private static func rect(_ value: Any?) -> CGRect? {
+            guard let value = value as? [String: Any], let x = value["x"] as? Double,
+                  let y = value["y"] as? Double, x.isFinite, y.isFinite,
+                  let size = size(value) else { return nil }
+            return CGRect(origin: CGPoint(x: x, y: y), size: size)
         }
 
         private static func size(_ value: Any?) -> CGSize? {
@@ -1355,14 +1390,15 @@ final class TetherNativeUITests: XCTestCase {
 
     private func assertSettingsPageLayout(_ window: XCUIElement, page: String, title: String,
                                           minimumViewport: Bool = false) throws {
-        let selectedTab = try navigationControl(page, title: title, activateWindow: false).row
+        let selectedTarget = try navigationControl(page, title: title, activateWindow: false)
+        let selectedTab = selectedTarget.row
         let navigationFrame = try settingsNavigationFrame()
         let toolbar = try nativeSettingsToolbar(in: window)
-        XCTAssertTrue([selectedTab.label, selectedTab.title, selectedTab.value as? String ?? ""].contains(title)
-            || selectedTab.descendants(matching: .staticText).matching(NSPredicate(
-                format: "label == %@ OR title == %@ OR value == %@", title, title, title)).count == 1,
-            "The selected native sidebar row must identify the page in the current language")
-        XCTAssertTrue(selectedTab.isHittable, "The selected sidebar row must remain visible after native presentation")
+        XCTAssertTrue([selectedTarget.caption.label, selectedTarget.caption.title,
+                       selectedTarget.caption.value as? String ?? ""].contains(title),
+            "The selected native sidebar input must identify the page in the current language")
+        XCTAssertTrue(selectedTarget.action.isHittable,
+                      "The selected sidebar's actual Cell must remain reachable after native presentation")
         XCTAssertTrue(window.frame.insetBy(dx: -1, dy: -1).contains(navigationFrame),
                       "Every native sidebar row must fit inside Settings")
         let body = try required("settings-page-\(page)")
@@ -1384,27 +1420,36 @@ final class TetherNativeUITests: XCTestCase {
                        "Native sidebar rows must not overlap the titlebar close button")
         XCTAssertGreaterThanOrEqual(scroll.frame.minY, close.frame.maxY - 1,
                                    "Reading content must remain below native titlebar controls")
+        let sidebar = try nativeSettingsNavigationHost(in: window)
+        // The fixture identity lives in native toolbar chrome, not a footer.
+        // Validate its actual parent and separation from every reading/control area.
+        try assertPreviewIndicator(in: toolbar, avoiding: [sidebar, scroll, close])
         if minimumViewport {
             XCTAssertLessThanOrEqual(scroll.frame.minY - toolbar.frame.maxY, 36,
                                      "The compact page must not leave an unused gap below the native toolbar")
-            let preview = window.descendants(matching: .staticText)["preview-indicator"].firstMatch
-            let readingBottom: CGFloat
-            if preview.exists {
-                XCTAssertTrue(isLayoutFrame(preview.frame), "The preview footer needs measured native bounds")
-                XCTAssertLessThanOrEqual(scroll.frame.maxY, preview.frame.minY + 1,
-                                         "Reading content must not overlap the preview-only footer")
-                readingBottom = preview.frame.minY
-            } else {
-                readingBottom = window.frame.maxY
-            }
-            XCTAssertGreaterThanOrEqual(scroll.frame.height, readingBottom - scroll.frame.minY - 24,
-                                       "The reading viewport must fill the area above the measured preview footer")
+            let geometry = try settingsGeometry(after: Date().timeIntervalSince1970,
+                description: "\(page)-minimum-reading-content-layout")
+            XCTAssertEqual(window.frame.width, geometry.frame.width, accuracy: 1,
+                "AX and the fresh AppKit content layout must describe the same window width")
+            XCTAssertEqual(window.frame.height, geometry.frame.height, accuracy: 1,
+                "AX and the fresh AppKit content layout must describe the same window height")
+            let layout = geometry.contentLayoutFrame(in: window.frame)
+            XCTAssertTrue(isLayoutFrame(layout), "The actual content layout needs finite, nonempty bounds")
+            XCTAssertTrue(window.frame.insetBy(dx: -1, dy: -1).contains(layout),
+                "The measured application content layout must remain inside Settings")
+            XCTAssertGreaterThanOrEqual(scroll.frame.minY, layout.minY - 1,
+                "The reading viewport must start inside the actual content layout below native chrome")
+            XCTAssertLessThanOrEqual(scroll.frame.maxY, layout.maxY + 1,
+                "The reading viewport must not extend beyond the actual content layout")
+            XCTAssertGreaterThanOrEqual(scroll.frame.height, layout.maxY - scroll.frame.minY - 24,
+                "The reading viewport must fill the actual content area beneath the toolbar")
         }
     }
 
     private struct SettingsNavigationTarget {
         let row: XCUIElement
         let action: XCUIElement
+        let caption: XCUIElement
     }
 
     private var settingsPageNames: [(page: String, title: String)] {
@@ -1459,7 +1504,7 @@ final class TetherNativeUITests: XCTestCase {
         XCTAssertTrue(isLayoutFrame(sidebar.frame), "The native sidebar needs nonempty measured bounds")
         XCTAssertTrue(window.frame.insetBy(dx: -1, dy: -1).contains(sidebar.frame))
         for (page, _) in settingsPageNames {
-            XCTAssertEqual(sidebarNavigationRows(in: sidebar, page: page).count, 1,
+            XCTAssertEqual(try sidebarNavigationRows(in: sidebar, page: page).count, 1,
                 "Each approved page must expose one actual native sidebar input")
         }
         return sidebar
@@ -1472,20 +1517,26 @@ final class TetherNativeUITests: XCTestCase {
             description: "Native Settings titlebar toolbar")
     }
 
-    private func sidebarNavigationRows(in sidebar: XCUIElement, page: String) -> [XCUIElement] {
-        let identifier = "settings-tab-\(page)"
-        let title = settingsPageNames.first { $0.page == page }?.title
-        // macOS can consume Label identifiers when promoting List items into
-        // native selectable rows. Match the exact localized input name inside
-        // the uniquely identified sidebar; never fall back to a standalone text.
-        for type in [XCUIElement.ElementType.outlineRow, .tableRow, .cell] {
-            let rows = sidebar.descendants(matching: type).allElementsBoundByIndex.filter {
-                $0.identifier == identifier || $0.descendants(matching: .any).matching(identifier: identifier).firstMatch.exists
-                    || (title != nil && [$0.label, $0.title, $0.value as? String ?? ""].contains(title!))
-            }
-            if !rows.isEmpty { return rows }
+    private func sidebarNavigationCaption(in sidebar: XCUIElement, page: String) throws -> XCUIElement {
+        let matches = sidebar.descendants(matching: .staticText).matching(identifier: "settings-tab-\(page)")
+        let caption = try required(try XCTUnwrap(matches.count == 1 ? matches.firstMatch : nil,
+            "Each sidebar page must have exactly one stable native text anchor"),
+            description: "Unique native sidebar caption \(page)")
+        XCTAssertTrue(isLayoutFrame(caption.frame), "The sidebar caption must expose actual nonempty native bounds")
+        XCTAssertTrue(sidebar.frame.insetBy(dx: -1, dy: -1).contains(caption.frame),
+                      "The complete caption must belong to the actual sidebar")
+        return caption
+    }
+
+    private func sidebarNavigationRows(in sidebar: XCUIElement, page: String) throws -> [XCUIElement] {
+        let caption = try sidebarNavigationCaption(in: sidebar, page: page)
+        // Captured native AX has four sibling OutlineRows with a Cell and one
+        // identified StaticText each. Descendant-ID queries on an indexed row
+        // can overmatch a sibling; spatial containment binds the unique anchor
+        // to its actual native row without accepting an arbitrary text input.
+        return sidebar.descendants(matching: .outlineRow).allElementsBoundByIndex.filter {
+            isLayoutFrame($0.frame) && $0.frame.insetBy(dx: -1, dy: -1).contains(caption.frame)
         }
-        return []
     }
 
     private func navigationControl(_ page: String, title: String,
@@ -1494,38 +1545,39 @@ final class TetherNativeUITests: XCTestCase {
         let window = try required(app.windows.matching(identifier: "com_apple_SwiftUI_Settings_window").firstMatch,
                                   description: "Settings window containing native sidebar choice \(title)")
         let sidebar = try nativeSettingsNavigationHost(in: window)
-        let matches = sidebarNavigationRows(in: sidebar, page: page)
+        let caption = try sidebarNavigationCaption(in: sidebar, page: page)
+        let matches = try sidebarNavigationRows(in: sidebar, page: page)
         let row = try required(try XCTUnwrap(matches.count == 1 ? matches.first : nil,
-            "The native selectable sidebar row must be unique for \(title)"),
-            description: "Native Settings sidebar choice \(title)")
-        XCTAssertTrue([row.label, row.title, row.value as? String ?? ""].contains(title)
-            || row.descendants(matching: .staticText).matching(NSPredicate(
-                format: "label == %@ OR title == %@ OR value == %@", title, title, title)).count == 1,
-            "The native sidebar must expose the complete localized accessible name \(title)")
+            "The native OutlineRow containing the unique caption must be unambiguous for \(title)"),
+            description: "Native Settings sidebar row \(title)")
+        XCTAssertTrue([caption.label, caption.title, caption.value as? String ?? ""].contains(title),
+            "The anchored native sidebar caption must expose the full localized accessibility name \(title)")
         XCTAssertTrue(sidebar.frame.insetBy(dx: -1, dy: -1).contains(row.frame),
-                      "The native input must belong to its actual Settings sidebar")
+                      "The native row must belong to its actual Settings sidebar")
         XCTAssertTrue(window.frame.insetBy(dx: -1, dy: -1).contains(row.frame),
-                      "The native sidebar input must fit inside Settings")
+                      "The native sidebar row must fit inside Settings")
+        XCTAssertTrue(row.frame.insetBy(dx: -1, dy: -1).contains(caption.frame),
+                      "The complete caption must remain inside its native OutlineRow")
         let visibleTitle = settingsVisibleTitle(page, accessibleTitle: title)
-        let titlePredicate = NSPredicate(format: "label == %@ OR title == %@ OR value == %@",
-                                         visibleTitle, visibleTitle, visibleTitle)
-        let visibleText = row.descendants(matching: .staticText).matching(titlePredicate)
         let textWidth = (visibleTitle as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 12)]).width
         XCTAssertGreaterThanOrEqual(row.frame.width + 1, textWidth,
                                    "The sidebar row must allocate room for its complete visible title \(visibleTitle)")
-        XCTAssertGreaterThanOrEqual(row.frame.height, 20, "The sidebar needs a reachable native input area")
-        if visibleText.firstMatch.exists {
-            XCTAssertEqual(visibleText.count, 1, "The native row must expose one complete visible title")
-            let text = visibleText.firstMatch
-            XCTAssertGreaterThanOrEqual(text.frame.width + 1, textWidth,
-                                       "The visible sidebar label must allocate room for \(visibleTitle)")
-            XCTAssertTrue(row.frame.insetBy(dx: -1, dy: -1).contains(text.frame),
-                          "The complete title must remain inside its semantic sidebar row")
+        XCTAssertGreaterThanOrEqual(row.frame.height, 32,
+                                   "The native sidebar must preserve its complete 32pt input row")
+        XCTAssertGreaterThanOrEqual(caption.frame.width + 1, textWidth,
+                                   "The measured native caption must allocate room for \(visibleTitle)")
+        let cells = sidebar.descendants(matching: .cell).allElementsBoundByIndex.filter {
+            isLayoutFrame($0.frame) && row.frame.insetBy(dx: -1, dy: -1).contains($0.frame)
+                && $0.frame.insetBy(dx: -1, dy: -1).contains(caption.frame)
         }
-        waitForHittable(row, description: "Native Settings sidebar choice \(title)")
-        XCTAssertTrue(row.isEnabled, "The native sidebar row must be an enabled input target for \(title)")
-        // Selection is verified against actual page contents after every input.
-        return SettingsNavigationTarget(row: row, action: row)
+        let action = try required(try XCTUnwrap(cells.count == 1 ? cells.first : nil,
+            "The native row must contain exactly one actual Cell around its caption for \(title)"),
+            description: "Native Settings sidebar Cell \(title)")
+        waitForHittable(action, description: "Native Settings sidebar Cell \(title)")
+        XCTAssertTrue(action.isEnabled, "The actual sidebar Cell must be an enabled input target for \(title)")
+        // OutlineRow is a disabled AX container; actual activation belongs to
+        // its measured enabled Cell. Every input still verifies selected content.
+        return SettingsNavigationTarget(row: row, action: action, caption: caption)
     }
 
     @discardableResult
@@ -1976,7 +2028,7 @@ final class TetherNativeUITests: XCTestCase {
 
     @discardableResult
     private func required(_ element: XCUIElement, description: String, file: StaticString = #filePath, line: UInt = #line) throws -> XCUIElement {
-        let exists = element.waitForExistence(timeout: 5)
+        let exists = element.exists || element.waitForExistence(timeout: 5)
         if !exists { evidence("missing-\(description)") }
         return try XCTUnwrap(exists ? element : nil, "Required AX element unavailable: \(description)", file: file, line: line)
     }
