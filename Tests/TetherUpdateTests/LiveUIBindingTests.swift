@@ -38,6 +38,12 @@ private final class LiveUIAssertion: IdleAssertionBackend {
 
 /// Shipping views + AppModel + real policy/controller, with memory-only executors and defaults.
 final class LiveUIBindingTests: XCTestCase {
+    override func setUp() async throws {
+        try await super.setUp()
+        // These model/view paths read AppKit state even in a filtered test run.
+        await MainActor.run { _ = NSApplication.shared }
+    }
+
     func testRenderSamplesKeepTitleSwitchesAndTimersInOneIsolatedSession() async throws {
         try await MainActor.run {
             let previous = Localization.current; defer { Localization.current = previous }

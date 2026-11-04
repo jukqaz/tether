@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 import SwiftUI
 import TetherCore
@@ -6,6 +7,12 @@ import TetherCore
 /// Verifies settings routes and live-model contracts. Rendering/scrolling belongs
 /// to the separate native UI suite; these checks do not claim physical coverage.
 final class FinalSettingsNavigationTests: XCTestCase {
+    override func setUp() async throws {
+        try await super.setUp()
+        // These model/view paths read AppKit state even in a filtered test run.
+        await MainActor.run { _ = NSApplication.shared }
+    }
+
     func testSidebarOrderPreservesSavedPageIdentitiesAndLocalizedDestinations() async {
         await MainActor.run {
             let previous = Localization.current
