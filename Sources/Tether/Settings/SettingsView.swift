@@ -34,14 +34,17 @@ struct SettingsNavigation: View {
     @ObservedObject var model: AppModel
     @Binding var disclosures: SettingsDisclosureState
     @State private var columns: NavigationSplitViewVisibility = .all
+    @State private var selection: SettingsPage?
 
-    private var selection: Binding<SettingsPage?> {
-        Binding(get: { model.settingsPage }, set: { if let page = $0 { model.settingsPage = page } })
+    init(model: AppModel, disclosures: Binding<SettingsDisclosureState>) {
+        self.model = model
+        _disclosures = disclosures
+        _selection = State(initialValue: model.settingsPage)
     }
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columns) {
-            List(SettingsPage.allCases, selection: selection) { page in
+            List(SettingsPage.allCases, selection: $selection) { page in
                 Label {
                     Text(page.shortTitle)
                         .font(.system(size: 12))
@@ -84,6 +87,20 @@ struct SettingsNavigation: View {
             }.sharedBackgroundVisibility(.hidden)
         }
         .accessibilityLabel(L("Settings pages", "설정 페이지"))
+        // Native List can reconcile selection during its view update. Keep that
+        // write local, then publish route changes outside the binding setter.
+        .onChange(of: selection) { _, page in
+            guard let page else {
+                selection = model.settingsPage
+                return
+            }
+            guard page != model.settingsPage else { return }
+            model.settingsPage = page
+        }
+        .onChange(of: model.settingsPage) { _, page in
+            guard selection != page else { return }
+            selection = page
+        }
     }
 }
 
