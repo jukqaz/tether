@@ -27,12 +27,12 @@ struct Page<Content: View>: View {
 /// One content column for headings and scroll content, including wide windows.
 enum SettingsMetrics {
     static let contentWidth: CGFloat = 520
-    static let gutter: CGFloat = 20
-    static let sectionSpacing: CGFloat = 14
+    static let gutter: CGFloat = 16
+    static let sectionSpacing: CGFloat = 12
     static let cardInset: CGFloat = 12
-    static let rowHeight: CGFloat = 30
+    static let rowHeight: CGFloat = 22
     static let rowSpacing: CGFloat = 6
-    static let controlWidth: CGFloat = 136
+    static let controlWidth: CGFloat = 190
     static let conditionWidth: CGFloat = 190
 
     /// Keep the scroll viewport as wide as its toolbar. Only the readable
@@ -42,22 +42,24 @@ enum SettingsMetrics {
     }
 }
 
-/// One native grouped Form owns scrolling; nested settings groups do not add
-/// their own backgrounds or scroll containers over the system reading surface.
+/// Each page owns one scroll viewport with flat native utility rows.
+/// Nested groups add separators, never their own backgrounds or scrolling.
 struct SettingsForm<Content: View>: View {
     @ViewBuilder var content: Content
     @Environment(\.tetherSettingsScrollToEnd) private var scrollToEnd
 
     var body: some View {
-        Form { content }
-            .formStyle(.grouped)
-            .font(TetherTypography.body)
-            .toggleStyle(.switch)
-            .controlSize(.small)
-            .defaultScrollAnchor(scrollToEnd ? .bottom : .top)
-            .frame(maxWidth: SettingsMetrics.contentWidth + SettingsMetrics.gutter * 2,
-                   maxHeight: .infinity)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        ScrollView {
+            VStack(alignment: .leading, spacing: SettingsMetrics.sectionSpacing) { content }
+                .frame(maxWidth: SettingsMetrics.contentWidth, alignment: .leading)
+                .padding(SettingsMetrics.gutter)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .font(TetherTypography.body)
+        .toggleStyle(.checkbox)
+        .controlSize(.small)
+        .defaultScrollAnchor(scrollToEnd ? .bottom : .top)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -132,7 +134,7 @@ struct SettingsSection<Content: View>: View {
     }
 }
 
-/// Native sections supply the macOS preference grouping and row separators.
+/// Flat section headings and dividers keep dense utility settings legible.
 struct SettingsContentGroup<Content: View>: View {
     let title: String
     @ViewBuilder var content: Content
@@ -143,13 +145,14 @@ struct SettingsContentGroup<Content: View>: View {
     }
 
     var body: some View {
-        Section {
-            content
-        } header: {
+        VStack(alignment: .leading, spacing: 6) {
             Text(title).font(TetherTypography.section)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
+            content
+            Divider().padding(.top, 6)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -162,7 +165,10 @@ struct SettingsDisclosure<Content: View>: View {
 
     @ViewBuilder var body: some View {
         if groupsSection {
-            Section { disclosure }
+            VStack(alignment: .leading, spacing: 6) {
+                disclosure
+                Divider().padding(.top, 6)
+            }
         } else {
             disclosure
         }
@@ -170,7 +176,7 @@ struct SettingsDisclosure<Content: View>: View {
 
     private var disclosure: some View {
         DisclosureGroup(isExpanded: $isExpanded) {
-            content.padding(.top, 6).padding(.bottom, 2)
+            VStack(alignment: .leading, spacing: 6) { content }.padding(.top, 6).padding(.bottom, 2)
         } label: {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Text(title).font(TetherTypography.body)
@@ -234,14 +240,14 @@ struct SettingRow<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ViewThatFits(in: .horizontal) {
-                // Grouped Form can stack LabeledContent even when both sides
-                // fit. Measure a real horizontal row so only overflow falls
-                // through, while the switches and pickers stay native.
-                HStack(alignment: .center, spacing: 10) {
+                // Keep aligned value columns while allowing long translations
+                // to fall back to a vertical row instead of clipping.
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
                     Text(title).font(TetherTypography.body).fixedSize()
                         .accessibilityHidden(!showsAccessibleTitle)
                     Spacer(minLength: 0)
-                    content.fixedSize(horizontal: true, vertical: true)
+                    content.frame(width: SettingsMetrics.controlWidth, alignment: .trailing)
+                        .fixedSize(horizontal: true, vertical: true)
                         .multilineTextAlignment(.trailing)
                 }
                 VStack(alignment: .leading, spacing: 6) {
@@ -284,22 +290,21 @@ struct SettingsToggle: View {
     @Binding var isOn: Bool
     var identifier: String? = nil
     var body: some View {
-        SettingRow(title: title, detail: detail, showsAccessibleTitle: false) {
+        VStack(alignment: .leading, spacing: 4) {
             identifiedToggle
+                .frame(maxWidth: .infinity, minHeight: SettingsMetrics.rowHeight, alignment: .leading)
+            if let detail { Note(detail).padding(.leading, 18) }
         }
     }
 
     @ViewBuilder private var identifiedToggle: some View {
-        if let identifier {
-            nativeToggle.accessibilityIdentifier(identifier)
-        } else {
-            nativeToggle
-        }
+        if let identifier { nativeToggle.accessibilityIdentifier(identifier) }
+        else { nativeToggle }
     }
 
     private var nativeToggle: some View {
-        Toggle(title, isOn: $isOn).labelsHidden().toggleStyle(.switch)
-            .tint(.tetherAction)
+        Toggle(title, isOn: $isOn).toggleStyle(.checkbox)
+            .font(TetherTypography.body)
             .accessibilityLabel(title)
             .accessibilityHint(hint ?? detail ?? "")
     }

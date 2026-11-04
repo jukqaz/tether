@@ -289,13 +289,22 @@ private enum NativeUITestWindowObservation {
                 "isResizable": window.styleMask.contains(.resizable)] as [String: Any]
     }
 
-    private static func rect(_ value: NSRect) -> [String: Double] {
-        ["x": Double(value.origin.x), "y": Double(value.origin.y),
-         "width": Double(value.size.width), "height": Double(value.size.height)]
-    }
+    private static func rect(_ value: NSRect) -> [String: Any] { NativeUITestGeometry.rect(value) }
+    private static func size(_ value: NSSize) -> [String: Any] { NativeUITestGeometry.size(value) }
+}
 
-    private static func size(_ value: NSSize) -> [String: Double] {
-        ["width": Double(value.width), "height": Double(value.height)]
+/// AppKit represents unbounded constraints with infinity. JSON must preserve
+/// them as unavailable measurements, never trap or invent a finite geometry.
+enum NativeUITestGeometry {
+    static func rect(_ value: NSRect) -> [String: Any] {
+        ["x": number(value.origin.x), "y": number(value.origin.y),
+         "width": number(value.width), "height": number(value.height)]
+    }
+    static func size(_ value: NSSize) -> [String: Any] {
+        ["width": number(value.width), "height": number(value.height)]
+    }
+    private static func number(_ value: CGFloat) -> Any {
+        value.isFinite ? Double(value) : NSNull()
     }
 }
 

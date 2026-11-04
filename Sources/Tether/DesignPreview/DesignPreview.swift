@@ -30,7 +30,7 @@ enum DesignPreview {
             render(DesignPreviewPanel(state: state), to: output, dark: dark)
         } else if flag == "--render-design-settings" {
             render(DesignPreviewSettings(state: state, page: page, snapshot: true)
-                .frame(width: 560, height: 448), to: output, dark: dark)
+                .frame(width: 640, height: 480), to: output, dark: dark)
         } else {
             render(VStack(alignment: .leading, spacing: 16) {
                 HStack {
@@ -41,7 +41,7 @@ enum DesignPreview {
                         .font(.system(size: 12)).foregroundStyle(.secondary)
                 }
                 HStack(alignment: .top, spacing: 20) {
-                    DesignPreviewSettings(state: state, page: page, snapshot: true).frame(width: 560, height: 448)
+                    DesignPreviewSettings(state: state, page: page, snapshot: true).frame(width: 640, height: 480)
                         .clipShape(.rect(cornerRadius: 12))
                     VStack(alignment: .leading, spacing: 12) {
                         Text(L("Menu bar panel", "메뉴바 패널")).font(.system(size: 12)).foregroundStyle(.secondary)
@@ -66,11 +66,11 @@ enum DesignPreview {
             action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu; menu.addItem(appItem); app.mainMenu = menu
         let settings = makeWindow(title: L("Tether · Preview", "Tether · 미리보기"),
-            size: NSSize(width: 560, height: 448), dark: dark,
+            size: NSSize(width: 640, height: 480), dark: dark,
             view: DesignPreviewSettings(state: state, page: page, showPreviewControls: true))
         let panel = makeWindow(title: L("Tether · Menu preview", "Tether · 메뉴 미리보기"), size: NSSize(width: 280, height: 540), dark: dark,
             view: DesignPreviewPanel(state: state, openSettings: { settings.makeKeyAndOrderFront(nil) }))
-        settings.contentMinSize = NSSize(width: 560, height: 448)
+        settings.contentMinSize = NSSize(width: 640, height: 480)
         panel.setContentSize(panel.contentView!.fittingSize)
         settings.center()
         let visible = (settings.screen ?? NSScreen.main)?.visibleFrame ?? settings.frame

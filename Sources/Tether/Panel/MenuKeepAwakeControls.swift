@@ -58,21 +58,24 @@ struct MenuKeepAwakeControls: View {
         VStack(alignment: .leading, spacing: 6) {
             if model.showsLidOptions {
                 HStack(spacing: 8) {
-                    Text(L("Keep awake with lid closed", "덮개를 닫아도 계속 사용"))
-                        .fixedSize(horizontal: false, vertical: true)
+                    Toggle(L("Keep awake with lid closed", "덮개를 닫아도 계속 사용"), isOn: lidBinding)
+                        .fixedSize(horizontal: false, vertical: true).disabled(lidControlDisabled)
+                        .accessibilityIdentifier("panel-allow-closed-lid")
                     Spacer(minLength: 4)
                     if !model.helperSetupConfirmed {
                         Button(L("Set up…", "준비…"), action: openHelperSetup)
                             .buttonStyle(.link).font(TetherTypography.secondary).fixedSize()
                             .accessibilityIdentifier("panel-prepare-lid-helper")
                     }
-                    Toggle(L("Keep awake with lid closed", "덮개를 닫아도 계속 사용"), isOn: lidBinding)
-                        .labelsHidden().fixedSize().disabled(lidControlDisabled)
-                        .accessibilityLabel(L("Keep awake with lid closed", "덮개를 닫아도 계속 사용"))
-                        .accessibilityIdentifier("panel-allow-closed-lid")
                 }
                 .help(L("Applies to current and future work; does not start work by itself.",
                         "현재와 다음 유지에 적용하며, 이 옵션만으로 새 유지를 시작하지 않습니다."))
+            }
+            if model.showsLidOptions, model.v3Settings.allowClosedLid {
+                Text(lidStatusDetail).font(TetherTypography.secondary)
+                    .foregroundStyle(Color.tetherSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("panel-lid-status")
             }
             option(L("Keep display awake", "덮개가 열려 있을 때 화면 켜두기"), selection: displayBinding,
                    identifier: "panel-keep-display-awake")
@@ -87,17 +90,24 @@ struct MenuKeepAwakeControls: View {
             }
         }
         .font(TetherTypography.body)
-        .toggleStyle(.switch).tint(.tetherAction).controlSize(.small)
+        .toggleStyle(.checkbox).tint(.tetherAction).controlSize(.small)
     }
 
     private func option(_ title: String, selection: Binding<Bool>, identifier: String) -> some View {
-        HStack(spacing: 8) {
-            Text(title).fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 4)
-            Toggle(title, isOn: selection).labelsHidden().fixedSize()
-                .accessibilityLabel(title)
-                .accessibilityIdentifier(identifier)
+        Toggle(title, isOn: selection)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier(identifier)
+    }
+
+    var lidStatusDetail: String {
+        if model.lidReleasePending { return model.lidSupportSummary }
+        if model.workSessionHolding, model.userSession?.v4LidRequested == false {
+            return L("This work does not request closed-lid use", "현재 작업은 덮개 유지를 요청하지 않음")
         }
+        if !model.workSessionHolding, model.helperSetupConfirmed {
+            return L("Applies when work requests closed-lid use", "작업에서 덮개 유지를 요청할 때 적용")
+        }
+        return model.lidSupportSummary
     }
 
     var displayStatusDetail: String {

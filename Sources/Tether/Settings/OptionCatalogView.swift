@@ -31,6 +31,14 @@ struct OptionCatalogView: View {
                             .buttonStyle(.link)
                             .accessibilityIdentifier("option-catalog-open-\(entry.id)")
                     }
+                    if entry.id == "O25", model.showsLidOptions {
+                        Button(L("Closed-lid helper…", "덮개 유지 도우미…")) {
+                            model.settingsPage = .safety
+                            dismiss()
+                        }
+                        .buttonStyle(.link)
+                        .accessibilityIdentifier("option-catalog-open-O25-helper")
+                    }
                 }.accessibilityElement(children: .contain)
                     .accessibilityIdentifier("option-catalog-\(entry.id)")
                 Divider()
@@ -85,14 +93,15 @@ struct OptionCatalogView: View {
                     destination = nil
                     dismiss()
                 }
-            case .keep, .power, .app: EmptyView()
+            case .keep, .power, .protection, .app: EmptyView()
             }
         }
     }
     private func open(_ target: OptionDestination) {
         switch target {
-        case .keep: model.settingsPage = .general; dismiss()
+        case .keep: model.settingsPage = .safety; dismiss()
         case .power: model.settingsPage = .safety; dismiss()
+        case .protection: model.settingsPage = .protection; dismiss()
         case .app: model.settingsPage = .system; dismiss()
         default: destination = target
         }

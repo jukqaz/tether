@@ -2,7 +2,7 @@ import Foundation
 import TetherCore
 
 enum OptionDestination: String, Identifiable {
-    case duration, manualDefaults, rules, currentWork, keep, power, app, notifications, lifecycle
+    case duration, manualDefaults, rules, currentWork, keep, power, protection, app, notifications, lifecycle
     var id: String { rawValue }
     var actionTitle: String {
         switch self {
@@ -12,6 +12,7 @@ enum OptionDestination: String, Identifiable {
         case .currentWork: L("Open menu controls…", "메뉴 조작 열기…")
         case .keep: L("Keep-awake settings…", "유지 설정…")
         case .power: L("Power settings…", "전원 설정…")
+        case .protection: L("Protection and diagnostics…", "보호·진단 설정…")
         case .app: L("App settings…", "앱 설정…")
         case .notifications: L("Notification settings…", "알림 설정…")
         case .lifecycle: L("Configure event actions…", "이벤트 실행 설정…")
@@ -61,15 +62,15 @@ enum OptionCatalog {
             e("O12", "Lock actions", "잠금 동작", "Automatic lock actions are not implemented. macOS password requirements still apply.", "자동 잠금 동작은 아직 구현되지 않았습니다. macOS 암호 요구는 계속 적용됩니다.", .notImplemented, nil),
             e("O13", "Keep activity status", "활동 상태 유지", "Synthetic keys, mouse movement and activity generation are not implemented.", "가짜 키·마우스 이동·활동 생성은 아직 구현되지 않았습니다.", .notImplemented, nil),
             e("O14", "Closed-lid environment", "덮개 중 환경 설정", "Speaker muting and changing Low Power Mode are not implemented.", "스피커 음소거·저전력 모드 변경은 아직 구현되지 않았습니다.", .notImplemented, nil),
-            e("O15", "Protection", "기기 보호", "Set battery, thermal and Low Power Mode protection.", "배터리·열 상태·저전력 모드의 보호 기준을 정합니다.", .partial, .keep, support: ("Battery/time limits, OS thermal state and Low Power Mode stop. Fan/sensor controls are unavailable.", "배터리·시간 한도, OS 열 상태·저전력 중지를 제공합니다. 팬·센서 제어는 미지원입니다.")),
-            e("O16", "Recovery", "보호 후 복구", "Choose manual or automatic resume after protection.", "보호 중지 후 직접 또는 자동으로 다시 시작할지 정합니다.", .connected, .keep),
+            e("O15", "Protection", "기기 보호", "Set battery, thermal and Low Power Mode protection.", "배터리·열 상태·저전력 모드의 보호 기준을 정합니다.", .partial, .protection, support: ("Battery/time limits, OS thermal state and Low Power Mode stop. Fan/sensor controls are unavailable.", "배터리·시간 한도, OS 열 상태·저전력 중지를 제공합니다. 팬·센서 제어는 미지원입니다.")),
+            e("O16", "Recovery", "보호 후 복구", "Choose manual or automatic resume after protection.", "보호 중지 후 직접 또는 자동으로 다시 시작할지 정합니다.", .connected, .protection),
             e("O17", "External controls", "외부 도구 제어", "Use commands, links or Shortcuts to control work.", "명령·링크·단축어로 유지를 조작합니다.", .partial, .app, "Shortcuts 단축어", support: ("CLI, URLs and App Intents share the common policy. AppleScript and MCP servers are unavailable.", "CLI·URL·App Intents는 공통 정책을 사용합니다. AppleScript·MCP 서버는 미지원입니다.")),
             e("O18", "Run on events", "이 일이 생기면 실행", "Send a webhook when a selected work event occurs.", "선택한 작업 이벤트가 생기면 Webhook을 보냅니다.", .partial, .lifecycle, "hook shell webhook", support: ("Bounded HTTPS webhooks are connected. Shell/Shortcut supervision is not implemented.", "시간 제한이 있는 HTTPS Webhook을 연결합니다. shell·Shortcut 감시자는 아직 미구현입니다.")),
             e("O19", "Wake schedules", "예약 깨우기", "Creating OS wake schedules is not implemented. Responding to Wake is a separate feature.", "OS 깨우기 일정 생성은 아직 구현되지 않았습니다. 깨어남 대응과 별개입니다.", .notImplemented, nil),
             e("O20", "Disk keep-awake", "디스크 유지", "The isolated driver is under test; native cleanup is not confirmed and activation is unavailable.", "격리 실행기를 검증 중입니다. 실제 정리를 확인하지 못해 아직 활성화할 수 없습니다.", .notImplemented, nil),
             e("O21", "Notifications and sound", "알림과 소리", "Choose timer and task notifications, warning time and sound.", "타이머·작업 알림과 만료 예고 시점·소리를 정합니다.", .partial, .notifications, support: ("Separate timer/task completion and expiry warning time/sound. Repeating reminders are unavailable.", "타이머·작업 종료 알림, 만료 예고 시점·소리를 구분합니다. 반복 알림은 아직 미지원입니다.")),
             e("O22", "Menu and controls", "메뉴와 조작", "Show the icon alone or include the time remaining.", "메뉴바에 아이콘만 또는 남은 시간도 표시합니다.", .partial, .app, support: ("Icon or remaining time. Custom menu layouts, global shortcuts and click actions are unavailable.", "아이콘·남은 시간 표시를 선택합니다. 자유 배치·전역 단축키·클릭 동작은 아직 미지원입니다.")),
-            e("O23", "History and diagnostics", "통계와 진단", "Review usage, recent events, other app requests and reports.", "사용 통계·최근 동작·다른 앱 요청·보고서를 확인합니다.", .connected, .app),
+            e("O23", "History and diagnostics", "통계와 진단", "Review usage, recent events, other app requests and reports.", "사용 통계·최근 동작·다른 앱 요청·보고서를 확인합니다.", .connected, .protection),
             e("O24", "General and transfer", "일반·설정 이동", "Set language and startup, or import and export settings.", "언어·시작 동작을 정하고 설정을 가져오거나 내보냅니다.", .connected, .app),
             e("O25", "Updates and helper", "업데이트와 도우미", "Check updates, choose a channel and prepare the lid helper.", "업데이트·배포 채널·덮개 도우미를 관리합니다.", .partial, .app, support: ("Channels, explicit install and helper preparation. Widgets/Control Center are not implemented.", "채널·명시 설치·도우미 준비를 제공합니다. 위젯·제어 센터는 아직 미지원입니다.")),
             e("O26", "Additional tools", "추가 도구 후보", "Keyboard cleaning, fan/network/game controls and virtual displays require separate implementations.", "키보드 청소·팬/네트워크/게임 제어·가상 화면은 별도 구현이 필요한 후보입니다.", .notImplemented, nil)

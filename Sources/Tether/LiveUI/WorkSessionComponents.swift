@@ -2,14 +2,14 @@ import SwiftUI
 import TetherCore
 
 enum WorkSessionMetrics {
-    static let panelWidth: CGFloat = 300
+    static let panelWidth: CGFloat = 304
     static let panelMaximumHeight: CGFloat = 606
-    static let panelInset: CGFloat = 15
+    static let panelInset: CGFloat = 12
     static let modulePadding: CGFloat = 10
     static let iconWidth: CGFloat = 16
     static let iconSpacing: CGFloat = 8
-    static let settingsMinimum = CGSize(width: 560, height: 480)
-    static let pageInset: CGFloat = 20
+    static let settingsMinimum = CGSize(width: 600, height: 440)
+    static let pageInset: CGFloat = 16
     static func panelHeightLimit(visibleHeight: CGFloat) -> CGFloat {
         min(panelMaximumHeight, max(202, visibleHeight - 32))
     }

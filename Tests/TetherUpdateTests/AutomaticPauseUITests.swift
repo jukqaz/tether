@@ -68,14 +68,14 @@ final class AutomaticPauseUITests: XCTestCase {
                     let panel = NSHostingView(rootView: TetherPanel(model: model, maximumHeight: 360)
                         .environment(\.colorScheme, dark ? .dark : .light)
                         .environment(\.tetherReduceTransparencyOverride, true))
-                    XCTAssertEqual(panel.fittingSize.width, 300, accuracy: 0.5)
+                    XCTAssertEqual(panel.fittingSize.width, 304, accuracy: 0.5)
                     XCTAssertLessThanOrEqual(panel.fittingSize.height, 360.5)
                     model.settingsPage = .safety
                     let settings = NSHostingView(rootView: SettingsView(model: model, screenshot: true)
                         .environment(\.colorScheme, dark ? .dark : .light)
                         .environment(\.tetherReduceTransparencyOverride, true)
-                        .frame(width: 560, height: 480))
-                    XCTAssertEqual(settings.fittingSize, CGSize(width: 560, height: 480))
+                        .frame(width: 640, height: 480))
+                    XCTAssertEqual(settings.fittingSize, CGSize(width: 640, height: 480))
                     XCTAssertFalse(panel.fittingSize.height.isNaN)
                 }
             }

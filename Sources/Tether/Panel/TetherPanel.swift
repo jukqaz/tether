@@ -70,7 +70,7 @@ struct TetherPanel: View {
                 .foregroundStyle(model.presentation.color)
                 .frame(width: 24, height: 24).padding(.top, 2)
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(statusTitle).font(TetherTypography.status)
                     .fixedSize(horizontal: false, vertical: true)
                 Text([statusDetail, powerLabel].compactMap { $0 }.joined(separator: " · "))
@@ -84,7 +84,7 @@ struct TetherPanel: View {
     }
 
     private var panelContent: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             if model.v4ACDrainWarning {
                 Text(L("Battery charge continues to decrease while connected to power.",
                        "전원 연결 중 배터리 잔량이 계속 줄고 있습니다."))
@@ -94,7 +94,7 @@ struct TetherPanel: View {
             }
             if let problem = model.problem {
                 attention(title: problem.title, detail: problem.message, color: problem.color,
-                    destination: .system, actionTitle: problem.reviewLabel)
+                    destination: problemDestination(problem), actionTitle: problem.reviewLabel)
             } else if needsLidReview {
                 attention(title: model.helperSetupConfirmed
                     ? L("Closed-lid request needs review", "덮개 기능 적용 확인 필요")
@@ -102,16 +102,16 @@ struct TetherPanel: View {
                     detail: model.helperSetupConfirmed
                         ? L("Review the current helper response and closed-lid request.", "현재 도우미 응답과 덮개 유지 요청 상태를 확인하세요.")
                         : L("Review required MacBook helper setup.", "MacBook 필수 도우미 준비를 확인하세요."),
-                    color: .tetherWarning, destination: .system)
+                    color: .tetherWarning, destination: .safety)
             }
             if model.userSessionStatus?.ownReleasePending == true {
                 attention(title: L("Confirming release", "잠자기 방지 해제 확인 중"),
-                    detail: model.presentation.subtitle, color: .tetherWarning, destination: .system)
+                    detail: model.presentation.subtitle, color: .tetherWarning, destination: .protection)
             } else if model.lidReleasePending {
                 attention(title: L("Closed-lid release needs confirmation", "덮개 설정 되돌리기 확인 필요"),
                     detail: L("General work and closed-lid recovery have separate results.",
                               "일반 잠자기 방지와 덮개 설정 복구 결과는 별도로 확인합니다."),
-                    color: .tetherWarning, destination: .system)
+                    color: .tetherWarning, destination: .protection)
             }
             if showsDisplayRecoveryWarning { displayRecoveryAttention }
             if actionVisibility.showsCurrentWork {
@@ -136,7 +136,7 @@ struct TetherPanel: View {
                 VStack(alignment: .leading, spacing: 6) {
                     if actionVisibility.showsAutomaticToggle { automaticControls }
                     if actionVisibility.showsQuickOptions {
-                        MenuKeepAwakeControls(model: model, openHelperSetup: { showSettings(page: .system) })
+                        MenuKeepAwakeControls(model: model, openHelperSetup: { showSettings(page: .safety) })
                     }
                 }
             }
@@ -145,7 +145,7 @@ struct TetherPanel: View {
                 Button(summary) {
                     if settingsNavigationAction != nil {
                         model.otherAppDetailsRequested = true
-                        showSettings(page: .system)
+                        showSettings(page: .protection)
                     } else {
                         model.showOtherAppKeepAwakeDetails()
                     }
@@ -155,6 +155,11 @@ struct TetherPanel: View {
                     .accessibilityIdentifier("panel-other-app-requests")
             }
         }
+    }
+
+    private func problemDestination(_ problem: AppModel.Problem) -> SettingsPage {
+        if case .error = problem { return .protection }
+        return .safety
     }
 
     var actionVisibility: MenuActionVisibility { MenuActionVisibility(model: model) }
@@ -213,13 +218,13 @@ struct TetherPanel: View {
             if model.automaticWorkReasonActive {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 8) {
-                        Text(L("Automatic keep-awake", "자동 잠자기 방지")).font(TetherTypography.body.weight(.medium))
+                        Text(L("Automatic", "자동 유지")).font(TetherTypography.body.weight(.medium))
                         Spacer(minLength: 4)
                         Text(currentAutomaticSummary).font(TetherTypography.secondary)
                             .foregroundStyle(Color.tetherSecondary).fixedSize()
                     }
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(L("Automatic keep-awake", "자동 잠자기 방지")).font(TetherTypography.body.weight(.medium))
+                        Text(L("Automatic", "자동 유지")).font(TetherTypography.body.weight(.medium))
                         Text(currentAutomaticSummary).font(TetherTypography.secondary)
                             .foregroundStyle(Color.tetherSecondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -244,19 +249,12 @@ struct TetherPanel: View {
 
     private var automaticControls: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(L("Automatic start", "자동 시작"))
-                Spacer(minLength: 8)
-                Toggle(L("Allow automatic starts", "자동 시작 허용"), isOn: Binding(
-                    get: { model.v3Settings.automaticEnabled }, set: { model.setAutomaticEnabled($0) }))
-                    .labelsHidden()
-                    .toggleStyle(.switch).tint(.tetherAction)
-                    .controlSize(.small)
-                    .accessibilityLabel(L("Allow automatic starts", "자동 시작 허용"))
-                    .accessibilityIdentifier("panel-automatic")
-                    .accessibilityHint(model.v3Settings.effectiveAutomaticCondition.title + ". " + L("Turning this off ends automatic work only.", "끄면 자동 유지만 종료합니다."))
-                    .disabled(!model.acceptingUserCommands || model.commandPending)
-            }
+            Toggle(L("Allow automatic starts", "자동 시작 허용"), isOn: Binding(
+                get: { model.v3Settings.automaticEnabled }, set: { model.setAutomaticEnabled($0) }))
+                .toggleStyle(.checkbox).controlSize(.small)
+                .accessibilityIdentifier("panel-automatic")
+                .accessibilityHint(model.v3Settings.effectiveAutomaticCondition.title + ". " + L("Turning this off ends automatic work only.", "끄면 자동 유지만 종료합니다."))
+                .disabled(!model.acceptingUserCommands || model.commandPending)
             if actionVisibility.showsAutomaticRest {
                 AutomaticPauseControls(model: model, compact: true)
             }
@@ -373,7 +371,7 @@ struct TetherPanel: View {
             Spacer(minLength: 4)
             if !badge.isEmpty { Text(badge).font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary) }
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 5)
         .accessibilityElement(children: .combine)
     }
 
@@ -416,11 +414,8 @@ struct TetherPanel: View {
             if actionVisibility.showsStopAll || actionVisibility.showsResume { stopAllControl }
             Spacer(minLength: 6)
             if model.userCommandsArePreview { PreviewIndicator() }
-            Button(action: showSettings) {
-                Label(L("Settings…", "설정…"), systemImage: "gearshape")
-                    .labelStyle(.iconOnly)
-            }
-                .actionButton().controlSize(.small)
+            Button(L("Settings…", "설정…"), action: showSettings)
+                .buttonStyle(.link).font(TetherTypography.secondary)
                 .help(L("Settings", "설정"))
                 .accessibilityLabel(L("Settings", "설정"))
                 .accessibilityIdentifier("panel-open-settings")
@@ -430,12 +425,10 @@ struct TetherPanel: View {
     }
 
     private var stopAllControl: some View {
-        Button(model.workPaused ? L("Resume", "다시 허용") : L("Stop all", "모두 중지")) {
+        CompactPushButton(model.workPaused ? L("Resume", "다시 허용") : L("Stop all", "모두 중지"),
+                          prominent: model.workPaused, identifier: "panel-pause-all") {
             model.setEnabled(model.workPaused)
         }
-        .font(TetherTypography.body)
-        .actionButton(prominent: model.workPaused).controlSize(.small)
-        .accessibilityIdentifier("panel-pause-all")
         .accessibilityHint(model.workPaused
             ? model.automaticPauseActive
                 ? L("Allow work again. Automatic-only rest still applies; ended timers do not restart.", "유지를 다시 허용합니다. 자동만 쉬는 기한은 유지하며 끝난 타이머는 복원하지 않습니다.")
@@ -459,24 +452,18 @@ struct TetherPanel: View {
     }
 
     private var moreActions: some View {
-        Menu {
-            if model.showsLidOptions {
-                Text(L("Closed lid · \(model.lidSupportSummary)", "덮개 유지 · \(model.lidSupportSummary)"))
-                Divider()
+        CompactActionMenu(title: L("More actions", "다른 동작"), actions: [
+            CompactMenuAction(L("Next manual start…", "다음 수동 시작 설정…")) {
+                showSettings(page: .general)
+            },
+            CompactMenuAction(L("Sleep…", "잠자기…"), separatorBefore: true,
+                              enabled: model.sessionAvailable && !model.commandPending) {
+                model.sleepNow()
+            },
+            CompactMenuAction(L("Quit Tether", "Tether 종료"), separatorBefore: true) {
+                NSApplication.shared.terminate(nil)
             }
-            Button(L("Sleep…", "잠자기…")) { model.sleepNow() }
-                .disabled(!model.sessionAvailable || model.commandPending)
-                .accessibilityHint(L("Release Tether's own keep-awake requests, then request sleep", "Tether의 자체 유지 요청을 해제한 뒤 잠자기를 요청합니다"))
-            Divider()
-            Button(L("Quit Tether", "Tether 종료")) { NSApplication.shared.terminate(nil) }
-        } label: {
-            Image(systemName: "ellipsis").frame(width: 18, height: 18)
-        }
-        .menuStyle(.button).menuIndicator(.hidden).fixedSize()
-        .actionButton().controlSize(.small)
-        .font(TetherTypography.secondary)
-        .accessibilityLabel(L("More actions", "다른 동작"))
-        .accessibilityIdentifier("panel-more-actions")
+        ], identifier: "panel-more-actions")
     }
 
     private func showSettings() {

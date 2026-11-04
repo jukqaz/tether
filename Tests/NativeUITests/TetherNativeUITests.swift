@@ -24,7 +24,7 @@ final class TetherNativeUITests: XCTestCase {
         }
     }
 
-    func testLightAppearanceMenuAndThreeSettingsPages() throws {
+    func testLightAppearanceMenuAndFourSettingsPages() throws {
         try launch(language: "ko", scenario: "ac", appearance: "light")
         let application = try XCTUnwrap(try state()["application"] as? [String: Any])
         XCTAssertEqual(application["effectiveAppearance"] as? String, NSAppearance.Name.aqua.rawValue,
@@ -52,7 +52,7 @@ final class TetherNativeUITests: XCTestCase {
         try openSettingsFromMenu()
         let window = try required(app.windows.matching(identifier: "com_apple_SwiftUI_Settings_window").firstMatch,
                                   description: "Light appearance native Settings window")
-        for (page, title) in [("general", "잠자기 방지"), ("safety", "자동 시작"), ("system", "앱 설정")] {
+        for (page, title) in settingsPageNames {
             try selectPage(page, title: title)
             try assertSettingsPageLayout(window, page: page, title: title)
             let application = try XCTUnwrap(try state()["application"] as? [String: Any])
@@ -82,13 +82,14 @@ final class TetherNativeUITests: XCTestCase {
         try waitForManualDeadline(deadline, requestID: requestID)
         app.typeKey(.escape, modifierFlags: [])
         try openSettings()
-        try selectPage("system", title: "App settings")
+        try selectPage("system", title: "General")
         let menuDisplay = try revealSettingsControl(try required("settings-menu-bar-display"))
         menuDisplay.click()
         try required(app.menuItems["Icon + time remaining"], description: "Menu bar remaining-time option").click()
         try waitForState(["menuBarDetails": true, "manual": true, "holding": true])
         evidence("remaining-time-option-settings")
-        try selectPage("safety", title: "Automatic start")
+        try selectPage("safety", title: "Power & Lid")
+        try expandSettingsDisclosure("settings-automatic-behavior-details")
         try required("settings-automatic-rules").click()
         try required("automatic-template-workHours").click()
         XCTAssertTrue(try required("automatic-rules-apply").exists)
@@ -101,14 +102,19 @@ final class TetherNativeUITests: XCTestCase {
     func testDisplayAwakeOptionUsesCurrentSessionAndReleasesOnStop() throws {
         try launch(language: "ko", scenario: "ac")
         try openSettings()
+        try selectPage("safety", title: "전원·덮개")
         let row = try revealSettingsControl(try required("keep-display-awake-toggle"))
-        // The identifier belongs to the full row. Its center is the label, not
-        // necessarily the native switch on the right-hand side.
-        let toggle = try required(row.descendants(matching: .any).matching(NSPredicate(
-            format: "elementType == %d OR elementType == %d OR elementType == %d",
-            XCUIElement.ElementType.checkBox.rawValue, XCUIElement.ElementType.switch.rawValue,
-            XCUIElement.ElementType.toggle.rawValue)).firstMatch, description: "Actual display-awake toggle")
-        XCTAssertEqual(toggle.label, "덮개가 열려 있을 때 화면 켜두기")
+        // AppKit checkboxes carry their own ID; a SwiftUI row can instead
+        // expose its actual input as a child. Never click an arbitrary label.
+        let toggle: XCUIElement
+        if [.checkBox, .switch, .toggle].contains(row.elementType) { toggle = row }
+        else {
+            toggle = try required(row.descendants(matching: .any).matching(NSPredicate(
+                format: "elementType == %d OR elementType == %d OR elementType == %d",
+                XCUIElement.ElementType.checkBox.rawValue, XCUIElement.ElementType.switch.rawValue,
+                XCUIElement.ElementType.toggle.rawValue)).firstMatch, description: "Actual display-awake toggle")
+        }
+        XCTAssertEqual(toggle.label, "화면 켜두기 허용")
         try revealSettingsControl(toggle)
         toggle.click()
         try waitForState(["keepDisplayAwake": true, "displayHolding": true, "holding": true])
@@ -138,18 +144,19 @@ final class TetherNativeUITests: XCTestCase {
         let after = Date().timeIntervalSince1970
         edge.click(forDuration: 0.2, thenDragTo: edge.withOffset(CGVector(dx: -600, dy: 0)))
         _ = try settingsGeometry(after: after, description: "core-settings-minimum-width") {
-            abs($0.frame.width - 560) <= 1
+            abs($0.frame.width - 600) <= 1
         }
-        try selectPage("system", title: "App settings")
+        try selectPage("system", title: "General")
         XCTAssertFalse(window.descendants(matching: .any)["settings-shortcuts-details"].exists)
         XCTAssertEqual(window.popUpButtons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "shortcut-key-")).count, 0)
-        try expandSettingsDisclosure("settings-other-app-requests-details")
+        try selectPage("protection", title: "Protection & Diagnostics")
+        try required("settings-other-app-requests-details")
         XCTAssertTrue(try required("settings-review-sleep-influences").exists)
-        try selectPage("general", title: "Keep awake")
+        try selectPage("safety", title: "Power & Lid")
         XCTAssertTrue(try required("keep-display-awake-toggle").exists)
         XCTAssertTrue(try required("settings-lock-policy-note").exists)
-        try selectPage("safety", title: "Automatic start")
         XCTAssertTrue(try required("automatic-ac-toggle").exists)
+        try expandSettingsDisclosure("settings-automatic-behavior-details")
         XCTAssertTrue(try required("settings-automatic-rules").exists)
         evidence("english-core-settings-minimum-width")
     }
@@ -158,10 +165,11 @@ final class TetherNativeUITests: XCTestCase {
         try launch(language: "ko", scenario: "ac")
         try openSettings()
         let window = try activateSettingsWindow()
-        let pages = [("general", "잠자기 방지", ["settings-protection-rules-details", "settings-work-rules-details"]),
-                     ("safety", "자동 시작", ["settings-automatic-behavior-details"]),
-                     ("system", "앱 설정", ["settings-protection-alerts-details",
-                        "settings-helper-details", "settings-updates-details", "settings-records-diagnostics-details"])]
+        let pages = [("safety", "전원·덮개", ["settings-automatic-behavior-details", "settings-closed-lid-display-details", "settings-helper-details"]),
+                     ("general", "직접 유지", ["settings-manual-battery-details"]),
+                     ("protection", "보호·진단", ["settings-work-rules-details",
+                        "settings-records-diagnostics-details", "settings-usage-statistics-details"]),
+                     ("system", "일반", ["settings-updates-details"])]
         for (page, title, disclosures) in pages {
             try selectPage(page, title: title)
             for identifier in disclosures { try expandSettingsDisclosure(identifier) }
@@ -178,8 +186,8 @@ final class TetherNativeUITests: XCTestCase {
             try headerScrollEvidence("scroll-\(page)-top", window: window,
                                      selectedTab: selectedTab, scroll: scroll, anchor: anchor)
             scroll.scroll(byDeltaX: 0, deltaY: -160)
-            assertFixedFrame(try settingsNavigationFrame(), equals: initialNavigation, description: "\(page) tabs at middle")
-            assertFixedFrame(selectedTab.frame, equals: initialHeading, description: "\(page) selected native tab at middle")
+            assertFixedFrame(try settingsNavigationFrame(), equals: initialNavigation, description: "\(page) sidebar at middle")
+            assertFixedFrame(selectedTab.frame, equals: initialHeading, description: "\(page) selected native sidebar row at middle")
             try assertSettingsPageLayout(window, page: page, title: title)
             let middleAnchor = anchor.frame
             let middlePosition = verticalScrollValue(scroll)
@@ -193,8 +201,8 @@ final class TetherNativeUITests: XCTestCase {
                 "middleScrollbarValue": middlePosition ?? "unavailable",
                 "scrollObserved": contentMoved,
                 "coverage": contentMoved ? "scroll observed" : "unverified"]
-            if !contentMoved && page == "safety" {
-                // This tab can fit even after its only disclosure is expanded.
+            if !contentMoved {
+                // A compact page may fit even after every available disclosure is expanded.
                 // Accept that condition only after measuring every readable
                 // text/control, not merely an unchanged first content anchor.
                 bodyObservation["contentFitObservation"] = try measureSettingsContentFit(scroll)
@@ -210,8 +218,8 @@ final class TetherNativeUITests: XCTestCase {
             try headerScrollEvidence("scroll-\(page)-middle", window: window,
                                      selectedTab: selectedTab, scroll: scroll, anchor: anchor)
             scroll.scroll(byDeltaX: 0, deltaY: -4000)
-            assertFixedFrame(try settingsNavigationFrame(), equals: initialNavigation, description: "\(page) tabs at end")
-            assertFixedFrame(selectedTab.frame, equals: initialHeading, description: "\(page) selected native tab at end")
+            assertFixedFrame(try settingsNavigationFrame(), equals: initialNavigation, description: "\(page) sidebar at end")
+            assertFixedFrame(selectedTab.frame, equals: initialHeading, description: "\(page) selected native sidebar row at end")
             try assertSettingsPageLayout(window, page: page, title: title)
             let endAnchor = anchor.frame
             let endPosition = verticalScrollValue(scroll)
@@ -225,22 +233,23 @@ final class TetherNativeUITests: XCTestCase {
         }
     }
 
-    func testSettingsDisclosureExpansionSurvivesNativeTabRoundtrips() throws {
+    func testSettingsDisclosureExpansionSurvivesNativeSidebarRoundtrips() throws {
         try launch(language: "ko", scenario: "ac")
         try openSettings()
         let before = try state()
         let window = try required(app.windows.matching(identifier: "com_apple_SwiftUI_Settings_window").firstMatch,
                                   description: "Compact Settings window")
-        let pages = [("general", "잠자기 방지", "settings-protection-rules-details"),
-                     ("safety", "자동 시작", "settings-automatic-behavior-details"),
-                     ("system", "앱 설정", "settings-records-diagnostics-details")]
+        let pages = [("safety", "전원·덮개", "settings-automatic-behavior-details"),
+                     ("general", "직접 유지", "settings-manual-battery-details"),
+                     ("protection", "보호·진단", "settings-records-diagnostics-details"),
+                     ("system", "일반", "settings-updates-details")]
         for (page, title, identifier) in pages {
             try selectPage(page, title: title)
             try expandSettingsDisclosure(identifier)
             try assertSettingsPageLayout(window, page: page, title: title)
         }
-        // Window-owned disclosure state must survive native tab actions,
-        // regardless of whether TabView retains or recreates its content.
+        // Window-owned disclosure state must survive native sidebar actions,
+        // regardless of whether the split view retains or recreates its content.
         for (page, title, identifier) in pages {
             try selectPage(page, title: title)
             let triangle = try revealSettingsControl(try disclosureTriangle(identifier))
@@ -250,11 +259,12 @@ final class TetherNativeUITests: XCTestCase {
         }
         // An intentional collapse must persist too; preserving state must not
         // become an unconditional expand-on-return behavior.
+        try selectPage("protection", title: "보호·진단")
         let diagnostics = try revealSettingsControl(try disclosureTriangle("settings-records-diagnostics-details"))
         try clickSettingsDisclosure(diagnostics)
         try assertDisclosureCollapsed(diagnostics)
-        try selectPage("general", title: "잠자기 방지")
-        try selectPage("system", title: "앱 설정")
+        try selectPage("general", title: "직접 유지")
+        try selectPage("protection", title: "보호·진단")
         try assertDisclosureCollapsed(try disclosureTriangle("settings-records-diagnostics-details"))
         let after = try state()
         for key in ["automatic", "manual", "holding", "paused", "keepDisplayAwake", "displayHolding"] {
@@ -296,13 +306,11 @@ final class TetherNativeUITests: XCTestCase {
                                  identity: target.identity)
         evidence("settings-first-keyboard-opening")
 
-        // Give the native tab navigation keyboard focus, then change
-        // actual pages horizontally. Keep macOS keyboard-navigation unchanged.
-        try navigationControl("general", title: "Keep awake").action.click()
-        try assertSelectedPage("general")
+        // Select the real native sidebar, then exercise vertical keyboard
+        // navigation without changing macOS keyboard-navigation preferences.
+        try navigationControl("safety", title: "Power & Lid").action.click()
+        try assertSelectedPage("safety")
         var navigationTarget = try settingsFocusAfterFreshObservation()
-        // Native key-view order may enter the page first. Observe the bounded
-        // reverse/forward path before sending arrows to a native tab responder.
         for reverse in [true, false] {
             for attempt in 0..<8 where !isNativeSettingsNavigationResponder(navigationTarget) {
                 app.typeKey(.tab, modifierFlags: reverse ? .shift : [])
@@ -310,36 +318,38 @@ final class TetherNativeUITests: XCTestCase {
                 let observation = XCTAttachment(string:
                     "direction=\(reverse ? "reverse" : "forward") attempt=\(attempt + 1) "
                     + "isWindow=\(navigationTarget.isWindow) class=\(navigationTarget.className) identity=\(navigationTarget.identity)")
-                observation.name = "settings-tab-focus-\(reverse ? "reverse" : "forward")-\(attempt + 1)"
+                observation.name = "settings-sidebar-focus-\(reverse ? "reverse" : "forward")-\(attempt + 1)"
                 observation.lifetime = .keepAlways
                 add(observation)
             }
         }
         XCTAssertTrue(isNativeSettingsNavigationResponder(navigationTarget),
-                      "Arrow input requires a native tab/radio responder, not \(navigationTarget.className)")
-        // Native tabs can keep keyboard focus separate from selection. Activate
-        // the focused tab first; reverse Tab need not enter the pointer's tab.
-        app.typeKey(" ", modifierFlags: [])
-        _ = try settingsFocusAfterFreshObservation()
-        let pages = ["general", "safety", "system"]
+                      "Up/down selection requires the native sidebar responder, not \(navigationTarget.className)")
+        let pages = settingsPageNames.map(\.page)
         let selected = pages.filter { app.descendants(matching: .any)["settings-page-\($0)"].exists }
-        XCTAssertEqual(selected.count, 1, "Keyboard activation must leave one real page selected")
+        XCTAssertEqual(selected.count, 1, "Sidebar focus must leave one real page selected")
         var position = try XCTUnwrap(selected.first.flatMap { pages.firstIndex(of: $0) })
-        // Exercise both directions and all three pages without requiring a
-        // system tab control to wrap at an endpoint.
-        let deltas = position == 0 ? [1, 1, -1, -1]
-            : position == 2 ? [-1, -1, 1, 1] : [-1, 1, 1, -1]
+        // Reach the top without wrap assumptions, then visit all four pages in
+        // both directions through native List selection.
+        let deltas = Array(repeating: -1, count: position) + [1, 1, 1, -1, -1, -1]
         for delta in deltas {
-            let key: XCUIKeyboardKey = delta > 0 ? .rightArrow : .leftArrow
             XCTAssertTrue(isNativeSettingsNavigationResponder(try settingsFocusAfterFreshObservation()),
-                          "Keyboard movement and activation must stay on the native tab control")
-            app.typeKey(key, modifierFlags: [])
-            app.typeKey(" ", modifierFlags: [])
+                          "Vertical movement must stay on the actual native sidebar")
+            app.typeKey(delta > 0 ? .downArrow : .upArrow, modifierFlags: [])
             position += delta
-            XCTAssertTrue(pages.indices.contains(position), "The measured keyboard path must stay inside native tab bounds")
+            XCTAssertTrue(pages.indices.contains(position), "The keyboard path must stay inside sidebar bounds")
             try assertSelectedPage(pages[position])
         }
-        evidence("settings-tab-real-keyboard-selection")
+        evidence("settings-sidebar-real-keyboard-selection")
+        app.typeKey(.tab, modifierFlags: [])
+        let detailTarget = try settingsFocusAfterFreshObservation()
+        XCTAssertFalse(detailTarget.isWindow, "Tab from sidebar selection must reach a usable control")
+        XCTAssertFalse(isNativeSettingsNavigationResponder(detailTarget),
+                       "Tab must leave sidebar navigation for the page controls")
+        XCTAssertNotEqual(detailTarget.identity, navigationTarget.identity,
+                          "A real key-view transition must occur before claiming detail entry")
+        try assertSelectedPage("safety")
+        evidence("settings-sidebar-tab-enters-detail")
 
         let settings = try required(app.windows.matching(identifier: "com_apple_SwiftUI_Settings_window").firstMatch,
                                     description: "Keyboard-opened Settings window")
@@ -401,6 +411,7 @@ final class TetherNativeUITests: XCTestCase {
         evidence("gallery-menu-duration-presets-dismissed")
         try setAutomatic(true)
         try openSettingsFromMenu()
+        try selectPage("general", title: "직접 유지")
         let general = try required("settings-page-general")
         XCTAssertFalse(general.descendants(matching: .any)["settings-manual-duration-picker"].exists,
                        "Manual duration selection must live only in the menu bar")
@@ -408,28 +419,35 @@ final class TetherNativeUITests: XCTestCase {
             NSPredicate(format: "label == %@ OR title == %@", "유지 시간", "유지 시간")).firstMatch.exists,
             "General settings must not retain the manual duration row")
         evidence("gallery-settings-general")
+        try selectPage("safety", title: "전원·덮개")
         XCTAssertFalse(app.descendants(matching: .any)["closed-lid-disconnect-picker"].exists,
                        "The unplug action is hidden while closed-lid work is off")
-        try selectPage("safety", title: "자동 시작")
         evidence("gallery-settings-safety")
         XCTAssertTrue(try required("automatic-ac-toggle").exists)
-        XCTAssertTrue(try required("settings-automatic-rules").exists)
         try expandSettingsDisclosure("settings-automatic-behavior-details")
+        XCTAssertTrue(try required("settings-automatic-rules").exists)
         XCTAssertFalse(app.descendants(matching: .any)["settings-open-rehearsal"].exists)
         evidence("gallery-settings-safety-details")
-        try selectPage("system", title: "앱 설정")
-        try expandSettingsDisclosure("settings-protection-alerts-details")
+        try selectPage("system", title: "일반")
+        try revealSettingsControl(try required("settings-open-notifications")).click()
+        try required("settings-notifications-sheet")
         try required(app.checkBoxes["수동 유지 종료 알림"], description: "Independent manual expiry notification")
-        try required(app.checkBoxes["만료 5분 전 예고"], description: "Optional expiry warning")
+        try required(app.checkBoxes["만료 전 예고"], description: "Optional expiry warning")
         try required(app.checkBoxes["과열·상태 확인 실패"], description: "Thermal and observation protection alerts")
         try required(app.checkBoxes["배터리 부족"], description: "Battery protection alerts")
         XCTAssertFalse(app.buttons["Tether 사용법…"].exists, "The separate guide button must be removed")
-        XCTAssertFalse(app.sheets.firstMatch.exists, "App settings must not open a separate guide sheet")
+        try required("settings-notifications-back").click()
+        XCTAssertTrue(app.sheets.firstMatch.waitForNonExistence(timeout: 3),
+            "Returning from notifications must close that sheet without opening a guide")
         evidence("gallery-settings-system")
-        try expandSettingsDisclosure("settings-helper-details")
-        try expandSettingsDisclosure("settings-records-diagnostics-details")
         try expandSettingsDisclosure("settings-updates-details")
-        try expandSettingsDisclosure("settings-other-app-requests-details")
+        evidence("gallery-settings-system-details")
+        try selectPage("safety", title: "전원·덮개")
+        try expandSettingsDisclosure("settings-helper-details")
+        evidence("gallery-settings-safety-helper")
+        try selectPage("protection", title: "보호·진단")
+        try expandSettingsDisclosure("settings-records-diagnostics-details")
+        try required("settings-other-app-requests-details")
         let review = try required(app.buttons["settings-review-sleep-influences"], description: "Sleep influences button")
         XCTAssertTrue([review.label, review.title].contains("다른 앱의 잠자기 방지 요청 확인"),
                       "The compact Review action must retain its full accessible purpose")
@@ -439,7 +457,7 @@ final class TetherNativeUITests: XCTestCase {
             scroll.scroll(byDeltaX: 0, deltaY: -240)
         }
         XCTAssertTrue(review.isHittable)
-        evidence("gallery-settings-system-details")
+        evidence("gallery-settings-protection-details")
         review.click()
         try required(app.staticTexts["앱·시스템 절전 영향"], description: "Sleep influences sheet title")
         evidence("gallery-sleep-influences")
@@ -455,8 +473,8 @@ final class TetherNativeUITests: XCTestCase {
     func testSleepInfluencesPointerOpeningClearsOnlyInitialFocus() throws {
         try launch(language: "ko", scenario: "ac")
         try openSettings()
-        try selectPage("system", title: "앱 설정")
-        try expandSettingsDisclosure("settings-other-app-requests-details")
+        try selectPage("protection", title: "보호·진단")
+        try required("settings-other-app-requests-details")
         let review = try required(app.buttons["settings-review-sleep-influences"], description: "Sleep influences button")
         XCTAssertTrue([review.label, review.title].contains("다른 앱의 잠자기 방지 요청 확인"),
                       "The compact Review action must retain its full accessible purpose")
@@ -525,7 +543,7 @@ final class TetherNativeUITests: XCTestCase {
     func testDiagnosticsPrioritizesAppsAndHistoryHasNoNestedScroll() throws {
         try launch(language: "ko", scenario: "ac")
         try openSettings()
-        try selectPage("system", title: "앱 설정")
+        try selectPage("protection", title: "보호·진단")
         try expandSettingsDisclosure("settings-records-diagnostics-details")
         let recent = try required("recent-activity-disclosure")
         let triangle = recent.elementType == .disclosureTriangle ? recent
@@ -548,7 +566,7 @@ final class TetherNativeUITests: XCTestCase {
                              "Two complete three-line records need more than the old 108pt estimate")
         XCTAssertLessThanOrEqual(last.frame.maxY, list.frame.maxY + 1)
         evidence("history-natural-height")
-        try expandSettingsDisclosure("settings-other-app-requests-details")
+        try required("settings-other-app-requests-details")
         let review = try required(app.buttons["settings-review-sleep-influences"], description: "Sleep influences button")
         XCTAssertTrue([review.label, review.title].contains("다른 앱의 잠자기 방지 요청 확인"),
                       "The compact Review action must retain its full accessible purpose")
@@ -603,7 +621,7 @@ final class TetherNativeUITests: XCTestCase {
     func testActiveRecordingRemainsVisibleOutsideCollapsedDiagnostics() throws {
         try launch(language: "ko", scenario: "ac")
         try openSettings()
-        try selectPage("system", title: "앱 설정")
+        try selectPage("protection", title: "보호·진단")
         let before = try state()
         XCTAssertEqual(before["recordingActive"] as? Bool, false)
         XCTAssertTrue(before["recordingUntil"] is NSNull)
@@ -682,8 +700,8 @@ final class TetherNativeUITests: XCTestCase {
             "Collapsing diagnostics must retain the original visible deadline")
         evidence("recording-active-details-collapsed")
 
-        try selectPage("general", title: "잠자기 방지")
-        try selectPage("system", title: "앱 설정")
+        try selectPage("general", title: "직접 유지")
+        try selectPage("protection", title: "보호·진단")
         try assertDisclosureCollapsed(try disclosureTriangle("settings-records-diagnostics-details"))
         XCTAssertEqual(try assertActiveRecording(), deadline,
             "Page recreation must not hide current recording or restart its deadline")
@@ -901,20 +919,23 @@ final class TetherNativeUITests: XCTestCase {
         try waitForState(["manual": false, "holding": true])
         XCTAssertEqual(try state()["selectedManualMinutes"] as? Int, 60)
         try openSettingsFromMenu()
+        try selectPage("general", title: "Manual")
         XCTAssertFalse(app.descendants(matching: .any)["automatic-ac-toggle"].exists,
-                       "Stay Awake must link to automatic settings without duplicating its master switch")
-        try revealSettingsControl(try required("settings-go-to-automatic")).click()
+                       "Manual settings must not duplicate the automatic-start master switch")
+        XCTAssertFalse(app.descendants(matching: .any)["settings-go-to-automatic"].exists,
+            "The native sidebar replaces a duplicate page-navigation link")
+        try selectPage("safety", title: "Power & Lid")
         try required("settings-page-safety")
         XCTAssertTrue(try required("automatic-ac-toggle").exists)
+        try expandSettingsDisclosure("settings-automatic-behavior-details")
         XCTAssertTrue(try required("settings-automatic-rules").exists)
         XCTAssertFalse(app.descendants(matching: .any)["automatic-power-condition"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["automatic-battery-duration-picker"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["manual-battery-continuation-toggle"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["settings-manual-duration-picker"].exists)
-        try expandSettingsDisclosure("settings-automatic-behavior-details")
         XCTAssertFalse(app.descendants(matching: .any)["settings-open-rehearsal"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["settings-rehearsal-sheet"].exists)
-        try selectPage("system", title: "App settings")
+        try selectPage("system", title: "General")
         XCTAssertFalse(app.descendants(matching: .any)["settings-open-history"].exists)
         try expandSettingsDisclosure("settings-updates-details")
         XCTAssertFalse(app.descendants(matching: .any)["update-after-work-schedule"].exists)
@@ -925,17 +946,20 @@ final class TetherNativeUITests: XCTestCase {
     func testDesktopSettingsOmitBatteryAndClosedLidControls() throws {
         try launch(language: "en", scenario: "desktop")
         try openSettings()
+        try selectPage("general", title: "Manual")
         try required("settings-page-general")
         XCTAssertFalse(app.staticTexts["Manual session"].exists,
                        "Desktop settings must omit the empty manual session section")
         XCTAssertFalse(app.descendants(matching: .any)["settings-manual-duration-picker"].exists,
                        "Manual duration selection must live only in the menu bar")
         XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Keep working with the lid closed")).firstMatch.exists)
-        try expandSettingsDisclosure("settings-protection-rules-details")
+        try selectPage("protection", title: "Protection & Diagnostics")
+        try required("settings-protection-rules-details")
         XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Stop below")).firstMatch.exists)
         XCTAssertTrue(app.staticTexts["Thermal protection"].exists)
-        try selectPage("system", title: "App settings")
-        try expandSettingsDisclosure("settings-protection-alerts-details")
+        try selectPage("system", title: "General")
+        try revealSettingsControl(try required("settings-open-notifications")).click()
+        try required("settings-notifications-sheet")
         XCTAssertFalse(app.checkBoxes["Battery protection"].exists,
                        "Expanding alerts must not reveal a battery option on a desktop Mac")
         evidence("desktop-settings")
@@ -946,7 +970,7 @@ final class TetherNativeUITests: XCTestCase {
         try waitForState(["automatic": false, "manual": false, "holding": false, "paused": false])
         try openSettings()
         XCTAssertFalse(app.descendants(matching: .any)["closed-lid-allow-toggle"].exists)
-        try selectPage("safety", title: "Automatic start")
+        try selectPage("safety", title: "Power & Lid")
         XCTAssertTrue(try required("automatic-ac-toggle").exists)
         XCTAssertFalse(app.descendants(matching: .any)["automatic-power-condition"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["closed-lid-allow-toggle"].exists)
@@ -966,7 +990,8 @@ final class TetherNativeUITests: XCTestCase {
                        "Serious thermal pressure must hide the unavailable manual start")
         try waitForState(["manual": false, "holding": false, "paused": true])
         try openSettingsFromMenu()
-        try expandSettingsDisclosure("settings-protection-rules-details")
+        try selectPage("protection", title: "Protection & Diagnostics")
+        try required("settings-protection-rules-details")
         XCTAssertTrue(app.staticTexts["Thermal protection"].exists)
         evidence("thermal-protection")
     }
@@ -1030,7 +1055,7 @@ final class TetherNativeUITests: XCTestCase {
         XCTAssertFalse(settings.frame.intersects(stop.frame), "Persistent menu actions must not overlap")
         evidence("long-error-menu")
         try openSettingsFromMenu()
-        try required("settings-page-general")
+        try required("settings-page-safety")
     }
 
     func testOverflowErrorRetainsCompleteRecoveryAdvice() throws {
@@ -1060,15 +1085,15 @@ final class TetherNativeUITests: XCTestCase {
             scroll.scroll(byDeltaX: 0, deltaY: -180)
         }
         XCTAssertTrue(review.isHittable)
-        XCTAssertEqual(review.label, "앱 설정에서 진단…")
+        XCTAssertEqual(review.label, "보호·진단에서 확인…")
         review.click()
-        try required("settings-page-system")
+        try required("settings-page-protection")
         XCTAssertTrue(try required("settings-error-context").isHittable,
                       "The common diagnostics entry must retain the request's error context")
         evidence("generic-error-diagnostics-destination")
     }
 
-    func testClosedLidSetupReviewOpensAppSettingsWithoutBatteryFallback() throws {
+    func testClosedLidSetupReviewOpensPowerSettingsWithoutBatteryFallback() throws {
         try launch(language: "en", scenario: "lidSetup")
         try waitForState(["automatic": true, "automaticActive": true, "manual": false, "holding": true])
         let before = try state()
@@ -1078,7 +1103,7 @@ final class TetherNativeUITests: XCTestCase {
         let reviewedAt = Date().timeIntervalSince1970
         try required("panel-review-settings").click()
         try nativeSettingsNavigationHost()
-        try required("settings-page-system")
+        try required("settings-page-safety")
         XCTAssertFalse(app.descendants(matching: .any)["settings-page-general"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["automatic-battery-duration-picker"].exists)
         var after: [String: Any]?
@@ -1150,30 +1175,30 @@ final class TetherNativeUITests: XCTestCase {
         try openSettings()
         let window = try required(app.windows.matching(identifier: "com_apple_SwiftUI_Settings_window").firstMatch,
                                   description: "Native Settings window")
-        let titles = language == "ko" ? ["잠자기 방지", "자동 시작", "앱 설정"]
-                                       : ["Keep awake", "Automatic start", "App settings"]
+        let pages = settingsPageNames
         if minimumSize {
             try verifySettingsResize(window, evidenceName: "settings-first-open")
-            try assertSettingsPageLayout(window, page: "general", title: titles[0], minimumViewport: true)
+            let current = try XCTUnwrap(pages.first { app.descendants(matching: .any)["settings-page-\($0.page)"].exists })
+            try assertSettingsPageLayout(window, page: current.page, title: current.title, minimumViewport: true)
         }
-        let pages = ["general", "safety", "system"]
         let navigation = try nativeSettingsNavigationHost(in: window)
         var frames: [CGRect] = []
-        for (page, title) in zip(pages, titles) {
+        for (page, title) in pages {
             let target = try navigationControl(page, title: title)
             let control = target.row
             XCTAssertTrue(target.action.isHittable, "\(title) must be clickable in the native window")
             XCTAssertTrue(window.frame.insetBy(dx: -1, dy: -1).contains(control.frame))
             XCTAssertTrue(navigation.frame.insetBy(dx: -1, dy: -1).contains(control.frame),
-                          "Each native tab must remain inside the native Settings toolbar")
-            let textWidth = (title as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 12)]).width
-            XCTAssertGreaterThanOrEqual(control.frame.width + 1, textWidth, "\(title) has insufficient room for its visible label")
+                          "Each native navigation row must remain inside the actual sidebar")
+            let visibleTitle = settingsVisibleTitle(page, accessibleTitle: title)
+            let textWidth = (visibleTitle as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 12)]).width
+            XCTAssertGreaterThanOrEqual(control.frame.width + 1, textWidth, "\(visibleTitle) has insufficient room for its visible label")
             XCTAssertGreaterThanOrEqual(control.frame.height, 20)
             for earlier in frames {
-                XCTAssertFalse(earlier.insetBy(dx: 1, dy: 1).intersects(control.frame.insetBy(dx: 1, dy: 1)), "Top navigation tabs overlap")
+                XCTAssertFalse(earlier.insetBy(dx: 1, dy: 1).intersects(control.frame.insetBy(dx: 1, dy: 1)), "Sidebar navigation rows overlap")
             }
             frames.append(control.frame)
-            // The native tab above is already resolved and validated. Do
+            // The native sidebar row above is already resolved and validated. Do
             // not repeat activation, title checks and descendant queries.
             target.action.click()
             try assertSelectedPage(page)
@@ -1199,10 +1224,10 @@ final class TetherNativeUITests: XCTestCase {
                                     description: "Reopened native Settings window")
         _ = try settingsGeometry(after: reopening, description: "settings-\(language)-reopened-presentation")
         try assertSelectedPage("system")
-        try assertSettingsPageLayout(reopened, page: "system", title: titles[2])
+        try assertSettingsPageLayout(reopened, page: "system", title: settingsPageNames.last!.title)
         if minimumSize {
             try verifySettingsResize(reopened, evidenceName: "settings-reopened")
-            try assertSettingsPageLayout(reopened, page: "system", title: titles[2], minimumViewport: true)
+            try assertSettingsPageLayout(reopened, page: "system", title: settingsPageNames.last!.title, minimumViewport: true)
         }
         evidence("settings-\(language)-reopened")
         let reopenedClose = try required(reopened.buttons[XCUIIdentifierCloseWindow], description: "Reopened Settings close button")
@@ -1263,8 +1288,8 @@ final class TetherNativeUITests: XCTestCase {
     private func verifySettingsResize(_ window: XCUIElement, evidenceName: String) throws {
         try activateSettingsWindow()
         let initial = try settingsGeometry(after: Date().timeIntervalSince1970, description: "\(evidenceName)-before-resize")
-        XCTAssertEqual(initial.contentMinimum.width, 560, accuracy: 1)
-        XCTAssertEqual(initial.contentMinimum.height, 480, accuracy: 1)
+        XCTAssertEqual(initial.contentMinimum.width, 600, accuracy: 1)
+        XCTAssertEqual(initial.contentMinimum.height, 440, accuracy: 1)
         evidence("\(evidenceName)-before-resize")
 
         // Exercise real growth first, including a reopened window that retained
@@ -1295,7 +1320,7 @@ final class TetherNativeUITests: XCTestCase {
         evidence("\(evidenceName)-taller")
 
         // Rounded corners are outside the resize hit area. Use straight edges
-        // and compare both axes to the observed content/frame minima, not 480pt
+        // and compare both axes to the observed content/frame minima, not a fixed number
         // of outer height or an unchanged default window's height.
         try activateSettingsWindow()
         _ = try settingsGeometry(after: Date().timeIntervalSince1970,
@@ -1319,9 +1344,9 @@ final class TetherNativeUITests: XCTestCase {
             abs($0.frame.width - $0.minimumFrame.width) <= 1 && abs($0.frame.height - $0.minimumFrame.height) <= 1
                 && $0.frame.height < narrower.frame.height - 2
         }
-        XCTAssertEqual(minimum.contentMinimum.width, 560, accuracy: 1)
-        XCTAssertEqual(minimum.contentMinimum.height, 480, accuracy: 1)
-        XCTAssertEqual(window.frame.width, 560, accuracy: 1,
+        XCTAssertEqual(minimum.contentMinimum.width, 600, accuracy: 1)
+        XCTAssertEqual(minimum.contentMinimum.height, 440, accuracy: 1)
+        XCTAssertEqual(window.frame.width, 600, accuracy: 1,
                        "A drag must resize Settings to its real minimum; an unchanged default window is not sufficient")
         XCTAssertEqual(window.frame.width, minimum.frame.width, accuracy: 1)
         XCTAssertEqual(window.frame.height, minimum.frame.height, accuracy: 1)
@@ -1332,14 +1357,14 @@ final class TetherNativeUITests: XCTestCase {
                                           minimumViewport: Bool = false) throws {
         let selectedTab = try navigationControl(page, title: title, activateWindow: false).row
         let navigationFrame = try settingsNavigationFrame()
-        let toolbar = try nativeSettingsNavigationHost(in: window)
+        let toolbar = try nativeSettingsToolbar(in: window)
         XCTAssertTrue([selectedTab.label, selectedTab.title, selectedTab.value as? String ?? ""].contains(title)
             || selectedTab.descendants(matching: .staticText).matching(NSPredicate(
                 format: "label == %@ OR title == %@ OR value == %@", title, title, title)).count == 1,
-            "The selected native tab must identify the page in the current language")
-        XCTAssertTrue(selectedTab.isHittable, "The selected tab must remain visible after native presentation")
+            "The selected native sidebar row must identify the page in the current language")
+        XCTAssertTrue(selectedTab.isHittable, "The selected sidebar row must remain visible after native presentation")
         XCTAssertTrue(window.frame.insetBy(dx: -1, dy: -1).contains(navigationFrame),
-                      "Every native tab must fit inside Settings")
+                      "Every native sidebar row must fit inside Settings")
         let body = try required("settings-page-\(page)")
         let scroll = try settingsPageScrollView()
         XCTAssertTrue(window.frame.insetBy(dx: -1, dy: -1).contains(body.frame),
@@ -1349,12 +1374,14 @@ final class TetherNativeUITests: XCTestCase {
         XCTAssertGreaterThanOrEqual(scroll.frame.minY, toolbar.frame.maxY - 1,
                                    "The reading viewport must remain below the complete native toolbar")
         XCTAssertFalse(navigationFrame.insetBy(dx: 1, dy: 1).intersects(scroll.frame.insetBy(dx: 1, dy: 1)),
-                       "Scrollable content must not overlap the native tab strip")
+                       "Scrollable content must not overlap the native sidebar")
+        XCTAssertGreaterThanOrEqual(scroll.frame.minX, navigationFrame.maxX - 1,
+            "The reading viewport must sit beside, rather than under, the native sidebar")
         let close = try required(window.buttons[XCUIIdentifierCloseWindow], description: "Settings close button")
         XCTAssertTrue(close.isEnabled && close.isHittable,
                       "Native presentation must preserve an enabled, reachable close button")
         XCTAssertFalse(navigationFrame.insetBy(dx: 1, dy: 1).intersects(close.frame.insetBy(dx: 1, dy: 1)),
-                       "Native tabs must not overlap the titlebar close button")
+                       "Native sidebar rows must not overlap the titlebar close button")
         XCTAssertGreaterThanOrEqual(scroll.frame.minY, close.frame.maxY - 1,
                                    "Reading content must remain below native titlebar controls")
         if minimumViewport {
@@ -1382,52 +1409,38 @@ final class TetherNativeUITests: XCTestCase {
 
     private var settingsPageNames: [(page: String, title: String)] {
         testLanguage == "ko"
-            ? [("general", "잠자기 방지"), ("safety", "자동 시작"), ("system", "앱 설정")]
-            : [("general", "Keep awake"), ("safety", "Automatic start"), ("system", "App settings")]
+            ? [("safety", "전원·덮개"), ("general", "직접 유지"), ("protection", "보호·진단"), ("system", "일반")]
+            : [("safety", "Power & Lid"), ("general", "Manual"),
+               ("protection", "Protection & Diagnostics"), ("system", "General")]
+    }
+
+    private func settingsVisibleTitle(_ page: String, accessibleTitle: String) -> String {
+        page == "protection" && testLanguage == "en" ? "Protection" : accessibleTitle
     }
 
     private func settingsNavigationTargets() throws -> [SettingsNavigationTarget] {
         try settingsPageNames.map { try navigationControl($0.page, title: $0.title, activateWindow: false) }
     }
 
-    /// On macOS Settings, TabView promotes its tabs into NSToolbar items.
-    /// Its content identifier can remain on the selected Form, so it is not a
-    /// navigation-container frame. Measure only the three actual tab inputs.
+    /// Measure the real selectable rows, separately from the native titlebar.
+    /// The detail ScrollView may move; the four sidebar rows must stay fixed.
     private func settingsNavigationFrame() throws -> CGRect {
         let targets = try settingsNavigationTargets()
-        XCTAssertEqual(targets.count, 3, "Settings must expose three measured native tabs")
+        XCTAssertEqual(targets.count, 4, "Settings must expose four measured native sidebar choices")
         let frame = targets.reduce(CGRect.null) { $0.union($1.row.frame) }
-        XCTAssertTrue(isLayoutFrame(frame), "The native tab strip requires real, nonempty geometry")
+        XCTAssertTrue(isLayoutFrame(frame), "The native sidebar requires real, nonempty geometry")
         for (index, target) in targets.enumerated() {
-            XCTAssertTrue(isLayoutFrame(target.row.frame), "Each native tab requires measured bounds")
+            XCTAssertTrue(isLayoutFrame(target.row.frame), "Each native sidebar row requires measured bounds")
+            if index > 0 {
+                XCTAssertGreaterThanOrEqual(target.row.frame.minY, targets[index - 1].row.frame.maxY - 1,
+                    "Sidebar pages must follow their approved top-to-bottom order")
+            }
             for earlier in targets.prefix(index) {
                 XCTAssertFalse(earlier.row.frame.insetBy(dx: 1, dy: 1)
-                    .intersects(target.row.frame.insetBy(dx: 1, dy: 1)), "Native navigation tabs must not overlap")
+                    .intersects(target.row.frame.insetBy(dx: 1, dy: 1)), "Native sidebar rows must not overlap")
             }
         }
         return frame
-    }
-
-    private func identifiedToolbarTabs(in toolbar: XCUIElement, page: String) -> [XCUIElement] {
-        let identifier = "settings-tab-\(page)"
-        let types: [XCUIElement.ElementType] = [.button, .toolbarButton]
-        return types.flatMap {
-            toolbar.descendants(matching: $0).matching(identifier: identifier).allElementsBoundByIndex
-        }
-    }
-
-    private func namedToolbarButtons(in toolbar: XCUIElement, title: String) -> [XCUIElement] {
-        let titlePredicate = NSPredicate(format: "label == %@ OR title == %@ OR value == %@",
-                                         title, title, title)
-        // The final classic macOS tab items expose native buttons with full
-        // localized titles. Only this toolbar's native input roles qualify.
-        let types: [XCUIElement.ElementType] = [.button, .toolbarButton]
-        return types.flatMap { type in
-            toolbar.descendants(matching: type).allElementsBoundByIndex.filter { candidate in
-                [candidate.label, candidate.title, candidate.value as? String ?? ""].contains(title)
-                    || candidate.descendants(matching: .staticText).matching(titlePredicate).firstMatch.exists
-            }
-        }
     }
 
     @discardableResult
@@ -1439,66 +1452,79 @@ final class TetherNativeUITests: XCTestCase {
 
     @discardableResult
     private func nativeSettingsNavigationHost(in window: XCUIElement) throws -> XCUIElement {
-        let toolbars = window.toolbars.allElementsBoundByIndex.filter { toolbar in
-            settingsPageNames.allSatisfy { page in
-                let named = namedToolbarButtons(in: toolbar, title: page.title)
-                if !named.isEmpty { return named.count == 1 }
-                return identifiedToolbarTabs(in: toolbar, page: page.page).count == 1
-            }
+        let hosts = window.descendants(matching: .any).matching(identifier: "settings-sidebar").allElementsBoundByIndex
+        let sidebar = try required(try XCTUnwrap(hosts.count == 1 ? hosts.first : nil,
+            "Settings must expose one identified native sidebar, separate from its detail page"),
+            description: "Native Settings sidebar")
+        XCTAssertTrue(isLayoutFrame(sidebar.frame), "The native sidebar needs nonempty measured bounds")
+        XCTAssertTrue(window.frame.insetBy(dx: -1, dy: -1).contains(sidebar.frame))
+        for (page, _) in settingsPageNames {
+            XCTAssertEqual(sidebarNavigationRows(in: sidebar, page: page).count, 1,
+                "Each approved page must expose one actual native sidebar input")
         }
+        return sidebar
+    }
+
+    private func nativeSettingsToolbar(in window: XCUIElement) throws -> XCUIElement {
+        let toolbars = window.toolbars.allElementsBoundByIndex
         return try required(try XCTUnwrap(toolbars.count == 1 ? toolbars.first : nil,
-            "Settings must have one native toolbar containing three uniquely named localized tab buttons"),
-            description: "Native Settings tab toolbar")
+            "The native Settings titlebar must remain measurable independently of the sidebar"),
+            description: "Native Settings titlebar toolbar")
+    }
+
+    private func sidebarNavigationRows(in sidebar: XCUIElement, page: String) -> [XCUIElement] {
+        let identifier = "settings-tab-\(page)"
+        let title = settingsPageNames.first { $0.page == page }?.title
+        // macOS can consume Label identifiers when promoting List items into
+        // native selectable rows. Match the exact localized input name inside
+        // the uniquely identified sidebar; never fall back to a standalone text.
+        for type in [XCUIElement.ElementType.outlineRow, .tableRow, .cell] {
+            let rows = sidebar.descendants(matching: type).allElementsBoundByIndex.filter {
+                $0.identifier == identifier || $0.descendants(matching: .any).matching(identifier: identifier).firstMatch.exists
+                    || (title != nil && [$0.label, $0.title, $0.value as? String ?? ""].contains(title!))
+            }
+            if !rows.isEmpty { return rows }
+        }
+        return []
     }
 
     private func navigationControl(_ page: String, title: String,
                                    activateWindow: Bool = true) throws -> SettingsNavigationTarget {
         if activateWindow { try activateSettingsWindow() }
         let window = try required(app.windows.matching(identifier: "com_apple_SwiftUI_Settings_window").firstMatch,
-                                  description: "Settings window containing native tab \(title)")
-        let toolbar = try nativeSettingsNavigationHost(in: window)
-        let named = namedToolbarButtons(in: toolbar, title: title)
-        let row: XCUIElement
-        if !named.isEmpty {
-            row = try required(try XCTUnwrap(named.count == 1 ? named.first : nil,
-                "The native Settings toolbar needs one fully named input button for \(title)"),
-                description: "Native Settings toolbar tab \(title)")
-        } else {
-            // A stable item identifier is optional in the native toolbar. It is
-            // a fallback only, and cannot bypass the complete-name check below.
-            let identified = identifiedToolbarTabs(in: toolbar, page: page)
-            row = try required(try XCTUnwrap(identified.count == 1 ? identified.first : nil,
-                "The native toolbar tab identifier must be unique for \(title)"),
-                description: "Native Settings toolbar tab \(title)")
-        }
-        let titlePredicate = NSPredicate(format: "label == %@ OR title == %@ OR value == %@",
-                                         title, title, title)
-        let fullTitle = row.descendants(matching: .staticText).matching(titlePredicate)
-        if ![row.label, row.title, row.value as? String ?? ""].contains(title) {
-            XCTAssertEqual(fullTitle.count, 1,
-                           "The native toolbar tab must expose the full localized accessibility name \(title)")
-            try required(fullTitle.firstMatch, description: "Full localized toolbar tab name \(title)")
-        }
-        XCTAssertTrue(toolbar.frame.insetBy(dx: -1, dy: -1).contains(row.frame),
-                      "The native tab input must belong to its actual Settings toolbar")
+                                  description: "Settings window containing native sidebar choice \(title)")
+        let sidebar = try nativeSettingsNavigationHost(in: window)
+        let matches = sidebarNavigationRows(in: sidebar, page: page)
+        let row = try required(try XCTUnwrap(matches.count == 1 ? matches.first : nil,
+            "The native selectable sidebar row must be unique for \(title)"),
+            description: "Native Settings sidebar choice \(title)")
+        XCTAssertTrue([row.label, row.title, row.value as? String ?? ""].contains(title)
+            || row.descendants(matching: .staticText).matching(NSPredicate(
+                format: "label == %@ OR title == %@ OR value == %@", title, title, title)).count == 1,
+            "The native sidebar must expose the complete localized accessible name \(title)")
+        XCTAssertTrue(sidebar.frame.insetBy(dx: -1, dy: -1).contains(row.frame),
+                      "The native input must belong to its actual Settings sidebar")
         XCTAssertTrue(window.frame.insetBy(dx: -1, dy: -1).contains(row.frame),
-                      "The native toolbar tab must fit inside Settings")
-        let textWidth = (title as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 12)]).width
+                      "The native sidebar input must fit inside Settings")
+        let visibleTitle = settingsVisibleTitle(page, accessibleTitle: title)
+        let titlePredicate = NSPredicate(format: "label == %@ OR title == %@ OR value == %@",
+                                         visibleTitle, visibleTitle, visibleTitle)
+        let visibleText = row.descendants(matching: .staticText).matching(titlePredicate)
+        let textWidth = (visibleTitle as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 12)]).width
         XCTAssertGreaterThanOrEqual(row.frame.width + 1, textWidth,
-                                   "The native toolbar tab must allocate room for the full visible title \(title)")
-        XCTAssertGreaterThanOrEqual(row.frame.height, 20, "The native tab needs a reachable native input area")
-        if fullTitle.firstMatch.exists {
-            XCTAssertEqual(fullTitle.count, 1, "The native toolbar tab must expose one complete visible title")
-            let text = fullTitle.firstMatch
+                                   "The sidebar row must allocate room for its complete visible title \(visibleTitle)")
+        XCTAssertGreaterThanOrEqual(row.frame.height, 20, "The sidebar needs a reachable native input area")
+        if visibleText.firstMatch.exists {
+            XCTAssertEqual(visibleText.count, 1, "The native row must expose one complete visible title")
+            let text = visibleText.firstMatch
             XCTAssertGreaterThanOrEqual(text.frame.width + 1, textWidth,
-                                       "The visible native tab must allocate room for \(title)")
+                                       "The visible sidebar label must allocate room for \(visibleTitle)")
             XCTAssertTrue(row.frame.insetBy(dx: -1, dy: -1).contains(text.frame),
-                          "The visible title must remain inside its semantic toolbar tab")
+                          "The complete title must remain inside its semantic sidebar row")
         }
-        waitForHittable(row, description: "Native Settings toolbar tab \(title)")
-        XCTAssertTrue(row.isEnabled, "The native tab must be an enabled input target for \(title)")
-        // Every input path validates actual selected-page contents after the
-        // click; a matching toolbar name alone never proves successful selection.
+        waitForHittable(row, description: "Native Settings sidebar choice \(title)")
+        XCTAssertTrue(row.isEnabled, "The native sidebar row must be an enabled input target for \(title)")
+        // Selection is verified against actual page contents after every input.
         return SettingsNavigationTarget(row: row, action: row)
     }
 
@@ -1529,7 +1555,7 @@ final class TetherNativeUITests: XCTestCase {
 
     private func assertSelectedPage(_ page: String) throws {
         try required("settings-page-\(page)")
-        for other in ["general", "safety", "system"] where other != page {
+        for other in settingsPageNames.map(\.page) where other != page {
             XCTAssertFalse(app.descendants(matching: .any)["settings-page-\(other)"].exists,
                            "Selecting \(page) must change the real page")
         }
@@ -1663,11 +1689,10 @@ final class TetherNativeUITests: XCTestCase {
     }
 
     private func isNativeSettingsNavigationResponder(_ target: (isWindow: Bool, className: String, identity: String)) -> Bool {
-        // A Form control or generic hosting view is not a navigation target.
-        // These narrow native tab responder names still require confirmation
-        // against this candidate's actual responder telemetry in the UI run.
-        !target.isWindow && (target.className.contains("Segmented") || target.className.contains("RadioButton")
-            || target.className.contains("NSTabView") || target.className.contains("TabButton"))
+        // A generic hosting view or detail control is not sufficient. Real
+        // up/down selection must be delivered to the native List responder.
+        !target.isWindow && (target.className.contains("OutlineView")
+            || target.className.contains("TableView") || target.className.contains("Sidebar"))
     }
 
     private func openSettingsFromMenu() throws {
@@ -1925,7 +1950,7 @@ final class TetherNativeUITests: XCTestCase {
     private func settingsPageScrollView() throws -> XCUIElement {
         let settings = try required(app.windows.matching(identifier: "com_apple_SwiftUI_Settings_window").firstMatch,
                                     description: "Settings window containing the current page")
-        let pages = ["general", "safety", "system"].map {
+        let pages = settingsPageNames.map(\.page).map {
             settings.descendants(matching: .any)["settings-page-\($0)"].firstMatch
         }.filter { $0.exists }
         XCTAssertEqual(pages.count, 1, "Exactly one real Settings page must provide the reading viewport")
@@ -2074,14 +2099,15 @@ final class TetherNativeUITests: XCTestCase {
         let observation: [String: Any] = ["schemaVersion": 2, "step": name,
             "testName": self.name, "fixtureBundleIdentifier": bundleID,
             "fixtureExecutablePath": expectedExecutablePath,
-            "scope": "Current native Settings tabs and reading viewport; pixel bleed requires screenshot review",
+            "scope": "Current native Settings sidebar, titlebar and reading viewport; pixel bleed requires screenshot review",
             "windowFrame": layoutFrame(initialWindow), "navigationFrame": layoutFrame(navigationFrame),
-            "navigationTabFrames": navigationTargets.map { layoutFrame($0.row.frame) },
-            "navigationTabElements": navigationTargets.map {
+            "navigationRowFrames": navigationTargets.map { layoutFrame($0.row.frame) },
+            "nativeToolbarFrame": layoutFrame(try nativeSettingsToolbar(in: window).frame),
+            "navigationRowElements": navigationTargets.map {
                 ["elementType": $0.row.elementType.rawValue, "identifier": $0.row.identifier,
                  "label": $0.row.label, "frame": layoutFrame($0.row.frame)] as [String: Any]
             },
-            "captionCoverage": "Native button bounds and complete localized names are measured; pixel rendering still requires screenshot review",
+            "captionCoverage": "Native sidebar row bounds and complete localized names are measured; pixel rendering still requires screenshot review",
             "selectedTabTitle": selectedTab.label.isEmpty ? selectedTab.title : selectedTab.label,
             "selectedTabFrame": layoutFrame(selectedTab.frame), "readingViewportFrame": layoutFrame(scroll.frame),
             "contentAnchorLabel": anchor.label, "contentAnchorFrame": layoutFrame(anchor.frame),

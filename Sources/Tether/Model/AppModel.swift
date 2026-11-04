@@ -122,7 +122,7 @@ final class AppModel: ObservableObject {
     /// What happened to the last report ("Copied", "Report saved").
     @Published var reportNote: String?
     /// The page the settings window shows, kept while the app runs.
-    @Published var settingsPage = SettingsPage.general
+    @Published var settingsPage = SettingsPage.safety
     @Published var otherAppDetailsRequested = false
     @Published var localUsageStats = StatsTracker()
     @Published var usageStatisticsIssue: String?

@@ -14,7 +14,7 @@ struct ManualSessionControls: View {
     @State private var showOtherTime = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 6) {
             if model.manualSessionActive, presentation != .start {
                 HStack(alignment: .center, spacing: 10) {
                     VStack(alignment: .leading, spacing: 3) {
@@ -39,15 +39,18 @@ struct ManualSessionControls: View {
                     .accessibilityValue(remainingDescription)
                     .accessibilityIdentifier("panel-manual-countdown")
                     Spacer(minLength: 2)
-                    Button(L("End timer", "타이머 끝내기")) { model.endManualSession() }
-                        .actionButton().controlSize(.small)
-                        .fixedSize(horizontal: true, vertical: false)
-                        .accessibilityIdentifier("panel-end-manual")
+                    VStack(alignment: .trailing, spacing: 5) {
+                        CompactPushButton(L("End timer", "타이머 끝내기"), identifier: "panel-end-manual") { model.endManualSession() }
+                        if showsTimedExtension { extensionButton(30) }
+                    }
                         .accessibilityHint(model.manualEndingDetail)
                         .disabled(model.commandPending)
                 }
-                if showsTimedExtension {
-                    extensionButton(30)
+
+                if showsTimedExtension, let reason = model.manualExtensionUnavailableReason(by: 30) {
+                    Text(reason).font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("panel-extend-manual-reason-30")
                 }
                 Text(model.manualEndingDetail).font(TetherTypography.secondary)
                     .foregroundStyle(Color.tetherSecondary)
@@ -58,11 +61,10 @@ struct ManualSessionControls: View {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack(spacing: 8) {
                         ManualDurationPicker(model: model)
-                        Button(L("Start", "직접 시작")) {
+                        CompactPushButton(L("Start", "시작"), prominent: prominentStart, identifier: "panel-start-manual") {
                             if model.selectedManualMinutes == 0 { model.startUntimedSession() }
                             else { model.startManualSession(minutes: model.selectedManualMinutes) }
-                        }.actionButton(prominent: prominentStart)
-                            .controlSize(.regular)
+                        }
                             .fixedSize(horizontal: true, vertical: false)
                             .layoutPriority(1)
                             .accessibilityLabel(L("Start manual session", "타이머 직접 시작"))
@@ -106,26 +108,13 @@ struct ManualSessionControls: View {
         let reason = model.manualExtensionUnavailableReason(by: minutes)
         let hint = reason ?? L("Adds \(minutes) minutes to this timer without restarting it.",
                                "현재 타이머를 다시 시작하지 않고 \(minutes)분을 더합니다.")
-        return VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Button { model.extendManualSession(by: minutes) } label: {
-                    Label(L("Add \(minutes) min", "\(minutes)분 추가"), systemImage: "plus")
-                }
-                    .actionButton().controlSize(.small)
-                    .disabled(reason != nil)
-                    .help(hint)
-                    .accessibilityLabel(L("Extend manual work by \(minutes) minutes", "수동 유지 \(minutes)분 연장"))
-                    .accessibilityHint(hint)
-                    .accessibilityIdentifier("panel-extend-manual-\(minutes)")
-                Spacer(minLength: 0)
-            }
-            if let reason {
-                Text(reason).font(TetherTypography.body)
-                    .foregroundStyle(Color.tetherSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("panel-extend-manual-reason-\(minutes)")
-            }
+        return CompactPushButton(L("Add \(minutes) min", "+\(minutes)분"), identifier: "panel-extend-manual-\(minutes)") {
+            model.extendManualSession(by: minutes)
         }
+        .disabled(reason != nil)
+        .help(hint)
+        .accessibilityLabel(L("Extend manual work by \(minutes) minutes", "수동 유지 \(minutes)분 연장"))
+        .accessibilityHint(hint)
     }
 
 }
@@ -158,16 +147,12 @@ struct ManualDurationPicker: View {
         })
     }
     var body: some View {
-        Picker(L("Next manual duration", "직접 시작 시간"), selection: durationSelection) {
-            ForEach(durationChoices, id: \.self) { minutes in
-                Text(minutes == 0 ? L("Until turned off", "끄기 전까지") : model.durationChoiceTitle(minutes))
-                    .tag(minutes)
-            }
-        }.labelsHidden().pickerStyle(.menu).controlSize(.small)
-            .buttonSizing(.flexible)
+        CompactPopUp(title: L("Next manual duration", "직접 시작 시간"), selection: durationSelection,
+                     choices: durationChoices.map { minutes in
+                         PopupChoice(minutes, minutes == 0
+                             ? L("Until turned off", "끄기 전까지") : model.durationChoiceTitle(minutes))
+                     }, identifier: "manual-duration-picker")
             .frame(maxWidth: .infinity, alignment: .leading)
-            .foregroundStyle(Color.tetherPrimary)
-            .accessibilityIdentifier("manual-duration-picker")
             .accessibilityHint(L("Use Start to begin", "직접 시작을 눌러야 유지가 시작됩니다"))
             .disabled(controlsDisabled)
     }

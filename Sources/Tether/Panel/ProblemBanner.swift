@@ -52,7 +52,7 @@ struct ProblemBanner: View {
 
     @ViewBuilder private var action: some View {
         if case .lid = problem {
-            Button(L("Review setup…", "도우미 상태 보기…")) { model.settingsPage = .system }
+            Button(L("Review setup…", "도우미 상태 보기…")) { model.settingsPage = .safety }
                 .actionButton()
         } else if let title = problem.action {
             Button(title) { model.installHelper() }

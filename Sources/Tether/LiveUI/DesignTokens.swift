@@ -4,10 +4,10 @@ import SwiftUI
 enum TetherTypography {
     static let bodySize: CGFloat = 12
     static let secondarySize: CGFloat = 11
-    static let sectionSize: CGFloat = 13
-    static let statusSize: CGFloat = 14
-    static let pageSize: CGFloat = 15
-    static let countdownSize: CGFloat = 24
+    static let sectionSize: CGFloat = 12
+    static let statusSize: CGFloat = 13
+    static let pageSize: CGFloat = 14
+    static let countdownSize: CGFloat = 17
 
     static let body = Font.system(size: bodySize)
     static let secondary = Font.system(size: secondarySize)

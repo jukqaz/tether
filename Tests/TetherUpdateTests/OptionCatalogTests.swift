@@ -38,10 +38,17 @@ final class OptionCatalogTests: XCTestCase {
                 XCTAssertNotNil(entry.destination, entry.id)
             }
             let actions = Set(entries.compactMap { $0.destination?.actionTitle })
-            XCTAssertEqual(actions.count, 9)
+            XCTAssertEqual(actions.count, 10)
             XCTAssertFalse(actions.contains(language == .english ? "Open options…" : "옵션 열기…"))
             XCTAssertTrue(entries.first { $0.id == "O17" }!.matches("AppleScript"),
                 "Support details remain searchable after moving them out of the default list")
         }
     }
+    func testProtectionAndDiagnosticsUseTheirDedicatedSettingsDestination() throws {
+        for id in ["O15", "O16", "O23"] {
+            XCTAssertEqual(try XCTUnwrap(OptionCatalog.entries.first { $0.id == id }).destination, .protection)
+        }
+        XCTAssertEqual(OptionCatalog.entries.first { $0.id == "O10" }?.destination, .keep)
+    }
+
 }

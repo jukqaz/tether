@@ -2,10 +2,10 @@ import SwiftUI
 
 struct DesignPreviewSettings: View {
     enum Page: String, CaseIterable, Identifiable {
-        case sessions, protection, app
+        case power, sessions, protection, app
         var id: Self { self }
         var settingsPage: SettingsPage {
-            switch self { case .sessions: .general; case .protection: .safety; case .app: .system }
+            switch self { case .power: .safety; case .sessions: .general; case .protection: .protection; case .app: .system }
         }
     }
     @ObservedObject var state: DesignPreviewState
@@ -18,6 +18,6 @@ struct DesignPreviewSettings: View {
     }
     var body: some View {
         SettingsView(model: state.model, screenshot: snapshot)
-            .frame(minWidth: 560, minHeight: 448)
+            .frame(minWidth: WorkSessionMetrics.settingsMinimum.width, minHeight: WorkSessionMetrics.settingsMinimum.height)
     }
 }

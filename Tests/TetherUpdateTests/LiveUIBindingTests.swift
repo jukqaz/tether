@@ -187,23 +187,20 @@ final class LiveUIBindingTests: XCTestCase {
         }
     }
 
-    func testSettingsNavigationNamesSeparateStayAwakeAutomaticAndAppPreferences() async {
+    func testSettingsNavigationPreservesPageIdentitiesAndSeparatesFourResponsibilities() async {
         await MainActor.run {
             let previous = Localization.current; defer { Localization.current = previous }
+            XCTAssertEqual(SettingsPage.allCases.map(\.rawValue), ["safety", "general", "protection", "system"],
+                "Saved page identities must remain compatible while sidebar order follows the task flow")
             Localization.current = .english
-            XCTAssertEqual(SettingsPage.general.shortTitle, "Keep awake")
-            XCTAssertEqual(SettingsPage.general.title, "Keep awake")
-            XCTAssertEqual(SettingsPage.safety.shortTitle, "Power & automation")
-            XCTAssertEqual(SettingsPage.safety.title, "Power & automation")
-            XCTAssertEqual(SettingsPage.system.shortTitle, "App")
-            XCTAssertEqual(SettingsPage.system.title, "App settings")
-
+            XCTAssertEqual(SettingsPage.allCases.map(\.title),
+                ["Power & Lid", "Manual", "Protection & Diagnostics", "General"])
+            XCTAssertEqual(SettingsPage.allCases.map(\.shortTitle), ["Power & Lid", "Manual", "Protection", "General"],
+                "A compact visible label must retain a distinct complete accessible title")
             Localization.current = .korean
-            XCTAssertEqual(SettingsPage.general.title, "잠자기 방지")
-            XCTAssertEqual(SettingsPage.safety.title, "전원·자동화")
-            XCTAssertEqual(SettingsPage.system.title, "앱 설정")
-            XCTAssertEqual(SettingsPage.allCases.map(\.shortTitle), ["유지", "전원·자동화", "앱"])
-            XCTAssertEqual(Set(SettingsPage.allCases.map(\.title)).count, 3)
+            XCTAssertEqual(SettingsPage.allCases.map(\.title), ["전원·덮개", "직접 유지", "보호·진단", "일반"])
+            XCTAssertEqual(SettingsPage.allCases.map(\.shortTitle), ["전원·덮개", "직접 유지", "보호·진단", "일반"])
+            XCTAssertEqual(Set(SettingsPage.allCases.map(\.title)).count, 4)
         }
     }
 
@@ -214,10 +211,10 @@ final class LiveUIBindingTests: XCTestCase {
             let (model, controller, backend) = fixture()
             defer { _ = controller.end() }
             let savedIntent = model.defaults.data(forKey: UserSessionController.preferenceKey)
-            let initialRow = SystemPage(model: model).activeRecordingStatus
+            let initialRow = ProtectionPage(model: model).activeRecordingStatus
             let inactive = NSHostingView(rootView: initialRow.frame(width: 400))
             XCTAssertEqual(inactive.fittingSize.height, 0, accuracy: 0.5,
-                "Inactive recording must not add a status row to compact App Settings")
+                "Inactive recording must not add a status row to compact Protection & Diagnostics")
 
             model.setDebugLogging(true, minutes: 15)
             XCTAssertTrue(model.diagnosticRecordingActive)
@@ -228,11 +225,11 @@ final class LiveUIBindingTests: XCTestCase {
             // reads controller state, independently of that collapsed detail.
             for _ in 0..<2 {
                 model.settingsPage = .general
-                model.settingsPage = .system
-                let row = SystemPage(model: model).activeRecordingStatus
+                model.settingsPage = .protection
+                let row = ProtectionPage(model: model).activeRecordingStatus
                 let active = NSHostingView(rootView: row.frame(width: 400))
                 XCTAssertGreaterThan(active.fittingSize.height, 28,
-                    "Reconstructed App Settings must still render status, deadline and Stop")
+                    "Reconstructed Protection & Diagnostics must still render status, deadline and Stop")
                 XCTAssertEqual(row.recordingDetail, "Recording until \(Texts.time(until))")
                 XCTAssertTrue(row.model.canRecordDiagnostics)
                 XCTAssertEqual(model.diagnosticRecordingUntil, until,
@@ -242,10 +239,10 @@ final class LiveUIBindingTests: XCTestCase {
             // Exercise the same action used by the visible Stop button, without
             // synthesizing GUI input or changing installed application state.
             let recordingEndedBefore = model.commonActivity.filter { $0.kind == .recordingEnded }.count
-            SystemPage(model: model).activeRecordingStatus.stopRecording()
+            ProtectionPage(model: model).activeRecordingStatus.stopRecording()
             XCTAssertFalse(model.diagnosticRecordingActive)
             XCTAssertNil(model.diagnosticRecordingUntil)
-            let stopped = NSHostingView(rootView: SystemPage(model: model).activeRecordingStatus.frame(width: 400))
+            let stopped = NSHostingView(rootView: ProtectionPage(model: model).activeRecordingStatus.frame(width: 400))
             XCTAssertEqual(stopped.fittingSize.height, 0, accuracy: 0.5)
             // commonActivity is newest-first and can include unrelated decision
             // events. Verify the added end event without assuming its array index.
@@ -794,7 +791,7 @@ final class LiveUIBindingTests: XCTestCase {
                 controller.update(power: .ac, thermal: 0, fullWake: true, controllingUser: true, now: ContinuousTime.now, batteryPercent: nil)
                 let model = AppModel(preview: true, capabilities: MacCapabilities(supportedPlatform: true, internalBattery: internalBattery, lid: false),
                                      previewSession: controller, previewDefaults: defaults)
-                try assertSnapshot(NSHostingView(rootView: GeneralPage(model: model)), size: CGSize(width: 560, height: 480))
+                try assertSnapshot(NSHostingView(rootView: GeneralPage(model: model)), size: CGSize(width: 640, height: 480))
                 XCTAssertFalse(model.automaticEnabled, "Retired battery-only auto cannot silently enable AC")
                 XCTAssertFalse(model.workSessionHolding)
                 model.setPowerCondition(.ac); model.setAutomaticEnabled(true)
@@ -1402,7 +1399,7 @@ final class LiveUIBindingTests: XCTestCase {
                         .environment(\.colorScheme, .dark)
                         .environment(\.tetherReduceTransparencyOverride, true)
                         .environment(\.tetherContrastOverride, .increased))
-                    XCTAssertEqual(panel.fittingSize.width, 300, accuracy: 0.5)
+                    XCTAssertEqual(panel.fittingSize.width, 304, accuracy: 0.5)
                     XCTAssertGreaterThan(panel.fittingSize.height, 140,
                         "Compact status, controls and persistent actions still need a readable surface")
                     XCTAssertLessThanOrEqual(panel.fittingSize.height, WorkSessionMetrics.panelMaximumHeight)
@@ -1419,11 +1416,11 @@ final class LiveUIBindingTests: XCTestCase {
                         .environment(\.colorScheme, .dark)
                         .environment(\.tetherReduceTransparencyOverride, true)
                         .environment(\.tetherContrastOverride, .increased)
-                        .frame(width: 560, height: 480))
-                    XCTAssertEqual(WorkSessionMetrics.settingsMinimum, CGSize(width: 560, height: 480))
-                    XCTAssertEqual(settings.fittingSize.width, 560, accuracy: 0.5)
+                        .frame(width: 640, height: 480))
+                    XCTAssertEqual(WorkSessionMetrics.settingsMinimum, CGSize(width: 600, height: 440))
+                    XCTAssertEqual(settings.fittingSize.width, 640, accuracy: 0.5)
                     XCTAssertEqual(settings.fittingSize.height, 480, accuracy: 0.5)
-                    try assertSnapshot(settings, size: CGSize(width: 560, height: 480))
+                    try assertSnapshot(settings, size: CGSize(width: 640, height: 480))
                 }
             }
         }
@@ -1433,12 +1430,12 @@ final class LiveUIBindingTests: XCTestCase {
         try await MainActor.run {
             let short = NSHostingView(rootView: MenuPanelBody(maximumHeight: 180) {
                 Text("Short status").frame(height: 40)
-            }.frame(width: 300).fixedSize(horizontal: false, vertical: true))
+            }.frame(width: 304).fixedSize(horizontal: false, vertical: true))
             XCTAssertEqual(short.fittingSize.height, 40, accuracy: 0.5)
             let long = NSHostingView(rootView: MenuPanelBody(maximumHeight: 180) {
                 Text(String(repeating: "A long diagnostic message that must remain scrollable. ", count: 40))
                     .fixedSize(horizontal: false, vertical: true).padding(16)
-            }.frame(width: 300).fixedSize(horizontal: false, vertical: true))
+            }.frame(width: 304).fixedSize(horizontal: false, vertical: true))
             XCTAssertEqual(long.fittingSize.height, 180, accuracy: 0.5)
             try assertSnapshot(long, size: long.fittingSize)
         }
@@ -1464,7 +1461,7 @@ final class LiveUIBindingTests: XCTestCase {
                             let panel = NSHostingView(rootView: TetherPanel(model: model, maximumHeight: viewport)
                                 .environment(\.colorScheme, .dark)
                                 .environment(\.tetherReduceTransparencyOverride, true))
-                            XCTAssertEqual(panel.fittingSize.width, 300, accuracy: 0.5)
+                            XCTAssertEqual(panel.fittingSize.width, 304, accuracy: 0.5)
                             XCTAssertLessThanOrEqual(panel.fittingSize.height, viewport,
                                 "Overflow: language=\(language), portable=\(portable), state=\(state)")
                             try assertSnapshot(panel, size: panel.fittingSize)
@@ -1500,8 +1497,12 @@ final class LiveUIBindingTests: XCTestCase {
         let controller = NSHostingController(rootView: host.rootView)
         window.contentViewController = controller
         let content = controller.view
-        content.frame = CGRect(origin: .zero, size: size); content.layoutSubtreeIfNeeded()
-        let bitmap = try XCTUnwrap(content.bitmapImageRepForCachingDisplay(in: content.bounds))
+        window.setContentSize(size)
+        content.frame = CGRect(origin: .zero, size: size)
+        window.contentView?.layoutSubtreeIfNeeded()
+        content.layoutSubtreeIfNeeded()
+        let bitmap = try XCTUnwrap(content.bitmapImageRepForCachingDisplay(in: content.bounds),
+            "Snapshot failed for \(V.self): bounds=\(content.bounds), expected=\(size)")
         content.cacheDisplay(in: content.bounds, to: bitmap)
         let data = try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
         XCTAssertGreaterThan(data.count, 1000)

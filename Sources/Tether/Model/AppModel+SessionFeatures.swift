@@ -137,7 +137,7 @@ extension AppModel {
         return L("Other apps still request keep-awake (\(pids.count))…", "다른 앱의 잠자기 방지 요청 \(pids.count)개…")
     }
     func showOtherAppKeepAwakeDetails() {
-        settingsPage = .system
+        settingsPage = .protection
         otherAppDetailsRequested = true
         v4SettingsPresentationID = UUID()
     }

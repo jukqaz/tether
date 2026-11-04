@@ -277,7 +277,7 @@ extension AppModel {
         /// Generic errors share diagnostic tools; their source is not inferred
         /// from localized prose or presented as a known helper failure.
         var reviewLabel: String {
-            if case .error = self { return L("Diagnostics in App settings…", "앱 설정에서 진단…") }
+            if case .error = self { return L("Review protection and diagnostics…", "보호·진단에서 확인…") }
             return L("Review setup…", "도우미 상태 보기…")
         }
 

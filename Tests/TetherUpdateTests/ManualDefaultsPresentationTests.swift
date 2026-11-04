@@ -18,7 +18,7 @@ final class ManualDefaultsPresentationTests: XCTestCase {
                 let noRequest = view.displayApplicationDetail(for: .init(display: false))
                 let permissionOff = view.displayApplicationDetail(for: .init(display: true))
                 XCTAssertNotEqual(noRequest, permissionOff)
-                XCTAssertTrue(permissionOff.contains(L("Keep awake", "유지 탭")))
+                XCTAssertTrue(permissionOff.contains(L("Power & Lid", "전원·덮개")))
 
                 model.setKeepDisplayAwake(true)
                 let saved = model.defaults.data(forKey: UserSessionController.preferenceKey)
@@ -52,7 +52,7 @@ final class ManualDefaultsPresentationTests: XCTestCase {
                 let noRequest = view.lidApplicationDetail(for: .init(closedLid: false))
                 let permissionOff = view.lidApplicationDetail(for: .init(closedLid: true))
                 XCTAssertNotEqual(noRequest, permissionOff)
-                XCTAssertTrue(permissionOff.contains(L("Keep awake", "유지 탭")))
+                XCTAssertTrue(permissionOff.contains(L("Power & Lid", "전원·덮개")))
 
                 // This request omits lid keeping; a future draft may request it.
                 var next = controller.v4Settings
@@ -67,7 +67,7 @@ final class ManualDefaultsPresentationTests: XCTestCase {
                 let saved = model.defaults.data(forKey: UserSessionController.preferenceKey)
                 let missingHelper = view.lidApplicationDetail(for: .init(closedLid: true))
                 XCTAssertNotEqual(missingHelper, permissionOff)
-                XCTAssertTrue(missingHelper.contains(L("App settings", "앱 탭")))
+                XCTAssertTrue(missingHelper.contains(L("Power & Lid", "전원·덮개")))
                 XCTAssertEqual(view.lidApplicationDetail(for: .init(closedLid: false)), noRequest)
                 XCTAssertEqual(controller.manualRequestID, request)
                 XCTAssertEqual(controller.status.manualContinuousDeadline, deadline)
@@ -92,7 +92,7 @@ final class ManualDefaultsPresentationTests: XCTestCase {
                 let unavailable = view.lidApplicationDetail(for: .init(closedLid: true))
                 XCTAssertTrue(unavailable.contains(L("unavailable", "지원하지 않습니다")))
                 XCTAssertEqual(view.lidApplicationDetail(for: .init(closedLid: false)), unavailable)
-                XCTAssertFalse(unavailable.contains(L("App settings", "앱 탭")),
+                XCTAssertFalse(unavailable.contains(L("Power & Lid", "전원·덮개")),
                     "A desktop must not be directed to install an inapplicable helper")
                 XCTAssertEqual(model.v4Settings, before)
                 XCTAssertEqual(model.defaults.data(forKey: UserSessionController.preferenceKey), saved)
