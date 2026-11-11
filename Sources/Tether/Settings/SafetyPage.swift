@@ -130,8 +130,10 @@ struct SafetyPage: View {
     @ViewBuilder private var closedLidStatus: some View {
         Note(model.lidUsageStatusText, color: lidStatusNeedsAttention ? .tetherWarning : .tetherSecondary)
             .accessibilityIdentifier("settings-lid-current-status")
-        if model.showsLidOptions && !model.helperSetupConfirmed {
-            Note(L("Helper setup required · Review the helper below.", "도우미 준비 필요 · 아래 도우미에서 확인하세요."), color: .tetherWarning)
+        if model.showsLidOptions && !model.helperSetupConfirmed
+            && (model.v3Settings.allowClosedLid || closedLidDisplayExpansion.wrappedValue) {
+            Note(L("Set up the helper below to use the Mac with the lid closed.", "덮개를 닫고 사용하려면 아래에서 도우미를 준비하세요."),
+                 color: model.v3Settings.allowClosedLid ? .tetherWarning : .tetherSecondary)
                 .accessibilityIdentifier("settings-lid-preparation-required")
         }
         if let status = model.closedLidDisplayStatusText {
@@ -145,7 +147,8 @@ struct SafetyPage: View {
                 identifier: "settings-retry-brightness-restoration") { model.retryClosedLidDisplayRecovery() }
                 .disabled(!model.hasCoordinatorAuthority || model.commandPending)
         }
-        if model.snapshot.observedLidClosed == nil || model.lidReleasePending {
+        if model.lidReleasePending || (model.snapshot.observedLidClosed == nil
+            && (model.v3Settings.allowClosedLid || closedLidDisplayExpansion.wrappedValue)) {
             refreshPowerStatusButton(identifier: "settings-refresh-lid-status")
         }
     }
@@ -156,9 +159,9 @@ struct SafetyPage: View {
     }
 
     private var lidStatusNeedsAttention: Bool {
-        model.snapshot.observedLidClosed == nil || model.lidReleasePending
+        model.lidReleasePending
             || model.userSessionStatus?.ownReleasePending == true
-            || (model.v3Settings.allowClosedLid && !model.helperSetupConfirmed)
+            || (model.v3Settings.allowClosedLid && (model.snapshot.observedLidClosed == nil || !model.helperSetupConfirmed))
     }
     var showsClosedLidStatus: Bool { model.showsLidOptions || model.closedLidDisplayRecoveryPending || model.lidReleasePending }
     var automaticEventTitle: String {
