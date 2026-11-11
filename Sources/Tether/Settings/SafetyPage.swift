@@ -80,14 +80,16 @@ struct SafetyPage: View {
                         .font(TetherTypography.body).foregroundStyle(Color.tetherSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("settings-automatic-condition-summary")
+                    Note(L("Changes made in the advanced editor are saved only after you confirm them there.",
+                           "고급 편집창에서 바꾼 내용은 그 창에서 확인해야 저장됩니다."))
                     Button(L("Edit advanced rules and presets…", "고급 규칙·프리셋 편집…")) { showAdvancedRules = true }
                         .actionButton().disabled(settingsControlsDisabled)
                         .accessibilityIdentifier("settings-automatic-rules")
                     Note(L("Connecting power cannot be guaranteed to wake a sleeping Mac. Unavailable conditions cannot authorize a start.",
                            "잠든 Mac을 전원 연결만으로 깨우지는 못할 수 있습니다. 확인하지 못한 조건으로는 시작하지 않습니다."))
-                    Note(L("Changes take effect only after confirmation. Unplug, Stop all and protection still apply.",
-                           "검토 후 적용해야 바뀝니다. 전원 분리·모두 중지·보호 규칙은 그대로 적용됩니다."))
                     if model.v4Settings.automaticMode == .advanced {
+                        Note(L("The mode button below saves and applies immediately, separately from the advanced editor.",
+                               "아래 시작 방식 버튼은 누르면 바로 저장·적용됩니다. 고급 편집창의 확인과는 별개입니다."))
                         Button(L("Use AC power only", "AC 전원 연결 조건만 사용")) { model.setV4BasicAutomaticMode() }
                             .buttonStyle(.link).disabled(settingsControlsDisabled)
                             .accessibilityIdentifier("settings-use-basic-ac-mode")
@@ -98,7 +100,11 @@ struct SafetyPage: View {
                                 .disabled(settingsControlsDisabled)
                                 .accessibilityIdentifier("settings-automatic-power-condition")
                         }
+                        Note(L("Power range changes save immediately. Active automatic work keeps the power range captured when it started.",
+                               "전원 범위 변경은 즉시 저장됩니다. 진행 중인 자동 작업은 시작 당시의 전원 범위를 유지합니다."))
                     }
+                    Note(L("Unplug, Stop all and protection rules still apply.",
+                           "전원 분리·모두 중지·보호 규칙은 그대로 적용됩니다."))
                 }
             }.accessibilityIdentifier("settings-automatic-behavior-details")
         }
@@ -108,13 +114,13 @@ struct SafetyPage: View {
     }
 
     private var displayAndLidPermissions: some View {
-        SettingsContentGroup(L("Display & Lid", "화면과 덮개")) {
-            SettingsToggle(title: L("Allow display keep-awake", "화면 켜두기 허용"),
+        SettingsContentGroup(L("Work Feature Permissions", "작업 기능 허용")) {
+            SettingsToggle(title: WorkPermissionText.displayTitle,
                 isOn: Binding(get: { model.v3Settings.keepDisplayAwake }, set: { model.setKeepDisplayAwake($0) }),
                 identifier: "keep-display-awake-toggle")
                 .disabled(settingsControlsDisabled)
             if model.showsLidOptions {
-                SettingsToggle(title: L("Allow closed-lid work", "덮개 유지 허용"),
+                SettingsToggle(title: WorkPermissionText.lidTitle,
                     isOn: GeneralPage(model: model).lidBinding, identifier: "closed-lid-allow-toggle")
                     .disabled(GeneralPage(model: model).lidControlDisabled)
                 if model.v3Settings.allowClosedLid { closedLidDisplayControls }
@@ -132,8 +138,7 @@ struct SafetyPage: View {
                         identifier: "settings-retry-brightness-restoration") { model.retryClosedLidDisplayRecovery() }
                 }
             }
-            Note(L("Permissions only allow features requested by work; they do not start work.",
-                   "작업이 요청한 기능만 허용합니다. 허용을 켜도 작업이 시작되지는 않습니다."))
+            Note(WorkPermissionText.scopeDetail)
                 .accessibilityIdentifier("settings-global-permission-scope")
             Note(L("Locking and password requirements follow macOS. Tether does not unlock the Mac.",
                    "잠금·암호 요구는 macOS 설정을 따릅니다. Tether가 잠금을 해제하지는 않습니다."))

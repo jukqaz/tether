@@ -10,11 +10,11 @@ struct GeneralPage: View {
 
     var body: some View {
         SettingsForm {
-            SettingsContentGroup(L("Defaults for the Next Manual Start", "다음 시작 기본값")) {
+            SettingsContentGroup(L("Options for the Next Manual Start", "다음 수동 시작 옵션")) {
                 ManualDefaultsOptionsView(model: model, embedded: true)
             }
             if model.hasInternalBattery {
-                SettingsDisclosure(title: L("Power Range & Time Limit", "전원 범위와 시간 한도"),
+                SettingsDisclosure(title: L("Power & Time Limits · Save Immediately", "전원·시간 한도 · 즉시 저장"),
                     summary: model.v3Settings.manualPowerCondition.title, isExpanded: manualBatteryExpansion) {
                     SettingRow(title: L("Allowed power source", "사용할 전원")) {
                         CompactPopUp(title: L("Manual work power range", "수동 유지 전원 범위"),
@@ -30,8 +30,8 @@ struct GeneralPage: View {
                             identifier: "settings-battery-manual-limit")
                             .disabled(settingsControlsDisabled)
                     }
-                    Note(L("These two settings save immediately for the next start. Current work keeps its original limits. Reconnecting power does not refill battery time.",
-                           "전원·한도는 변경 즉시 저장되어 다음 시작부터 적용됩니다. 현재 작업의 한도는 그대로이며 전원 재연결로 배터리 시간이 늘지 않습니다."))
+                    Note(L("These settings save immediately for future manual starts. Apply and Discard above do not affect them. Current limits stay unchanged; reconnecting power does not refill battery time.",
+                           "이 두 설정은 변경 즉시 저장되어 다음 수동 시작부터 적용됩니다. 위의 적용·변경 취소에는 포함되지 않습니다. 현재 한도는 그대로이며 전원 재연결로 배터리 시간이 늘지 않습니다."))
                         .accessibilityIdentifier("settings-manual-limits-save-scope")
                 }.accessibilityIdentifier("settings-manual-battery-details")
             }

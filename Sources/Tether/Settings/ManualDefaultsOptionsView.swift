@@ -24,7 +24,7 @@ struct ManualDefaultsOptionsView: View {
                 editorActions
             }
         } else {
-            V4FeatureSheet(title: L("Next manual work defaults", "다음 수동 작업 기본값")) {
+            V4FeatureSheet(title: L("Options for the Next Manual Start", "다음 수동 시작 옵션")) {
                 editorContent
             } actions: { editorActions }
             .accessibilityIdentifier("settings-manual-defaults-sheet")
@@ -33,6 +33,8 @@ struct ManualDefaultsOptionsView: View {
 
     private var editorContent: some View {
         VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
+            Note(L("Choose features to request at the next manual start. App-wide permission is set separately in Power & Lid.",
+                   "다음에 직접 시작할 때 사용할 기능을 고릅니다. 앱 전체 허용은 전원·덮개에서 따로 정합니다."))
             SettingsToggle(title: L("Keep the display on", "화면 켜두기"),
                 isOn: $draft.nextManualOptions.display, identifier: "manual-defaults-display")
                 .disabled(controlsDisabled)
@@ -60,8 +62,7 @@ struct ManualDefaultsOptionsView: View {
                 Note(lidApplicationDetail(for: draft.nextManualOptions))
                     .accessibilityIdentifier("manual-defaults-lid-global-note")
             }
-            Note(L("Saved only when applied. Current work and its end time are unchanged.",
-                   "적용해야 저장됩니다. 현재 작업과 종료 시각은 바뀌지 않습니다."))
+            Note(manualOptionsSaveScope)
                 .accessibilityIdentifier("manual-defaults-scope")
             if let feedback { Note(feedback, color: .tetherWarning).accessibilityIdentifier("manual-defaults-feedback") }
         }
@@ -88,8 +89,20 @@ struct ManualDefaultsOptionsView: View {
                                                 "기본값을 적용하지 못했습니다. 현재 설정을 확인하세요.")
                 }
             }.disabled(controlsDisabled || embedded && !hasChanges)
-                .accessibilityHint(L("Changes defaults for a future manual start only", "다음 수동 시작의 기본값만 바꿉니다"))
+                .accessibilityHint(L("Saves only this section's feature choices for the next manual start", "이 구역의 기능 선택만 다음 수동 시작의 기본값으로 저장합니다"))
         }
+    }
+
+    private var manualOptionsSaveScope: String {
+        if !embedded {
+            return L("Apply saves only these feature choices for the next manual start. Cancel leaves them unchanged. Current work, its end time and app-wide permissions stay unchanged.",
+                     "적용하면 이 기능 선택만 다음 수동 시작의 기본값으로 저장합니다. 취소하면 저장하지 않습니다. 현재 작업·종료 시각과 앱 전체 허용은 바뀌지 않습니다.")
+        }
+        return model.showsLidOptions
+            ? L("Apply and Discard affect only the display, lid and inactivity choices above. Current work, its end time and app-wide permissions stay unchanged.",
+                "적용·변경 취소는 위의 화면·덮개·유휴 선택에만 적용됩니다. 현재 작업·종료 시각과 앱 전체 허용은 바뀌지 않습니다.")
+            : L("Apply and Discard affect only the display and inactivity choices above. Current work, its end time and app-wide permissions stay unchanged.",
+                "적용·변경 취소는 위의 화면·유휴 선택에만 적용됩니다. 현재 작업·종료 시각과 앱 전체 허용은 바뀌지 않습니다.")
     }
 
     private var hasChanges: Bool { draft.nextManualOptions != model.v4Settings.nextManualOptions }

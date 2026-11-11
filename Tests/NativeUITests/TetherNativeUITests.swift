@@ -264,8 +264,8 @@ final class TetherNativeUITests: XCTestCase {
         // become an unconditional expand-on-return behavior.
         try selectPage("protection", title: "보호·진단")
         let diagnostics = try revealSettingsControl(try disclosureTriangle("settings-records-diagnostics-details"))
-        try clickSettingsDisclosure(diagnostics)
-        try assertDisclosureCollapsed(diagnostics)
+        try clickSettingsDisclosure(diagnostics, identifier: "settings-records-diagnostics-details")
+        try assertDisclosureValue("settings-records-diagnostics-details", expanded: false)
         try selectPage("general", title: "직접 유지")
         try selectPage("protection", title: "보호·진단")
         try assertDisclosureCollapsed(try disclosureTriangle("settings-records-diagnostics-details"))
@@ -309,49 +309,79 @@ final class TetherNativeUITests: XCTestCase {
                                  identity: target.identity)
         evidence("settings-first-keyboard-opening")
 
-        // Select the real native sidebar, then exercise vertical keyboard
-        // navigation without changing macOS keyboard-navigation preferences.
+        // Resolve the real, enabled native Cell before giving it input. A
+        // SwiftUI key-view proxy's private class name does not prove its role;
+        // actual up/down selection must change both the row and page together.
         try navigationControl("safety", title: "Power & Lid").action.click()
-        try assertSelectedPage("safety")
+        try assertSelectedSidebarPage("safety")
         var navigationTarget = try settingsFocusAfterFreshObservation()
+        // Pointer selection and keyboard focus are independent on macOS. Reach
+        // the actual native outline via Tab, without changing system settings.
         for reverse in [true, false] {
-            for attempt in 0..<8 where !isNativeSettingsNavigationResponder(navigationTarget) {
+            for attempt in 0..<8 where navigationTarget.isSidebar != true {
                 app.typeKey(.tab, modifierFlags: reverse ? .shift : [])
                 navigationTarget = try settingsFocusAfterFreshObservation()
                 let observation = XCTAttachment(string:
-                    "direction=\(reverse ? "reverse" : "forward") attempt=\(attempt + 1) "
-                    + "isWindow=\(navigationTarget.isWindow) class=\(navigationTarget.className) identity=\(navigationTarget.identity)")
-                observation.name = "settings-sidebar-focus-\(reverse ? "reverse" : "forward")-\(attempt + 1)"
+                    "reverse=\(reverse) attempt=\(attempt + 1) class=\(navigationTarget.className) "
+                    + "identity=\(navigationTarget.identity) nativeSidebar=\(String(describing: navigationTarget.isSidebar))")
+                observation.name = "settings-sidebar-public-focus-\(reverse)-\(attempt + 1)"
                 observation.lifetime = .keepAlways
                 add(observation)
             }
         }
-        XCTAssertTrue(isNativeSettingsNavigationResponder(navigationTarget),
-                      "Up/down selection requires the native sidebar responder, not \(navigationTarget.className)")
+        XCTAssertEqual(navigationTarget.isSidebar, true,
+                       "Arrow input requires an observed native outline descendant, not a detail control")
         let pages = settingsPageNames.map(\.page)
-        let selected = pages.filter { app.descendants(matching: .any)["settings-page-\($0)"].exists }
-        XCTAssertEqual(selected.count, 1, "Sidebar focus must leave one real page selected")
-        var position = try XCTUnwrap(selected.first.flatMap { pages.firstIndex(of: $0) })
-        // Reach the top without wrap assumptions, then visit all four pages in
-        // both directions through native List selection.
-        let deltas = Array(repeating: -1, count: position) + [1, 1, 1, -1, -1, -1]
-        for delta in deltas {
-            XCTAssertTrue(isNativeSettingsNavigationResponder(try settingsFocusAfterFreshObservation()),
-                          "Vertical movement must stay on the actual native sidebar")
+        var position = 0
+        // Visit all four pages in both directions, with no endpoint wrap assumption.
+        for delta in [1, 1, 1, -1, -1, -1] {
+            let beforeInput = try settingsFocusAfterFreshObservation()
+            XCTAssertEqual(beforeInput.isSidebar, true,
+                           "Keyboard movement must remain in the observed native sidebar")
             app.typeKey(delta > 0 ? .downArrow : .upArrow, modifierFlags: [])
             position += delta
             XCTAssertTrue(pages.indices.contains(position), "The keyboard path must stay inside sidebar bounds")
-            try assertSelectedPage(pages[position])
+            try assertSelectedSidebarPage(pages[position])
         }
         evidence("settings-sidebar-real-keyboard-selection")
-        app.typeKey(.tab, modifierFlags: [])
-        let detailTarget = try settingsFocusAfterFreshObservation()
-        XCTAssertFalse(detailTarget.isWindow, "Tab from sidebar selection must reach a usable control")
-        XCTAssertFalse(isNativeSettingsNavigationResponder(detailTarget),
-                       "Tab must leave sidebar navigation for the page controls")
+
+        // Tab into the actual detail controls. Stop at the public AppKit popup
+        // role, then prove its identity by opening the known unplug-policy menu.
+        // This keeps the search bounded without classifying every KeyViewProxy
+        // as either a sidebar or a detail control.
+        var detailTarget = try settingsFocusAfterFreshObservation()
+        for attempt in 0..<8 {
+            app.typeKey(.tab, modifierFlags: [])
+            detailTarget = try settingsFocusAfterFreshObservation()
+            let observation = XCTAttachment(string:
+                "attempt=\(attempt + 1) isWindow=\(detailTarget.isWindow) "
+                + "class=\(detailTarget.className) identity=\(detailTarget.identity)")
+            observation.name = "settings-sidebar-tab-to-detail-\(attempt + 1)"
+            observation.lifetime = .keepAlways
+            add(observation)
+            if detailTarget.className == "NSPopUpButton" { break }
+        }
+        XCTAssertFalse(detailTarget.isWindow, "Tab from the sidebar must reach a usable detail control")
+        XCTAssertEqual(detailTarget.className, "NSPopUpButton",
+                       "The bounded Tab path must reach the actual native detail popup")
         XCTAssertNotEqual(detailTarget.identity, navigationTarget.identity,
-                          "A real key-view transition must occur before claiming detail entry")
-        try assertSelectedPage("safety")
+                          "Entering detail must move to a different actual keyboard target")
+        try assertSelectedSidebarPage("safety")
+        let unplug = try required("settings-unplug-policy-control")
+        XCTAssertEqual(unplug.elementType, .popUpButton)
+        XCTAssertTrue(unplug.isEnabled && unplug.isHittable)
+        XCTAssertTrue(try settingsPageScrollView().frame.insetBy(dx: -1, dy: -1).contains(unplug.frame),
+                      "The complete keyboard-target popup must fit inside the current detail viewport")
+        let savedUnplugChoice = unplug.value as? String
+        app.typeKey(" ", modifierFlags: [])
+        let unplugChoice = try required(app.menuItems["End all · Recommended"],
+                                       description: "Keyboard-opened unplug policy menu")
+        XCTAssertTrue(unplugChoice.isHittable, "Keyboard detail entry must open the actual unplug choices")
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(unplugChoice.waitForNonExistence(timeout: 3), "Escape must dismiss the actual detail popup menu")
+        XCTAssertEqual(unplug.value as? String, savedUnplugChoice,
+                       "Inspecting the keyboard target must not change the saved unplug policy")
+        try assertSelectedSidebarPage("safety")
         evidence("settings-sidebar-tab-enters-detail")
 
         let settings = try required(app.windows.matching(identifier: "com_apple_SwiftUI_Settings_window").firstMatch,
@@ -526,14 +556,32 @@ final class TetherNativeUITests: XCTestCase {
 
     func testWelcomeKeepsCompactIndependentChoicesAndFixedCompletion() throws {
         try launch(language: "ko", scenario: "ac")
+        let openedAt = Date().timeIntervalSince1970
         try required("ui-fixture-open-welcome").click()
         try required("welcome-content")
-        let observation = try XCTUnwrap(try state()["welcomeWindow"] as? [String: Any])
+        var welcomeObservation: [String: Any]?
+        let fresh = XCTNSPredicateExpectation(predicate: NSPredicate { [self] _, _ in
+            guard let current = observedState(),
+                  let observedAt = current["observedAt"] as? Double, observedAt > openedAt,
+                  let window = current["welcomeWindow"] as? [String: Any],
+                  window["identifier"] as? String == "tether-welcome-window",
+                  window["visible"] as? Bool == true, window["key"] as? Bool == true else { return false }
+            welcomeObservation = window
+            return true
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [fresh], timeout: 5), .completed,
+                       "The visible Welcome window needs a fresh native geometry observation")
+        let observation = try XCTUnwrap(welcomeObservation)
         let minimum = try XCTUnwrap(observation["contentMinSize"] as? [String: Any])
-        let frame = try XCTUnwrap(observation["contentRect"] as? [String: Any])
+        // A full-size content view includes titlebar chrome in contentRect.
+        // contentLayoutRect is the actual 560×448 reading/control surface.
+        let frame = try XCTUnwrap(observation["contentLayoutRect"] as? [String: Any])
+        let outerContent = try XCTUnwrap(observation["contentRect"] as? [String: Any])
         XCTAssertEqual(minimum["width"] as? Double ?? 0, 560, accuracy: 1)
         XCTAssertEqual(frame["width"] as? Double ?? 0, 560, accuracy: 1)
         XCTAssertEqual(frame["height"] as? Double ?? 0, 448, accuracy: 1)
+        XCTAssertGreaterThanOrEqual(outerContent["width"] as? Double ?? 0, 560)
+        XCTAssertGreaterThanOrEqual(outerContent["height"] as? Double ?? 0, 448)
         XCTAssertEqual(observation["isResizable"] as? Bool, false)
         XCTAssertTrue(try required("welcome-automatic-toggle").exists)
         XCTAssertTrue(try required("welcome-closed-lid-toggle").exists)
@@ -1589,6 +1637,20 @@ final class TetherNativeUITests: XCTestCase {
                                   description: "Native Settings window to activate")
         window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0))
             .withOffset(CGVector(dx: 0, dy: 12)).click()
+        let after = Date().timeIntervalSince1970
+        let foreground = XCTNSPredicateExpectation(predicate: NSPredicate { [self] _, _ in
+            guard let current = observedState(), let observedAt = current["observedAt"] as? Double,
+                  observedAt > after, let application = current["application"] as? [String: Any],
+                  let settings = current["settingsWindow"] as? [String: Any],
+                  let keyNumber = application["keyWindowNumber"] as? Int,
+                  let settingsNumber = settings["windowNumber"] as? Int else { return false }
+            return application["active"] as? Bool == true && settings["key"] as? Bool == true
+                && keyNumber == settingsNumber
+        }, object: nil)
+        let result = XCTWaiter.wait(for: [foreground], timeout: 5)
+        if result != .completed { evidence("settings-foreground-interference") }
+        XCTAssertEqual(result, .completed,
+                       "Actual Settings must own foreground and the key window before sidebar input")
         return window
     }
 
@@ -1610,6 +1672,17 @@ final class TetherNativeUITests: XCTestCase {
         for other in settingsPageNames.map(\.page) where other != page {
             XCTAssertFalse(app.descendants(matching: .any)["settings-page-\(other)"].exists,
                            "Selecting \(page) must change the real page")
+        }
+    }
+
+    private func assertSelectedSidebarPage(_ page: String) throws {
+        try assertSelectedPage(page)
+        for item in settingsPageNames {
+            let target = try navigationControl(item.page, title: item.title, activateWindow: false)
+            XCTAssertEqual(target.row.isSelected, item.page == page,
+                           "Keyboard page changes must match exactly one selected native OutlineRow")
+            XCTAssertEqual(target.action.isSelected, item.page == page,
+                           "The selected page must match its actual native Cell selection")
         }
     }
 
@@ -1682,7 +1755,7 @@ final class TetherNativeUITests: XCTestCase {
         let triangle = try disclosureTriangle("panel-active-work-details")
         triangle.coordinate(withNormalizedOffset: .zero)
             .withOffset(CGVector(dx: 26, dy: min(7, triangle.frame.height / 2))).click()
-        try assertDisclosureCollapsed(triangle)
+        try assertDisclosureValue("panel-active-work-details", expanded: false)
     }
 
     private func assertPreviewIndicator(in container: XCUIElement, avoiding controls: [XCUIElement]) throws {
@@ -1706,7 +1779,7 @@ final class TetherNativeUITests: XCTestCase {
         }
     }
 
-    private func settingsFocusAfterFreshObservation() throws -> (isWindow: Bool, className: String, identity: String) {
+    private func settingsFocusAfterFreshObservation() throws -> (isWindow: Bool, className: String, identity: String, isSidebar: Bool?) {
         let after = Date().timeIntervalSince1970
         var matchedWindow: [String: Any]?
         let fresh = XCTNSPredicateExpectation(predicate: NSPredicate { [self] _, _ in
@@ -1724,7 +1797,11 @@ final class TetherNativeUITests: XCTestCase {
         let identity = try XCTUnwrap(window["firstResponderIdentity"] as? String)
         XCTAssertFalse(className.isEmpty, "A key Settings window must expose its current responder")
         XCTAssertNotEqual(identity, "none", "The current responder must have an observable identity")
-        return (isWindow, className, identity)
+        let details = window["firstResponderDetails"] as? [String: Any]
+        let outlineAncestor = details?["hasPublicOutlineViewAncestor"] as? Bool
+        let sidebarDescendant = details?["focusViewIsDescendantOfSidebar"] as? Bool
+        let isSidebar = outlineAncestor.flatMap { ancestor in sidebarDescendant.map { ancestor && $0 } }
+        return (isWindow, className, identity, isSidebar)
     }
 
     private func waitForSettingsFocus(isWindow: Bool, className: String? = nil, identity: String? = nil) throws {
@@ -1740,12 +1817,6 @@ final class TetherNativeUITests: XCTestCase {
                        "Settings must clear initial pointer focus and preserve an observed keyboard target")
     }
 
-    private func isNativeSettingsNavigationResponder(_ target: (isWindow: Bool, className: String, identity: String)) -> Bool {
-        // A generic hosting view or detail control is not sufficient. Real
-        // up/down selection must be delivered to the native List responder.
-        !target.isWindow && (target.className.contains("OutlineView")
-            || target.className.contains("TableView") || target.className.contains("Sidebar"))
-    }
 
     private func openSettingsFromMenu() throws {
         try required("panel-open-settings").click()
@@ -1882,52 +1953,66 @@ final class TetherNativeUITests: XCTestCase {
                        "Compact secondary settings must begin collapsed")
     }
 
-    private func disclosureTriangle(_ identifier: String) throws -> XCUIElement {
-        // Expanded SwiftUI disclosures can propagate the same identifier to
-        // their text children. Resolve the actual native input type first.
-        let identifiedTriangles = app.descendants(matching: .disclosureTriangle).matching(identifier: identifier)
-        let identifiedCount = identifiedTriangles.count
-        let initial: XCUIElement
-        if identifiedCount > 0 {
-            XCTAssertEqual(identifiedCount, 1, "The disclosure identifier must resolve to one native triangle")
-            initial = try required(identifiedTriangles.firstMatch, description: "Typed disclosure triangle \(identifier)")
-        } else {
-            let control = try required(identifier)
-            initial = try required(control.elementType == .disclosureTriangle ? control
-                : control.descendants(matching: .disclosureTriangle).firstMatch,
-                description: "Native disclosure triangle \(identifier)")
+    private func currentDisclosureTriangle(_ identifier: String) -> XCUIElement? {
+        let inputs = app.descendants(matching: .disclosureTriangle).matching(identifier: identifier)
+        if inputs.count == 1 { return inputs.firstMatch }
+        guard inputs.count == 0 else { return nil }
+        let groups = app.descendants(matching: .group).matching(identifier: identifier)
+        guard groups.count == 1 else { return nil }
+        let group = groups.firstMatch
+        let ownerFrame = group.frame
+        guard isLayoutFrame(ownerFrame) else { return nil }
+        // Expanded diagnostic content flattens nested disclosures into direct
+        // siblings. Only the unique triangle at the owner's top is its header.
+        let headers = group.children(matching: .disclosureTriangle).allElementsBoundByIndex.filter {
+            isLayoutFrame($0.frame) && abs($0.frame.minY - ownerFrame.minY) <= 1
+                && ownerFrame.insetBy(dx: -1, dy: -1).contains($0.frame)
         }
-        // SwiftUI moves the identifier to a containing Group when expanded.
-        // Keep the query on the native triangle, whose header remains unique,
-        // instead of letting Any.firstMatch silently retarget that Group.
-        let triangles = app.descendants(matching: .disclosureTriangle).matching(
-            NSPredicate(format: "label == %@", initial.label))
-        XCTAssertEqual(triangles.count, 1, "The identified disclosure must have one native header")
-        return try required(triangles.firstMatch, description: "Typed disclosure triangle \(identifier)")
+        return headers.count == 1 ? headers.first : nil
+    }
+
+    private func disclosureTriangle(_ identifier: String) throws -> XCUIElement {
+        try required(try XCTUnwrap(currentDisclosureTriangle(identifier),
+            "The stable disclosure ID must identify one native triangle or one containing Group"),
+            description: "Native disclosure triangle \(identifier)")
+    }
+
+    private func assertDisclosureValue(_ identifier: String, expanded: Bool) throws {
+        // The native input's label and identifier can move to its Group when
+        // the content opens. Resolve the same stable owner on each observation.
+        let expected = XCTNSPredicateExpectation(predicate: NSPredicate { [self] _, _ in
+            guard let input = currentDisclosureTriangle(identifier) else { return false }
+            if let value = input.value as? NSNumber { return value.boolValue == expanded }
+            return input.value as? String == (expanded ? "1" : "0")
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [expected], timeout: 3), .completed,
+                       "The actual disclosure value must match its requested open/closed state")
     }
 
     private func expandSettingsDisclosure(_ identifier: String) throws {
         let triangle = try disclosureTriangle(identifier)
         try assertDisclosureCollapsed(triangle)
         try revealSettingsControl(triangle)
-        try clickSettingsDisclosure(triangle)
-        try assertDisclosureExpanded(triangle)
+        try clickSettingsDisclosure(triangle, identifier: identifier)
+        try assertDisclosureValue(identifier, expanded: true)
     }
 
-    private func clickSettingsDisclosure(_ triangle: XCUIElement) throws {
-        if triangle.identifier == "settings-helper-details" {
-            // This existing helper primitive is a separate native one-line
+    private func clickSettingsDisclosure(_ triangle: XCUIElement, identifier: String) throws {
+        if ["settings-helper-details", "settings-updates-details"].contains(identifier) {
+            // These existing helper/update primitives are separate native one-line
             // DisclosureGroup, not SettingsDisclosure's 35.5pt HStack header.
             // Its observed 15pt AX bounds are the title itself, with no child
             // StaticText. Validate that measured shape before using its arrow;
             // this is an explicit control path, never a missing-title fallback.
-            XCTAssertFalse(triangle.label.isEmpty, "The native helper disclosure must expose its title")
+            XCTAssertEqual(triangle.elementType, .disclosureTriangle)
+            XCTAssertTrue(triangle.isEnabled && triangle.isHittable)
+            XCTAssertFalse(triangle.label.isEmpty, "The native disclosure must expose its title")
             XCTAssertTrue(isLayoutFrame(triangle.frame))
             XCTAssertGreaterThanOrEqual(triangle.frame.height, 12)
             XCTAssertLessThanOrEqual(triangle.frame.height, 20,
-                                     "Only the observed one-line helper title can use this measured arrow click")
+                                     "Only the observed one-line title can use this measured arrow click")
             XCTAssertEqual(triangle.descendants(matching: .staticText).count, 0,
-                           "A changed helper layout requires an explicit click-target review")
+                           "A changed one-line layout requires an explicit click-target review")
             let point = CGPoint(x: triangle.frame.minX + 26, y: triangle.frame.midY)
             let window = try required(app.windows.matching(identifier: "com_apple_SwiftUI_Settings_window").firstMatch,
                                       description: "Settings containing the native helper arrow")
@@ -1974,7 +2059,7 @@ final class TetherNativeUITests: XCTestCase {
         waitForHittable(triangle, description: "Compact menu disclosure \(identifier)")
         triangle.coordinate(withNormalizedOffset: .zero)
             .withOffset(CGVector(dx: 26, dy: min(7, triangle.frame.height / 2))).click()
-        try assertDisclosureExpanded(triangle)
+        try assertDisclosureValue(identifier, expanded: true)
         if identifier == "manual-next-session-details" {
             XCTAssertTrue(app.popUpButtons["manual-duration-picker"].waitForExistence(timeout: 3),
                           "The expanded disclosure must expose its next-session duration picker")
