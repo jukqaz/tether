@@ -39,9 +39,13 @@ cp Resources/local.tether.helper.plist Resources/local.tether.watchdog.plist Res
 # Compile both the flat icon and Liquid Glass catalog for the source runtime minimum.
 # Info.plist names both representations "AppIcon".
 MIN_MACOS=$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' Resources/Info.plist)
-xcrun actool Resources/AppIcon.icon --compile "$APP/Contents/Resources" --platform macosx \
-  --minimum-deployment-target "$MIN_MACOS" --app-icon AppIcon --output-partial-info-plist build/icon-info.plist \
-  --output-format human-readable-text >/dev/null
+xcrun actool "$PWD/Resources/AppIcon.icon" --compile "$PWD/$APP/Contents/Resources" --platform macosx \
+  --minimum-deployment-target "$MIN_MACOS" --app-icon AppIcon --output-partial-info-plist "$PWD/build/icon-info.plist" \
+  --output-format human-readable-text
+if [ ! -s "$APP/Contents/Resources/AppIcon.icns" ] || [ ! -s "$APP/Contents/Resources/Assets.car" ]; then
+  echo 'Icon Composer did not produce both app icon files.' >&2
+  exit 1
+fi
 # Strings live in code (English and Korean); these tell macOS which languages the app speaks.
 for lang in en ko; do mkdir -p "$APP/Contents/Resources/$lang.lproj"; done
 # Required system-action metadata is extracted before signing; failure aborts packaging.
