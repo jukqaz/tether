@@ -4,18 +4,17 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
   <channel>
     <title>Tether</title>
     <item>
-      <title>Tether 2026.11.1 Beta 1</title>
-      <pubDate>Wed, 11 Nov 2026 10:16:21 +0900</pubDate>
+      <title>Tether 2026.11.1</title>
+      <pubDate>Wed, 11 Nov 2026 11:30:09 +0900</pubDate>
       <link>https://github.com/jukqaz/tether</link>
-      <sparkle:version>59</sparkle:version>
-      <sparkle:shortVersionString>2026.11.1 Beta 1</sparkle:shortVersionString>
+      <sparkle:version>60</sparkle:version>
+      <sparkle:shortVersionString>2026.11.1</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-      <enclosure url="https://github.com/jukqaz/tether/releases/download/v2026.11.1-beta.1/Tether-2026.11.1-beta.1-arm64.zip" length="11217875" type="application/octet-stream" sparkle:edSignature="X7xU3oefwBDlYgxMn2XjtPuPFc3wEazIUn90CQp0l2qAVBLt7w8y9TUFYu7eJFDIkgxweRqlOQQhqRPRJ6WNAA=="></enclosure>
-      <sparkle:channel>beta</sparkle:channel>
+      <enclosure url="https://github.com/jukqaz/tether/releases/download/v2026.11.1/Tether-2026.11.1-arm64.zip" length="11225368" type="application/octet-stream" sparkle:edSignature="iFS88Y39HQD6jBiq0b6Eh0wIuP+WsrzfxLrO+MwaTg9N7xVVhznwxVRO9UhcRNdpmniHIiqiY2DtSfomFATHCw=="></enclosure>
     </item>
   </channel>
 </rss><!-- sparkle-signatures:
-edSignature: Sf4A3fExgnqGXYRTHVbGn2Hnd7Kx8aqDsyLiD4DoFxMlVxCgcso8+tYqOh9+Tq576bSIzDxO0Kstpr24CXavBg==
-length: 1228
+edSignature: O70i1Z7QD1fGBRO3SKV9pwz3OJTTPiF2ie56plPfh6YgW0NO1PMgNHYhEHS+F4btPE8VFxkO6BtymLnzAA5FDA==
+length: 1154
 -->
