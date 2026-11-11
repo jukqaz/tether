@@ -3,6 +3,7 @@ import TetherCore
 
 struct UsageStatisticsView: View {
     @ObservedObject var model: AppModel
+    @State private var scopeDetailsExpanded = false
 
     private var days: [DayStats] { model.localUsageStats.week(now: Date()) }
     private var hasRecords: Bool {
@@ -44,13 +45,13 @@ struct UsageStatisticsView: View {
                     }
                 }.font(TetherTypography.secondary)
             } else {
-                Note(L("Statistics appear after Tether confirms work. No recorded duration yet.",
-                       "Tether의 작업 유지가 확인되면 통계를 기록합니다. 아직 기록된 유지 시간이 없습니다."))
+                Note(L("No duration recorded yet. Statistics start after Tether confirms keep-awake.",
+                       "기록된 유지 시간이 없습니다. Tether의 유지가 확인되면 통계를 남깁니다."))
             }
-            DisclosureGroup(L("Recording scope", "기록 범위")) {
-                Note(L("Local observations for the last 7 days. Sleep, missing readings and unconfirmed work are not filled in.",
-                       "최근 7일의 로컬 관측 기록입니다. 잠자기·관측 공백·확인되지 않은 유지는 추정해 채우지 않습니다."))
-                    .padding(.top, 6)
+            SettingsDisclosure(title: L("Recording scope", "기록 범위"),
+                isExpanded: $scopeDetailsExpanded, groupsSection: false) {
+                Note(L("Local observations for 7 days; sleep, missing readings and unconfirmed work are not estimated.",
+                       "7일간의 로컬 관측값이며 잠자기·관측 공백·미확인 유지는 추정하지 않습니다."))
             }.accessibilityIdentifier("usage-statistics-scope-details")
         }
         .accessibilityElement(children: .contain)

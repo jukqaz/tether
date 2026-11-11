@@ -936,8 +936,12 @@ final class TetherNativeUITests: XCTestCase {
         XCTAssertEqual(rows.count, 2, "The initial AC fixture must preserve both observed records")
         let last = rows.element(boundBy: 1)
         try revealSettingsControl(last)
-        XCTAssertGreaterThan(list.frame.height, 108,
-                             "Two complete three-line records need more than the old 108pt estimate")
+        let first = rows.element(boundBy: 0)
+        XCTAssertGreaterThan(first.frame.height, 0)
+        XCTAssertGreaterThan(last.frame.height, 0)
+        XCTAssertGreaterThanOrEqual(first.frame.minY, list.frame.minY - 1)
+        XCTAssertGreaterThanOrEqual(last.frame.minY, first.frame.maxY - 1,
+                                    "Complete history rows must not overlap")
         XCTAssertLessThanOrEqual(last.frame.maxY, list.frame.maxY + 1)
         evidence("history-natural-height")
         try required("settings-other-app-requests-details")
@@ -1590,7 +1594,7 @@ final class TetherNativeUITests: XCTestCase {
             XCTAssertTrue(navigation.frame.insetBy(dx: -1, dy: -1).contains(control.frame),
                           "Each native navigation row must remain inside the actual sidebar")
             let visibleTitle = settingsVisibleTitle(page, accessibleTitle: title)
-            let textWidth = (visibleTitle as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 12)]).width
+            let textWidth = (visibleTitle as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 14)]).width
             XCTAssertGreaterThanOrEqual(control.frame.width + 1, textWidth, "\(visibleTitle) has insufficient room for its visible label")
             XCTAssertGreaterThanOrEqual(control.frame.height, 20)
             for earlier in frames {
@@ -1962,7 +1966,7 @@ final class TetherNativeUITests: XCTestCase {
         XCTAssertTrue(row.frame.insetBy(dx: -1, dy: -1).contains(caption.frame),
                       "The complete caption must remain inside its native OutlineRow")
         let visibleTitle = settingsVisibleTitle(page, accessibleTitle: title)
-        let textWidth = (visibleTitle as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 12)]).width
+        let textWidth = (visibleTitle as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 14)]).width
         XCTAssertGreaterThanOrEqual(row.frame.width + 1, textWidth,
                                    "The sidebar row must allocate room for its complete visible title \(visibleTitle)")
         XCTAssertGreaterThanOrEqual(row.frame.height, 32,

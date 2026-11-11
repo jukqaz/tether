@@ -91,7 +91,7 @@ struct MenuKeepAwakeControls: View {
                         Button(L("Set up…", "도우미 설정…"), action: openHelperSetup)
                             .buttonStyle(.link)
                             .font(TetherTypography.secondary)
-                            .padding(.leading, 22)
+                            .padding(.leading, WorkSessionMetrics.hierarchyIndent)
                             .accessibilityIdentifier("panel-prepare-lid-helper")
                     }
                 }
@@ -102,9 +102,7 @@ struct MenuKeepAwakeControls: View {
                     .disabled(controlsDisabled)
                     .help(WorkPermissionText.displayHelp + "\n" + displayStatusDetail)
                     .accessibilityHint(displayStatusDetail)
-                permissionDetail(usesCompactStopSummary && model.v3Settings.keepDisplayAwake
-                    ? L("Saved permission choices are kept.", "저장된 허용 선택은 유지됩니다.")
-                    : displayStatusDetail, original: displayStatusDetail)
+                permissionDetail(compactDisplayStatusDetail, original: displayStatusDetail)
                     .accessibilityIdentifier("panel-display-status")
             }
         }
@@ -124,6 +122,28 @@ struct MenuKeepAwakeControls: View {
                 && model.coordinatedLidBlockReason == nil))
     }
 
+    /// The checkbox already communicates the saved permission. Shorten only
+    /// confirmed ordinary states; an unresolved observation keeps its full text.
+    private var compactDisplayStatusDetail: String {
+        if usesCompactStopSummary && model.v3Settings.keepDisplayAwake {
+            return L("Saved permission choices are kept.", "저장된 허용 선택은 유지됩니다.")
+        }
+        guard stopSummaryIsInHeader, model.v3Settings.keepDisplayAwake,
+              model.featureStopSummary == nil,
+              model.snapshot.power != .unknown,
+              model.userSessionStatus?.observationLimited != true,
+              model.userSessionStatus?.ownReleasePending != true,
+              model.userSessionStatus?.displayError == nil,
+              !model.closedLidDisplayRecoveryPending else { return displayStatusDetail }
+        if model.userSessionStatus?.displayHolding == true {
+            return L("Display requested · locking follows macOS", "화면 요청 중 · 잠금은 macOS 설정을 따름")
+        }
+        if !model.workSessionHolding && !model.manualSessionActive && !model.automaticWorkReasonActive {
+            return L("No active keep-awake session", "현재 유지 없음")
+        }
+        return displayStatusDetail
+    }
+
     private var observedLidPosition: String {
         switch model.snapshot.observedLidClosed {
         case true?: L("Lid closed", "덮개 닫힘")
@@ -138,7 +158,7 @@ struct MenuKeepAwakeControls: View {
             .foregroundStyle(Color.tetherSecondary)
             .lineSpacing(2)
             .fixedSize(horizontal: false, vertical: true)
-            .padding(.leading, 22)
+            .padding(.leading, WorkSessionMetrics.hierarchyIndent)
             .accessibilityLabel(original)
             .help(original)
     }

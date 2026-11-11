@@ -13,15 +13,19 @@ struct Page<Content: View>: View {
 /// One content column for headings and scroll content, including wide windows.
 enum SettingsMetrics {
     static let contentWidth: CGFloat = 520
-    static let gutter: CGFloat = 22
+    static let gutter: CGFloat = 24
     static let contentTopInset: CGFloat = 8
-    static let sectionSpacing: CGFloat = 22
+    static let sectionSpacing: CGFloat = 24
     static let cardInset: CGFloat = 12
     static let rowHeight: CGFloat = 28
-    static let rowSpacing: CGFloat = 8
-    static let controlWidth: CGFloat = 160
+    static let rowSpacing: CGFloat = 10
+    static let controlWidth: CGFloat = 152
     static let conditionWidth: CGFloat = 190
-    static let checkboxTextInset: CGFloat = 20
+    static let hierarchyIndent = WorkSessionMetrics.hierarchyIndent
+    static let disclosureLabelInset = WorkSessionMetrics.disclosureLabelInset
+    static let disclosureContentInset = WorkSessionMetrics.disclosureContentInset
+    static let checkboxTextInset = hierarchyIndent
+    static let sidebarWidth: CGFloat = 164
 
     /// Keep the scroll viewport as wide as its toolbar. Only the readable
     /// column narrows; constraining the Form itself truncates its edge effect.
@@ -44,7 +48,7 @@ struct SettingsForm<Content: View>: View {
                 .padding(.horizontal, SettingsMetrics.gutter)
                 .padding(.top, SettingsMetrics.contentTopInset)
                 .padding(.bottom, SettingsMetrics.gutter)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .frame(maxWidth: .infinity, alignment: .top)
         }
         .font(settingsStyle ? TetherTypography.settingsBody : TetherTypography.body)
         .toggleStyle(.checkbox)
@@ -65,7 +69,7 @@ struct SettingsScroll<Content: View>: View {
                 .padding(.horizontal, SettingsMetrics.gutter)
                 .padding(.top, 18)
                 .padding(.bottom, 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity)
             Divider()
             if #available(macOS 26.0, *) {
                 scrollContent.scrollEdgeEffectHidden(true, for: .top)
@@ -82,7 +86,7 @@ struct SettingsScroll<Content: View>: View {
                 .padding(.horizontal, SettingsMetrics.gutter)
                 .padding(.top, SettingsMetrics.contentTopInset)
                 .padding(.bottom, SettingsMetrics.gutter)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .frame(maxWidth: .infinity, alignment: .top)
         }
     }
 }
@@ -161,7 +165,8 @@ struct SettingsContentGroup<Content: View>: View {
                     }
                 }
             }
-            content
+            VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) { content }
+                .padding(.leading, SettingsMetrics.hierarchyIndent)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .contain)
@@ -191,7 +196,8 @@ struct SettingsDisclosure<Content: View>: View {
     private var disclosure: some View {
         DisclosureGroup(isExpanded: $isExpanded) {
             VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) { content }
-                .padding(.leading, 12).padding(.top, 8).padding(.bottom, 2)
+                .padding(.leading, SettingsMetrics.disclosureContentInset)
+                .padding(.top, 8).padding(.bottom, 2)
         } label: {
             Group {
                 if let summary, !isExpanded {
@@ -211,6 +217,7 @@ struct SettingsDisclosure<Content: View>: View {
                 }
             }
             .frame(maxWidth: .infinity, minHeight: SettingsMetrics.rowHeight, alignment: .leading)
+            .padding(.leading, SettingsMetrics.disclosureLabelInset)
         }
         .accessibilityElement(children: .contain)
     }

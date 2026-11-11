@@ -44,24 +44,20 @@ struct ManualDefaultsOptionsView: View {
             displayOptions
             if model.showsLidOptions {
                 SettingsToggle(title: L("Continue with the lid closed", "덮개를 닫아도 계속 사용"),
-                    isOn: $draft.nextManualOptions.closedLid, identifier: "manual-defaults-closed-lid")
+                    detail: lidOptionDetail, isOn: $draft.nextManualOptions.closedLid,
+                    identifier: "manual-defaults-closed-lid", detailIdentifier: "manual-defaults-lid-global-note")
                     .disabled(controlsDisabled || !model.capabilities.lidControlAvailable)
             }
-            if model.showsLidOptions && draft.nextManualOptions.closedLid
-                && (!model.v3Settings.allowClosedLid || !model.helperSetupConfirmed) {
-                Note(lidApplicationDetail(for: draft.nextManualOptions))
-                    .accessibilityIdentifier("manual-defaults-lid-global-note")
-            }
-            SettingsDisclosure(title: L("Application Details", "적용 범위 자세히"),
+            SettingsDisclosure(title: L("Saving & Application", "저장·적용 범위"),
                 isExpanded: applicationDetailsExpansion, groupsSection: false,
                 identifier: "manual-defaults-application-details") {
                 Note(manualOptionsSaveScope)
                     .accessibilityIdentifier("manual-defaults-scope")
-                Note(L("App-wide permission is set separately in Power & Lid. Features are checked again when work starts.",
-                       "앱 전체 허용은 전원·덮개에서 따로 정하며, 시작할 때 조건을 다시 확인합니다."))
+                Note(L("Set app-wide permission in Power & Lid. Conditions are checked again at start.",
+                       "앱 전체 허용은 전원·덮개에서 정하며 시작할 때 조건을 다시 확인합니다."))
                 if draft.nextManualOptions.display && draft.nextManualOptions.releaseDisplayAfterIdle != nil {
-                    Note(L("Only display keep-awake ends after no keyboard or mouse input. Keep-awake and any time limit continue.",
-                           "키보드·마우스 입력이 없으면 화면 켜두기만 해제합니다. 작업 유지와 시간 한도는 계속됩니다."))
+                    Note(L("No keyboard or mouse input releases only display keep-awake. Work and time limits continue.",
+                           "입력이 없으면 화면 켜두기만 해제하며 작업 유지·시간 한도는 계속됩니다."))
                 }
             }.accessibilityIdentifier("manual-defaults-application-details")
             if let feedback { Note(feedback, color: .tetherWarning).accessibilityIdentifier("manual-defaults-feedback") }
@@ -71,19 +67,26 @@ struct ManualDefaultsOptionsView: View {
     private var displayOptions: some View {
         VStack(alignment: .leading, spacing: 4) {
             SettingsToggle(title: L("Keep the display on", "화면 켜두기"),
-                isOn: $draft.nextManualOptions.display, identifier: "manual-defaults-display")
+                detail: displayOptionDetail, isOn: $draft.nextManualOptions.display,
+                identifier: "manual-defaults-display", detailIdentifier: "manual-defaults-display-global-note")
                 .disabled(controlsDisabled)
             SettingRow(title: L("Release when inactive", "입력 없을 때 켜두기 해제")) {
                 CompactPopUp(title: L("Display inactivity timeout", "입력 없이 대기할 시간"),
                     selection: $draft.nextManualOptions.releaseDisplayAfterIdle,
                     choices: idleChoices, identifier: "manual-defaults-display-idle")
                     .disabled(controlsDisabled || !draft.nextManualOptions.display)
-            }
-            if !model.capabilities.generalIdleAvailable || draft.nextManualOptions.display && !model.v3Settings.keepDisplayAwake {
-                Note(displayApplicationDetail(for: draft.nextManualOptions))
-                    .accessibilityIdentifier("manual-defaults-display-global-note")
-            }
+            }.padding(.leading, SettingsMetrics.hierarchyIndent)
         }
+    }
+
+    private var displayOptionDetail: String? {
+        guard !model.capabilities.generalIdleAvailable || draft.nextManualOptions.display && !model.v3Settings.keepDisplayAwake else { return nil }
+        return displayApplicationDetail(for: draft.nextManualOptions)
+    }
+
+    private var lidOptionDetail: String? {
+        guard draft.nextManualOptions.closedLid && (!model.v3Settings.allowClosedLid || !model.helperSetupConfirmed) else { return nil }
+        return lidApplicationDetail(for: draft.nextManualOptions)
     }
 
     private var applicationDetailsExpansion: Binding<Bool> { applicationDetails ?? $applicationDetailsExpanded }
@@ -144,14 +147,14 @@ struct ManualDefaultsOptionsView: View {
 
     private var manualOptionsSaveScope: String {
         if !embedded {
-            return L("Apply saves only these feature choices for the next manual start. Cancel leaves them unchanged. Current work, its end time and app-wide permissions stay unchanged.",
-                     "적용하면 이 기능 선택만 다음 시작의 기본값으로 저장합니다. 취소하면 저장하지 않습니다. 현재 작업·종료 시각과 앱 전체 허용은 바뀌지 않습니다.")
+            return L("Apply saves these choices for the next manual start; Cancel does not save. Current work, its deadline and app-wide permissions stay unchanged.",
+                     "적용하면 다음 수동 시작의 기본값으로 저장하며 취소하면 저장하지 않습니다. 현재 유지·기한과 앱 전체 허용은 바뀌지 않습니다.")
         }
         return model.showsLidOptions
-            ? L("Apply and Discard affect only the display, lid and inactivity choices above. Current work, its end time and app-wide permissions stay unchanged.",
-                "적용·변경 취소는 위의 화면·덮개·입력 없음 설정에만 적용됩니다. 현재 작업·종료 시각과 앱 전체 허용은 바뀌지 않습니다.")
-            : L("Apply and Discard affect only the display and inactivity choices above. Current work, its end time and app-wide permissions stay unchanged.",
-                "적용·변경 취소는 위의 화면·입력 없음 설정에만 적용됩니다. 현재 작업·종료 시각과 앱 전체 허용은 바뀌지 않습니다.")
+            ? L("Apply and Discard affect only these display, lid and inactivity defaults. Current work, its deadline and app-wide permissions stay unchanged.",
+                "적용·변경 취소는 화면·덮개·입력 대기 기본값에만 적용됩니다. 현재 유지·기한과 앱 전체 허용은 바뀌지 않습니다.")
+            : L("Apply and Discard affect only these display and inactivity defaults. Current work, its deadline and app-wide permissions stay unchanged.",
+                "적용·변경 취소는 화면·입력 대기 기본값에만 적용됩니다. 현재 유지·기한과 앱 전체 허용은 바뀌지 않습니다.")
     }
 
     private var hasChanges: Bool { draft.nextManualOptions != model.v4Settings.nextManualOptions }

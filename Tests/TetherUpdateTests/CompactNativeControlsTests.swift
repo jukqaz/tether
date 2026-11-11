@@ -194,35 +194,61 @@ final class CompactNativeControlsTests: XCTestCase {
                     "The value column must grow beyond its standard width when the selected text needs it")
                 XCTAssertEqual(wide.fittingSize.height, SettingsMetrics.rowHeight, accuracy: 0.5)
 
-                let narrowWidth = max(SettingsMetrics.controlWidth, nativeWidth) + 12
-                let narrow = Self.settingsRow(label: label, choice: choice, width: narrowWidth)
-                let narrowButton = try XCTUnwrap(Self.popup(in: narrow))
-                XCTAssertEqual(narrow.fittingSize.width, narrowWidth, accuracy: 0.5)
-                let labelHeight = ceil((label as NSString).size(withAttributes: [
-                    .font: NSFont.systemFont(ofSize: TetherTypography.settingsBodySize)]).height)
-                XCTAssertGreaterThan(narrow.fittingSize.height, wide.fittingSize.height,
-                    "A narrow settings row must stack instead of clipping its control")
-                XCTAssertGreaterThanOrEqual(narrow.fittingSize.height + 0.5,
-                    labelHeight + narrowButton.bounds.height + 5,
-                    "The stacked row must fit the complete label, control and vertical gap")
-                XCTAssertGreaterThanOrEqual(narrowButton.bounds.width + 0.5, nativeWidth)
-                let controlFrame = narrowButton.convert(narrowButton.bounds, to: narrow)
-                XCTAssertGreaterThanOrEqual(controlFrame.minX, -0.5)
-                XCTAssertLessThanOrEqual(controlFrame.maxX, narrowWidth + 0.5)
+                // A control must remain complete even after two dependency
+                // levels reduce its available column at the minimum window.
+                let narrowWidth = max(SettingsMetrics.controlWidth, nativeWidth) + 52
+                for inset: CGFloat in [0, 20, 40] {
+                    let narrow = Self.settingsRow(label: label, choice: choice, width: narrowWidth,
+                        leadingInset: inset)
+                    let narrowButton = try XCTUnwrap(Self.popup(in: narrow))
+                    XCTAssertEqual(narrow.fittingSize.width, narrowWidth, accuracy: 0.5)
+                    let labelHeight = ceil((label as NSString).size(withAttributes: [
+                        .font: NSFont.systemFont(ofSize: TetherTypography.settingsBodySize)]).height)
+                    XCTAssertGreaterThan(narrow.fittingSize.height, wide.fittingSize.height,
+                        "A narrow settings row must stack instead of clipping its control (inset \(inset))")
+                    XCTAssertGreaterThanOrEqual(narrow.fittingSize.height + 0.5,
+                        labelHeight + narrowButton.bounds.height + 5,
+                        "The stacked row must fit the complete label, control and vertical gap")
+                    XCTAssertGreaterThanOrEqual(narrowButton.bounds.width + 0.5, nativeWidth)
+                    let controlFrame = narrowButton.convert(narrowButton.bounds, to: narrow)
+                    XCTAssertGreaterThanOrEqual(controlFrame.minX, inset - 0.5)
+                    XCTAssertLessThanOrEqual(controlFrame.maxX, narrowWidth + 0.5)
+                }
             }
         }
     }
 
     @MainActor
-    private static func settingsRow(label: String, choice: String, width: CGFloat) -> NSHostingView<AnyView> {
+    private static func settingsRow(label: String, choice: String, width: CGFloat, leadingInset: CGFloat = 0) -> NSHostingView<AnyView> {
         let host = NSHostingView(rootView: AnyView(SettingRow(title: label) {
             CompactPopUp(title: "Sleep policy", selection: .constant(0), choices: [PopupChoice(0, choice)])
         }
         .environment(\.tetherSettingsStyle, true)
+        .padding(.leading, leadingInset)
         .frame(width: width)))
         host.frame = NSRect(origin: .zero, size: host.fittingSize)
         host.layoutSubtreeIfNeeded()
         return host
+    }
+
+    func testSettingsValueColumnStaysInTheCenteredReadingColumnWhenTheWindowWidens() async throws {
+        try await MainActor.run {
+            for width: CGFloat in [512, 1000, 1240] {
+                let host = NSHostingView(rootView: AnyView(SettingsForm {
+                    SettingRow(title: "Choice") {
+                        CompactPopUp(title: "Choice", selection: .constant(0), choices: [PopupChoice(0, "Selected")])
+                    }
+                }.environment(\.tetherSettingsStyle, true).frame(width: width, height: 320)))
+                host.frame = NSRect(x: 0, y: 0, width: width, height: 320)
+                Self.settle(host)
+                let button = try XCTUnwrap(Self.popup(in: host))
+                let frame = button.convert(button.bounds, to: host)
+                let readingWidth = min(SettingsMetrics.contentWidth, width - SettingsMetrics.gutter * 2)
+                XCTAssertEqual(frame.maxX, (width + readingWidth) / 2, accuracy: 1,
+                    "The value column must stay with the centered page heading, not the viewport's left edge")
+                XCTAssertGreaterThanOrEqual(frame.minX, SettingsMetrics.gutter)
+            }
+        }
     }
 
     @MainActor

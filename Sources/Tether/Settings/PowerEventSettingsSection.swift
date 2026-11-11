@@ -13,7 +13,7 @@ struct PowerEventSettingsSection<Content: View, Status: View>: View {
         VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
             DisclosureGroup(isExpanded: $isExpanded) {
                 VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) { content }
-                    .padding(.leading, 12).padding(.top, 8)
+                    .padding(.leading, SettingsMetrics.disclosureContentInset).padding(.top, 8)
             } label: {
                 Group {
                     if isExpanded {
@@ -30,9 +30,11 @@ struct PowerEventSettingsSection<Content: View, Status: View>: View {
                     }
                 }
                 .frame(maxWidth: .infinity, minHeight: SettingsMetrics.rowHeight, alignment: .leading)
+                .padding(.leading, SettingsMetrics.disclosureLabelInset)
             }
             .accessibilityElement(children: .contain)
             status
+                .padding(.leading, SettingsMetrics.hierarchyIndent)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

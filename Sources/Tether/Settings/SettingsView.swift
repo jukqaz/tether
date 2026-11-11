@@ -52,9 +52,15 @@ struct SettingsNavigation: View {
                         .fixedSize(horizontal: false, vertical: true)
                 } icon: {
                     Image(systemName: page.symbol)
-                        .font(.system(size: 16))
-                        .foregroundStyle(.secondary)
+                        .symbolRenderingMode(.monochrome)
+                        .font(.system(size: 14, weight: .regular))
+                        .foregroundStyle(.primary)
+                        .frame(width: 18, height: 18)
+                        .accessibilityHidden(true)
                 }
+                .labelStyle(.titleAndIcon)
+                .listItemTint(.monochrome)
+                .frame(minHeight: 24, alignment: .leading)
                 .tag(page)
                 .accessibilityLabel(page.title)
                 .accessibilityIdentifier("settings-tab-\(page.rawValue)")
@@ -63,7 +69,8 @@ struct SettingsNavigation: View {
             .scrollContentBackground(.hidden)
             .environment(\.defaultMinListRowHeight, 32)
             .toolbar(removing: .sidebarToggle)
-            .navigationSplitViewColumnWidth(min: 168, ideal: 168, max: 192)
+            .navigationSplitViewColumnWidth(min: SettingsMetrics.sidebarWidth,
+                ideal: SettingsMetrics.sidebarWidth, max: 184)
             .background(Color(nsColor: .windowBackgroundColor))
             .accessibilityIdentifier("settings-sidebar")
         } detail: {

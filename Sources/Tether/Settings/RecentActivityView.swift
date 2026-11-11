@@ -41,12 +41,13 @@ struct RecentActivityView: View {
     }
 
     var body: some View {
-        DisclosureGroup(L("Recent activity", "최근 동작"), isExpanded: $expanded) {
-            VStack(alignment: .leading, spacing: 12) {
+        SettingsDisclosure(title: L("Recent activity", "최근 동작"),
+            isExpanded: $expanded, groupsSection: false) {
+            VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
                 HStack {
                     Note(model.usesUserSession
-                         ? L("Latest 20 retained work events.", "보관된 최근 작업 동작 20개를 표시합니다.")
-                         : L("Latest 20 events from retained logs.", "보관된 로그에서 최근 동작 20개를 표시합니다."))
+                         ? L("Latest 20 retained work events", "보관된 최근 작업 동작 20개")
+                         : L("Latest 20 retained log events", "보관된 로그의 최근 동작 20개"))
                     Spacer(minLength: 8)
                     Button(L("Refresh", "새로고침")) { Task { await refresh() } }.disabled(busy)
                 }
@@ -55,7 +56,7 @@ struct RecentActivityView: View {
                 }
                 if model.developmentService { PreviewNotice() }
                 if busy { ProgressView().controlSize(.small) }
-                else if rows.isEmpty { Note(L("No readable events yet. Open Logs & reports for available evidence.", "아직 읽을 수 있는 동작 기록이 없습니다. 로그와 보고서에서 확인 가능한 근거를 살펴볼 수 있습니다.")) }
+                else if rows.isEmpty { Note(L("No readable events yet. Check Logs and reports for available evidence.", "읽을 수 있는 동작 기록이 없습니다. 로그와 보고서에서 확인할 수 있습니다.")) }
                 else {
                     VStack(alignment: .leading, spacing: 12) {
                         ForEach(rows) { event in
@@ -63,13 +64,18 @@ struct RecentActivityView: View {
                                 Image(systemName: event.symbol).frame(width: 18).foregroundStyle(Color.tetherSecondary)
                                     .accessibilityHidden(true)
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text(event.title).font(.callout).fixedSize(horizontal: false, vertical: true)
+                                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                                        Text(event.title).font(TetherTypography.settingsBody)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                        Spacer(minLength: 0)
+                                        Text(event.date, format: .dateTime.month().day().hour().minute().second())
+                                            .font(TetherTypography.settingsSecondary).foregroundStyle(Color.tetherSecondary)
+                                            .monospacedDigit().fixedSize()
+                                    }
                                     if let detail = event.detail {
-                                        Text(detail).font(.subheadline).foregroundStyle(.secondary)
+                                        Text(detail).font(TetherTypography.settingsSecondary).foregroundStyle(Color.tetherSecondary)
                                             .fixedSize(horizontal: false, vertical: true)
                                     }
-                                    Text(event.date, format: .dateTime.month().day().hour().minute().second())
-                                        .font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary).monospacedDigit()
                                 }.accessibilityElement(children: .combine)
                             }.frame(maxWidth: .infinity, alignment: .leading)
                                 .accessibilityElement(children: .contain)
@@ -79,8 +85,8 @@ struct RecentActivityView: View {
                     .accessibilityElement(children: .contain)
                     .accessibilityIdentifier("recent-activity-list")
                 }
-                Note(L("A sleep request or transition notification does not prove completed physical sleep. Log rotation can leave gaps.", "잠자기 요청·전환 알림만으로 실제 절전 완료를 단정하지 않습니다. 로그 보관 범위에 따라 일부 기록이 없을 수 있습니다."))
-            }.padding(.top, 12)
+                Note(L("Sleep requests and transition notices do not prove physical sleep. Log rotation can leave gaps.", "잠자기 요청·전환 알림은 실제 절전 완료의 증거가 아닙니다. 로그 순환 보관으로 일부 기록이 없을 수 있습니다."))
+            }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("recent-activity-disclosure")

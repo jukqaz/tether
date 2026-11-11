@@ -3,7 +3,7 @@ import SwiftUI
 import TetherCore
 
 private enum WelcomeMetrics {
-    static let size = CGSize(width: 520, height: 380)
+    static let size = CGSize(width: 520, height: 340)
 }
 
 /// General work needs no helper. Selected notebook lid support requires preparation.
@@ -83,11 +83,11 @@ struct WelcomeView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(setupAlreadyCompleted
                                 ? L("Check setup", "준비 상태 확인")
-                                : L("Choose your starting options", "기본 동작 선택"))
+                                : L("Starting options", "기본 동작"))
                                 .font(TetherTypography.page)
                             Note(setupAlreadyCompleted
                                 ? L("Review your saved choices.", "저장된 선택을 확인하세요.")
-                                : L("You can change these choices later in Settings.", "선택은 나중에 설정에서 바꿀 수 있습니다."))
+                                : L("You can change these later in Settings.", "나중에 설정에서 바꿀 수 있습니다."))
                         }
                         Spacer(minLength: 0)
                         if model.userCommandsArePreview { PreviewIndicator() }
@@ -96,27 +96,30 @@ struct WelcomeView: View {
                         VStack(alignment: .leading, spacing: 14) {
                             SettingsToggle(title: model.v4Settings.automaticMode == .advanced
                                 ? L("Allow automatic start", "자동 시작 허용")
-                                : L("Start automatically on power", "전원을 연결하면 자동 유지"),
+                                : L("Allow automatic keep-awake on power", "전원 연결 시 자동 유지 허용"),
                                 detail: automaticResult, isOn: $automaticDraft,
                                 detailIdentifier: "welcome-automatic-result")
                                 .disabled(!choicesAvailable)
                                 .accessibilityIdentifier("welcome-automatic-toggle")
                             if showsClosedLidChoice {
-                                SettingsToggle(title: L("Allow closed-lid use", "덮개 닫고 사용 허용"),
-                                    detail: closedLidResult, isOn: $closedLidDraft,
-                                    detailIdentifier: "welcome-closed-lid-result")
-                                    .disabled(!closedLidChoiceAvailable)
-                                    .accessibilityIdentifier("welcome-closed-lid-toggle")
-                            }
-                            if closedLidDraft && model.capabilities.lidControlAvailable {
-                                helperPreparation.padding(.leading, SettingsMetrics.checkboxTextInset)
+                                VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
+                                    SettingsToggle(title: L("Allow closed-lid use", "덮개 닫고 사용 허용"),
+                                        detail: closedLidResult, isOn: $closedLidDraft,
+                                        detailIdentifier: "welcome-closed-lid-result")
+                                        .disabled(!closedLidChoiceAvailable)
+                                        .accessibilityIdentifier("welcome-closed-lid-toggle")
+                                    if closedLidDraft && model.capabilities.lidControlAvailable {
+                                        helperPreparation.padding(.leading, SettingsMetrics.hierarchyIndent)
+                                    }
+                                }
                             }
                         }
                         .accessibilityElement(children: .contain)
                         .accessibilityIdentifier("welcome-choice-result")
-                        Text(L("Start or end manual keep-awake from the menu bar.", "메뉴바에서 수동 유지를 시작·종료할 수 있습니다."))
+                        Text(L("Start or end manual keep-awake in the menu bar.", "수동 유지는 메뉴바에서 시작·종료합니다."))
                             .font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
                             .fixedSize(horizontal: false, vertical: true)
+                            .padding(.leading, SettingsMetrics.checkboxTextInset)
                     } else {
                         PolicyNote(L("Tether requires Apple Silicon and macOS 26 or later.", "Tether는 Apple Silicon과 macOS 26 이상이 필요합니다."))
                     }
@@ -170,11 +173,11 @@ struct WelcomeView: View {
             return L("Your automatic settings stay as saved.", "저장한 자동 설정을 유지합니다.")
         }
         guard automaticDraft else {
-            return L("Keep-awake won’t start automatically.", "자동으로 유지를 시작하지 않습니다.")
+            return L("Start keep-awake manually in the menu bar.", "메뉴바에서 직접 시작할 때만 유지합니다.")
         }
         return model.v4Settings.automaticMode == .advanced
             ? L("Starts when the saved conditions and protection checks allow.", "저장한 조건과 보호 기준을 충족하면 시작합니다.")
-            : L("Starts on power when this Mac is awake and protection allows.", "깨어 있는 Mac에서 전원이 연결되고 보호 중이 아니면 시작합니다.")
+            : L("Starts on power while this Mac is awake and protection allows.", "깨어 있고 보호 조건이 맞으면 전원 연결 시 시작합니다.")
     }
 
     private var closedLidResult: String {
@@ -188,7 +191,7 @@ struct WelcomeView: View {
         guard model.helperSetupConfirmed else {
             return L("Prepare the helper before saving this choice.", "이 선택을 저장하려면 먼저 도우미를 준비하세요.")
         }
-        return L("Allows closed-lid use during eligible keep-awake sessions.", "조건을 충족하는 유지에서 덮개를 닫고 사용할 수 있습니다.")
+        return L("Applies only during eligible keep-awake sessions.", "조건을 충족하는 유지 중에만 적용됩니다.")
     }
     private var helperPreparation: some View {
         VStack(alignment: .leading, spacing: 6) {

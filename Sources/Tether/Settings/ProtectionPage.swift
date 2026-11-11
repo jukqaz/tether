@@ -36,11 +36,11 @@ struct ProtectionPage: View {
                         ? L("Automatic after recovery", "안전 회복 후 자동 조건 적용")
                         : L("Resume manually", "직접 중지 해제"), isExpanded: workRulesExpansion, groupsSection: false) {
                     SettingsToggle(title: L("Recheck automatic conditions after recovery", "회복 후 자동 조건 다시 적용"),
+                        detail: L("When enabled, recheck automatic conditions after 60 safe seconds. Ended manual work does not restart; Stop all stays in effect.",
+                                  "켜면 안전한 상태가 60초 이어진 뒤 자동 조건을 다시 확인합니다. 종료된 수동 유지는 재시작하지 않으며 모두 중지는 유지합니다."),
                         isOn: Binding(get: { model.v3Settings.automaticallyResumeAfterProtection },
                             set: { model.setAutomaticallyResumeAfterProtection($0) }), identifier: "settings-protection-auto-resume")
                         .disabled(!model.acceptingUserCommands || model.commandPending)
-                    Note(L("When enabled, recheck automatic conditions after 60 safe seconds. Ended manual keep-awake never restarts; Stop all stays in effect.",
-                           "켜면 안전한 상태가 60초 이어진 뒤 자동 조건을 다시 확인합니다. 종료한 수동 유지는 다시 시작하지 않으며 모두 중지는 유지합니다."))
                 }.accessibilityIdentifier("settings-work-rules-details")
                 ProtectionBasisView(model: model, expansion: disclosures?.protectionBasis)
             }.accessibilityIdentifier("settings-protection-rules-details")

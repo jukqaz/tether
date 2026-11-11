@@ -2,12 +2,20 @@ import SwiftUI
 import TetherCore
 
 enum WorkSessionMetrics {
-    static let panelWidth: CGFloat = 380
+    static let panelWidth: CGFloat = 360
     static let panelMaximumHeight: CGFloat = 680
-    static let panelInset: CGFloat = 20
+    static let panelInset: CGFloat = 16
     static let modulePadding: CGFloat = 16
     static let iconWidth: CGFloat = 16
     static let iconSpacing: CGFloat = 8
+    /// One outline level, shared by menu details and settings dependencies.
+    static let hierarchyIndent: CGFloat = 20
+    /// Native disclosure titles start 12pt after their marker; checkbox titles
+    /// start 20pt after theirs. Preserve both native controls on one text axis.
+    static let disclosureLabelInset: CGFloat = 8
+    /// The title's text axis is already one level after the native marker.
+    /// Expanded children begin one further level inside that title.
+    static let disclosureContentInset = hierarchyIndent * 2
     static let settingsMinimum = CGSize(width: 720, height: 560)
     static let settingsDefault = CGSize(width: 720, height: 560)
     static let pageInset: CGFloat = 24

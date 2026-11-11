@@ -39,7 +39,7 @@ struct SafetyPage: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
+            Group {
                 if model.hasInternalBattery {
                     PowerEventSettingsSection(title: L("When power disconnects", "전원을 분리하면"),
                         outcome: disconnectEventSummary, outcomeIdentifier: "settings-unplug-policy-summary",
@@ -78,7 +78,9 @@ struct SafetyPage: View {
                             isOn: GeneralPage(model: model).lidBinding, identifier: "closed-lid-allow-toggle",
                             detailIdentifier: "settings-lid-current-status")
                             .disabled(GeneralPage(model: model).lidControlDisabled)
-                        if model.v3Settings.allowClosedLid { closedLidDisplayControls }
+                        if model.v3Settings.allowClosedLid {
+                            closedLidDisplayControls.padding(.leading, SettingsMetrics.hierarchyIndent)
+                        }
                     } status: { closedLidStatus }
                     .accessibilityElement(children: .contain)
                     .accessibilityIdentifier("settings-closed-lid-display-details")
@@ -92,26 +94,28 @@ struct SafetyPage: View {
                     .accessibilityElement(children: .contain)
                     .accessibilityIdentifier("settings-closed-lid-recovery")
                 }
-                displayPermission
-                SettingsDisclosure(title: L("Display sleep & behavior", "화면 꺼짐과 동작 안내"),
-                    isExpanded: scopeDetailsExpansion, groupsSection: false,
-                    identifier: "settings-power-scope-details") {
-                    lockPolicyNote
-                    lockScreenSettingsButton
-                    Note(WorkPermissionText.scopeDetail)
-                        .accessibilityIdentifier("settings-global-permission-scope")
-                    if model.showsLidOptions {
-                        Note(closedLidDisplayExplanation)
-                        if let reason = model.closedLidDisplayAvailabilityReason {
-                            Note(reason).accessibilityIdentifier("settings-closed-lid-display-availability")
+                SettingsContentGroup(L("Display", "화면")) {
+                    displayPermission
+                    SettingsDisclosure(title: L("Display sleep & behavior", "화면 꺼짐과 동작 안내"),
+                        isExpanded: scopeDetailsExpansion, groupsSection: false,
+                        identifier: "settings-power-scope-details") {
+                        lockPolicyNote
+                        lockScreenSettingsButton
+                        Note(WorkPermissionText.scopeDetail)
+                            .accessibilityIdentifier("settings-global-permission-scope")
+                        if model.showsLidOptions {
+                            Note(closedLidDisplayExplanation)
+                            if let reason = model.closedLidDisplayAvailabilityReason {
+                                Note(reason).accessibilityIdentifier("settings-closed-lid-display-availability")
+                            }
                         }
-                    }
-                    if model.hasInternalBattery, model.showsLidOptions, model.v3Settings.allowClosedLid {
-                        Note(disconnectExplanation)
-                    }
-                    Note(L("Connecting power may not wake a sleeping Mac. Unavailable conditions never authorize a start. Pausing automatic starts does not change a manual deadline.",
-                           "전원을 연결해도 잠든 Mac이 깨어나지 않을 수 있습니다. 확인되지 않은 조건으로는 시작하지 않으며, 자동 시작을 쉬어도 수동 유지 기한은 바뀌지 않습니다."))
-                }.accessibilityIdentifier("settings-power-scope-details")
+                        if model.hasInternalBattery, model.showsLidOptions, model.v3Settings.allowClosedLid {
+                            Note(disconnectExplanation)
+                        }
+                        Note(L("Connecting power may not wake a sleeping Mac. Unavailable conditions never authorize a start. Pausing automatic starts does not change a manual deadline.",
+                               "전원을 연결해도 잠든 Mac이 깨어나지 않을 수 있습니다. 확인되지 않은 조건으로는 시작하지 않으며, 자동 시작을 쉬어도 수동 유지 기한은 바뀌지 않습니다."))
+                    }.accessibilityIdentifier("settings-power-scope-details")
+                }
             }
             if model.showsLidOptions { ClosedLidHelperSettingsContent(model: model, disclosures: disclosures, summaryOnly: true) }
         }
@@ -142,9 +146,12 @@ struct SafetyPage: View {
                 isOn: Binding(get: { model.v3Settings.keepDisplayAwake }, set: { model.setKeepDisplayAwake($0) }),
                 identifier: "keep-display-awake-toggle", detailIdentifier: "settings-display-current-status")
                 .disabled(settingsControlsDisabled)
-            if let error = model.userSessionStatus?.displayError { Note(error, color: .tetherWarning) }
+            if let error = model.userSessionStatus?.displayError {
+                Note(error, color: .tetherWarning).padding(.leading, SettingsMetrics.checkboxTextInset)
+            }
             if model.userSessionStatus?.ownReleasePending == true || model.userSessionStatus?.displayError != nil {
                 refreshPowerStatusButton(identifier: "settings-refresh-display-status")
+                    .padding(.leading, SettingsMetrics.checkboxTextInset)
             }
         }
     }

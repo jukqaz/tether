@@ -16,8 +16,7 @@ struct GeneralPage: View {
             if model.hasInternalBattery {
                 SettingsDisclosure(title: L("Power & Time Limits", "전원·시간 한도"),
                     summary: manualLimitsSummary, isExpanded: manualBatteryExpansion) {
-                    Note(L("Saves immediately. Applies to future work.",
-                           "즉시 저장되고 이후 유지부터 적용됩니다."))
+                    Note(L("Saves immediately · applies to future work", "즉시 저장 · 이후 유지부터 적용"))
                         .accessibilityIdentifier("settings-manual-limits-save-summary")
                     SettingRow(title: L("Manual power source", "수동 유지 전원")) {
                         CompactPopUp(title: L("Manual work power range", "수동 유지 전원 범위"),
@@ -27,18 +26,18 @@ struct GeneralPage: View {
                             .disabled(settingsControlsDisabled)
                     }
                     SettingRow(title: L("Battery time limit", "배터리 시간 한도"),
-                        detail: L("New manual work and the next advanced automatic run",
-                                  "새 수동 유지와 고급 자동의 다음 조건 구간에 적용")) {
+                        detail: L("For new manual work and the next advanced automatic run",
+                                  "새 수동 유지·고급 자동의 다음 조건 구간에 적용")) {
                         CompactPopUp(title: L("Battery time limit", "배터리 시간 한도"),
                             selection: Binding(get: { model.v3Settings.batteryTimeLimit }, set: { model.setBatteryTimeLimit($0) }),
                             choices: WorkSessionBatteryLimit.allCases.map { PopupChoice($0, model.batteryLimitTitle($0)) },
                             identifier: "settings-battery-manual-limit")
                             .disabled(settingsControlsDisabled)
                     }
-                    SettingsDisclosure(title: L("Saving & Battery Time", "저장 범위와 배터리 시간"),
+                    SettingsDisclosure(title: L("Saving & Battery Time", "저장·배터리 시간 안내"),
                         isExpanded: manualLimitsDetailsExpansion, groupsSection: false) {
-                        Note(L("Apply and Discard above only affect manual defaults. Reconnecting power does not refill the current work's battery time.",
-                               "위의 적용·변경 취소는 수동 기본값에만 적용됩니다. 전원을 다시 연결해도 현재 유지의 배터리 시간은 늘지 않습니다."))
+                        Note(L("Saved separately from Apply and Discard above. Reconnecting power does not refill the current work's battery time.",
+                               "위의 적용·변경 취소와 별도로 저장합니다. 전원을 다시 연결해도 현재 유지의 배터리 시간은 늘지 않습니다."))
                             .accessibilityIdentifier("settings-manual-limits-save-scope")
                     }.accessibilityIdentifier("settings-manual-limits-application-details")
                 }.accessibilityIdentifier("settings-manual-battery-details")

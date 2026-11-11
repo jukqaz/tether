@@ -41,6 +41,10 @@ struct SystemPage: View {
                 if model.userCommandsArePreview || model.developmentService {
                     Button(L("Preview menu panel…", "메뉴 패널 보기…")) { showMenuPreview = true }
                         .popover(isPresented: $showMenuPreview) { TetherPanel(model: model) }
+                } else {
+                    Button(L("Review setup…", "준비 상태 확인…")) { WelcomeWindow.show(model: model) }
+                        .disabled(model.commandPending || model.helperInstallInFlight)
+                        .accessibilityIdentifier("settings-open-setup")
                 }
             }
 
@@ -62,17 +66,17 @@ struct SystemPage: View {
             SettingsDisclosure(title: L("Advanced Integrations", "고급 연동"), isExpanded: advancedExpansion,
                 identifier: "settings-app-advanced-details") {
                 SettingRow(title: L("Command-line control", "명령으로 제어"),
-                    detail: L("Start, extend or end manual keep-awake with the supported CLI and URLs", "지원되는 CLI·URL로 수동 유지를 시작·연장·종료합니다")) {
+                    detail: L("Manual start, extension and end via CLI or URLs", "CLI·URL로 수동 시작·연장·종료")) {
                     Button(L("Usage…", "사용 방법…")) { showCommandLineGuide = true }
                         .buttonStyle(.link).accessibilityIdentifier("settings-open-command-guide")
                 }
                 SettingRow(title: L("Work event actions", "작업 이벤트 연동"),
-                    detail: L("Send configured HTTPS webhooks on confirmed work events", "확인된 작업 이벤트에 설정한 HTTPS Webhook을 보냅니다")) {
+                    detail: L("Configured HTTPS webhooks for confirmed events", "확인된 이벤트를 설정한 HTTPS Webhook으로 전송")) {
                     Button(L("Configure…", "설정…")) { showEventActions = true }
                         .buttonStyle(.link).accessibilityIdentifier("settings-open-event-actions")
                 }
                 SettingRow(title: L("Import and export settings", "설정 가져오기·내보내기"),
-                    detail: L("Imports are saved as inactive copies after review", "검토 후 자동 실행하지 않는 사본으로 저장")) {
+                    detail: L("Reviewed imports become inactive copies", "검토 후 자동 실행 없이 사본으로 저장")) {
                     Button(L("Import / export…", "가져오기·내보내기…")) { showSettingsTransfer = true }
                         .buttonStyle(.link).accessibilityLabel(L("Import and export settings", "설정 가져오기·내보내기"))
                         .accessibilityIdentifier("settings-open-transfer")
@@ -81,8 +85,8 @@ struct SystemPage: View {
 
             SettingsDisclosure(title: L("About Tether", "앱 정보"),
                 summary: AppModel.appDisplayVersion, isExpanded: appDetailsExpansion) {
-                Note(L("Quitting ends Tether keep-awake and restores its power and display changes. Saved preferences are retained. Ended manual keep-awake will not restart.",
-                       "앱을 종료하면 Tether 유지를 끝내고 변경한 전원·화면 상태를 복원합니다. 저장한 환경설정은 유지하며, 종료된 수동 유지는 다시 시작하지 않습니다."))
+                Note(L("Quitting ends Tether keep-awake and restores its power and display changes. Preferences remain saved; ended manual work does not restart.",
+                       "앱 종료 시 Tether 유지를 끝내고 전원·화면 변경을 복원합니다. 설정은 남으며 종료된 수동 유지는 재시작하지 않습니다."))
                 Text("Tether · \(AppModel.appDisplayVersion) (\(AppModel.appBuild))")
                     .font(TetherTypography.secondary)
                     .foregroundStyle(Color.tetherSecondary)

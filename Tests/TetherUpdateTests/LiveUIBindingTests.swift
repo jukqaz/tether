@@ -1552,7 +1552,7 @@ final class LiveUIBindingTests: XCTestCase {
                         .environment(\.colorScheme, .dark)
                         .environment(\.tetherReduceTransparencyOverride, true)
                         .environment(\.tetherContrastOverride, .increased))
-                    XCTAssertEqual(panel.fittingSize.width, 380, accuracy: 0.5)
+                    XCTAssertEqual(panel.fittingSize.width, 360, accuracy: 0.5)
                     XCTAssertGreaterThan(panel.fittingSize.height, 140,
                         "Status, controls and persistent actions need a readable surface")
                     XCTAssertLessThanOrEqual(panel.fittingSize.height, WorkSessionMetrics.panelMaximumHeight)
@@ -1612,7 +1612,7 @@ final class LiveUIBindingTests: XCTestCase {
                             let panel = NSHostingView(rootView: TetherPanel(model: model, maximumHeight: viewport)
                                 .environment(\.colorScheme, .dark)
                                 .environment(\.tetherReduceTransparencyOverride, true))
-                            XCTAssertEqual(panel.fittingSize.width, 380, accuracy: 0.5)
+                            XCTAssertEqual(panel.fittingSize.width, 360, accuracy: 0.5)
                             XCTAssertLessThanOrEqual(panel.fittingSize.height, viewport,
                                 "Overflow: language=\(language), portable=\(portable), state=\(state)")
                             try assertSnapshot(panel, size: panel.fittingSize)

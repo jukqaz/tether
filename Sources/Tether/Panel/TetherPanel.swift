@@ -154,17 +154,18 @@ struct TetherPanel: View {
             if actionVisibility.showsStartBlockedReason {
                 Note(model.manualStartBlockedDetail)
             }
+            if actionVisibility.showsAutomaticRest {
+                AutomaticPauseControls(model: model, compact: true)
+            }
             if actionVisibility.showsQuickOptions || model.workPaused || model.workProtectionReason != nil {
+                Divider()
                 MenuKeepAwakeControls(model: model, canEdit: actionVisibility.showsQuickOptions,
                     openHelperSetup: { showSettings(page: .safety) }, stopSummaryIsInHeader: true)
             }
-            if actionVisibility.showsAutomaticRest || model.capabilities.internalBattery == true
+            if model.capabilities.internalBattery == true
                 || actionVisibility.showsWorkDetails || actionVisibility.showsAutomaticToggle {
                 VStack(alignment: .leading, spacing: 4) {
                     Divider().padding(.bottom, 4)
-                    if actionVisibility.showsAutomaticRest {
-                        AutomaticPauseControls(model: model, compact: true)
-                    }
                     if model.capabilities.internalBattery == true {
                         PowerBatteryDetails(monitor: powerBattery, isExpanded: $powerDetailsExpanded)
                             .padding(.vertical, 4)
@@ -222,9 +223,11 @@ struct TetherPanel: View {
             Text(L("The previous brightness has not been restored. Retry without starting a keep-awake session.",
                    "이전 밝기를 아직 되돌리지 못했습니다. 유지를 시작하지 않고 복구만 다시 시도합니다."))
                 .foregroundStyle(Color.tetherSecondary)
+                .padding(.leading, WorkSessionMetrics.hierarchyIndent)
             Button(L("Retry brightness restoration", "밝기 복구 다시 시도"), action: retryDisplayRecovery)
                 .buttonStyle(.link)
                 .disabled(!canRetryDisplayRecovery)
+                .padding(.leading, WorkSessionMetrics.hierarchyIndent)
                 .accessibilityIdentifier("panel-retry-brightness-restoration")
         }
         .font(TetherTypography.body)
@@ -369,21 +372,18 @@ struct TetherPanel: View {
 
     private var workDetails: some View {
         DisclosureGroup(isExpanded: $workDetailsExpanded) {
-            VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 2) {
                 if actionVisibility.showsAutomaticToggle {
-                    automaticControls.padding(.vertical, 8)
-                    Divider()
+                    automaticControls.padding(.vertical, 5)
                 }
                 workRow(title: L("Automatic power", "자동 시작 전원"),
                         detail: model.v3Settings.effectiveAutomaticCondition.title, badge: "")
                 if model.hasInternalBattery {
-                    Divider()
                     workRow(title: L("When unplugged", "전원 분리 시"),
                             detail: disconnectPolicySummary, badge: "")
                         .accessibilityIdentifier("panel-unplug-policy-summary")
                 }
                 if model.manualSessionActive && !model.automaticWorkReasonActive && !model.automaticPauseActive {
-                    Divider()
                     Text(model.manualEndingDetail).font(TetherTypography.secondary)
                         .foregroundStyle(Color.tetherSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -391,11 +391,11 @@ struct TetherPanel: View {
                         .padding(.vertical, 5)
                 }
                 if model.showsLidOptions {
-                    Divider()
                     workRow(title: closedLidPolicySummary, detail: closedLidDisconnectDetail, badge: "")
                 }
             }
-            .padding(.top, 5)
+            .padding(.leading, WorkSessionMetrics.disclosureContentInset)
+            .padding(.top, 8)
         } label: {
             HStack(spacing: 8) {
                 Text(L("Work details", "유지 상세"))
@@ -403,6 +403,7 @@ struct TetherPanel: View {
                     .help(model.disconnectPolicyDetail)
                     .accessibilityIdentifier("panel-closed-lid-policy")
             }
+            .padding(.leading, WorkSessionMetrics.disclosureLabelInset)
             .font(TetherTypography.body).foregroundStyle(Color.tetherPrimary)
         }
         .accessibilityElement(children: .contain)
@@ -410,14 +411,28 @@ struct TetherPanel: View {
     }
 
     private func workRow(title: String, detail: String, badge: String) -> some View {
-        HStack(alignment: .center, spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(TetherTypography.body).foregroundStyle(Color.tetherPrimary)
-                Text(detail).font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
+        let name = Text(title).font(TetherTypography.body).foregroundStyle(Color.tetherPrimary)
+        let value = Text(detail).font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
+        return ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                name.fixedSize()
+                Spacer(minLength: 0)
+                value.fixedSize()
+                if !badge.isEmpty {
+                    Text(badge).font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
+                        .fixedSize()
+                }
             }
-            .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 4)
-            if !badge.isEmpty { Text(badge).font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary) }
+            VStack(alignment: .leading, spacing: 4) {
+                name.fixedSize(horizontal: false, vertical: true)
+                value.fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, WorkSessionMetrics.hierarchyIndent)
+                if !badge.isEmpty {
+                    Text(badge).font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.leading, WorkSessionMetrics.hierarchyIndent)
+                }
+            }
         }
         .padding(.vertical, 5)
         .accessibilityElement(children: .combine)
@@ -448,9 +463,14 @@ struct TetherPanel: View {
             if collapsesDetail {
                 Text(title).foregroundStyle(color)
                     .fixedSize(horizontal: false, vertical: true)
-                DisclosureGroup(L("Details", "상세 정보"), isExpanded: $problemDetailsExpanded) {
+                DisclosureGroup(isExpanded: $problemDetailsExpanded) {
                     Text(detail).font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
                         .fixedSize(horizontal: false, vertical: true)
+                        .padding(.leading, WorkSessionMetrics.disclosureContentInset)
+                        .padding(.top, 4)
+                } label: {
+                    Text(L("Details", "상세 정보"))
+                        .padding(.leading, WorkSessionMetrics.disclosureLabelInset)
                 }
                 .font(TetherTypography.secondary)
                 .accessibilityElement(children: .contain)
@@ -460,9 +480,11 @@ struct TetherPanel: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Text(detail).font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
                     .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, WorkSessionMetrics.hierarchyIndent)
             }
             Button(actionTitle) { showSettings(page: destination) }
                 .buttonStyle(.link)
+                .padding(.leading, WorkSessionMetrics.hierarchyIndent)
                 .accessibilityIdentifier("panel-review-settings")
         }
     }

@@ -39,9 +39,14 @@ struct ManualSessionControls: View {
                 }
 
                 if showsTimedExtension, let reason = model.manualExtensionUnavailableReason(by: 30) {
-                    DisclosureGroup(L("Extension unavailable", "지금은 연장할 수 없음"), isExpanded: $extensionReasonExpanded) {
+                    DisclosureGroup(isExpanded: $extensionReasonExpanded) {
                         Text(reason).fixedSize(horizontal: false, vertical: true)
-                            .lineSpacing(2).padding(.top, 4)
+                            .lineSpacing(2)
+                            .padding(.leading, WorkSessionMetrics.hierarchyIndent)
+                            .padding(.top, 4)
+                    } label: {
+                        Text(L("Extension unavailable", "지금은 연장할 수 없음"))
+                            .padding(.leading, WorkSessionMetrics.disclosureLabelInset)
                     }
                     .font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
                     .help(reason)
@@ -54,13 +59,15 @@ struct ManualSessionControls: View {
                         .foregroundStyle(Color.tetherSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .lineSpacing(2)
+                        .padding(.leading, compact ? WorkSessionMetrics.hierarchyIndent : 0)
                         .help(model.manualEndingDetail)
                 }
             } else if !model.manualSessionActive, presentation != .current {
                 VStack(alignment: .leading, spacing: compact ? 6 : 10) {
                     ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 12) {
-                            ManualDurationPicker(model: model).frame(minWidth: 128)
+                        HStack(alignment: .firstTextBaseline, spacing: 12) {
+                            ManualDurationPicker(model: model)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             startButton.fixedSize(horizontal: true, vertical: false)
                         }
                         VStack(alignment: .leading, spacing: 10) {
@@ -73,6 +80,7 @@ struct ManualSessionControls: View {
                             .font(TetherTypography.secondary)
                             .buttonStyle(.link).disabled(!model.canStartManualSession)
                             .fixedSize(horizontal: false, vertical: true)
+                            .padding(.leading, compact ? WorkSessionMetrics.hierarchyIndent : 0)
                             .accessibilityIdentifier("panel-other-manual-time")
                     }
                 }

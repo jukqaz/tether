@@ -33,7 +33,7 @@ COMPOSITE_TYPES = {"segmentedcontrol", "combobox", "popupbutton"}
 PROMINENT_TARGETS = {"panel-start-manual", "panel-pause-all"}
 APP_CONTROL_PREFIXES = ("panel-", "custom-duration-", "settings-", "ui-fixture-")
 TOLERANCE = 0.5
-MENU_WIDTH_POINTS = 380
+MENU_WIDTH_POINTS = 360
 MENU_WIDTH_TOLERANCE_POINTS = 1
 
 

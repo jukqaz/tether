@@ -4,6 +4,8 @@ import TetherCore
 struct NotificationSettingsView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var monitor: NotificationSettingsMonitor
+    @State private var warningDetailsExpanded = false
+    @State private var notificationDetailsExpanded = false
     private var canConfigure: Bool { !model.userCommandsArePreview && !model.developmentService && model.acceptingUserCommands }
 
     var body: some View {
@@ -15,27 +17,31 @@ struct NotificationSettingsView: View {
                 get: { model.notifyLinkedTaskEnd }, set: { model.setNotifyLinkedTaskEnd($0) }))
                 .disabled(!canConfigure)
             SettingsToggle(title: L("Expiry warning", "만료 전 예고"),
-                detail: L("Once per timed manual keep-awake", "시간을 정한 수동 유지마다 한 번"),
+                detail: L("Once per timed manual session", "시간제 수동 유지마다 한 번"),
                 isOn: Binding(get: { model.notifyExpiryWarning }, set: { model.setNotifyExpiryWarning($0) }))
                 .disabled(!canConfigure)
-            SettingRow(title: L("Warn before expiry", "얼마 전에 알릴까요")) {
-                Picker(L("Warning time", "예고 시점"), selection: Binding(get: { model.v4Settings.expiryNoticeMinutes },
-                    set: { model.setExpiryNoticeMinutes($0) })) {
-                    ForEach(V4Settings.expiryNoticeMinuteChoices, id: \.self) { minutes in
-                        Text(L("\(minutes) min", "\(minutes)분")).tag(minutes)
-                    }
-                }.labelsHidden().pickerStyle(.menu)
+            VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
+                SettingRow(title: L("Warn before expiry", "만료 전 알림 시점")) {
+                    Picker(L("Warning time", "예고 시점"), selection: Binding(get: { model.v4Settings.expiryNoticeMinutes },
+                        set: { model.setExpiryNoticeMinutes($0) })) {
+                        ForEach(V4Settings.expiryNoticeMinuteChoices, id: \.self) { minutes in
+                            Text(L("\(minutes) min", "\(minutes)분")).tag(minutes)
+                        }
+                    }.labelsHidden().pickerStyle(.menu)
+                        // Rebuild the native menu so its selected title follows an in-place language change.
+                        .id(model.language)
+                        .disabled(!canConfigure || !model.notifyExpiryWarning)
+                        .accessibilityIdentifier("settings-expiry-warning-minutes")
+                }
+                SettingsToggle(title: L("Expiry warning sound", "만료 예고 소리"), isOn: Binding(
+                    get: { model.v4Settings.notificationSound }, set: { model.setNotificationSound($0) }))
                     .disabled(!canConfigure || !model.notifyExpiryWarning)
-                    .accessibilityIdentifier("settings-expiry-warning-minutes")
-            }
-            SettingsToggle(title: L("Expiry warning sound", "만료 예고 소리"), isOn: Binding(
-                get: { model.v4Settings.notificationSound }, set: { model.setNotificationSound($0) }))
-                .disabled(!canConfigure || !model.notifyExpiryWarning)
-            DisclosureGroup(L("Warnings and extensions", "만료 예고와 연장")) {
-                Note(L("Enabling warnings does not send a late reminder. The notice lets you review the deadline; +15 minutes appears only when the whole extension is allowed. Ended manual keep-awake will not restart.",
-                       "예고 시각이 지났다면 바로 알리지 않습니다. 예고에서 기한을 확인할 수 있고, 15분 전체 연장이 가능할 때만 +15분을 제공합니다. 종료된 수동 유지는 다시 시작하지 않습니다."))
-                    .padding(.top, 6)
-            }.accessibilityIdentifier("settings-expiry-warning-details")
+                SettingsDisclosure(title: L("Warnings and extensions", "만료 예고와 연장"),
+                    isExpanded: $warningDetailsExpanded, groupsSection: false) {
+                    Note(L("Past warning times are not replayed. The notice shows the deadline and offers +15 minutes only when the full extension is allowed. Ended manual work does not restart.",
+                           "지난 예고는 다시 알리지 않습니다. 알림에서 기한을 확인하며 15분 전체 연장이 가능할 때만 +15분을 제공합니다. 종료된 수동 유지는 재시작하지 않습니다."))
+                }.accessibilityIdentifier("settings-expiry-warning-details")
+            }.padding(.leading, SettingsMetrics.hierarchyIndent)
             Divider()
             SettingsToggle(title: L("Overheating or state-check failure", "과열·상태 확인 실패"), isOn: $model.notifyHeat)
                 .disabled(!canConfigure)
@@ -61,9 +67,10 @@ struct NotificationSettingsView: View {
                     .accessibilityLabel(L("Check notification permission again", "알림 권한 다시 확인"))
             }.disabled(!canConfigure || monitor.busy)
             if let error = monitor.error { Note(error) }
-            DisclosureGroup(L("Notification details", "알림 안내")) {
-                Note(L("Alerts report overheating, missing observations or low battery. Turning alerts on does not replay old events. macOS Focus and notification style can affect delivery; protection works without alerts.",
-                       "과열·관측 실패·배터리 부족을 알립니다. 알림을 켜도 지난 동작을 다시 알리지 않습니다. 집중 모드·알림 표시 방식에 따라 보이지 않을 수 있으며, 보호 기능은 알림 없이도 동작합니다."))
+            SettingsDisclosure(title: L("Notification details", "알림 안내"),
+                isExpanded: $notificationDetailsExpanded, groupsSection: false) {
+                Note(L("Past events are not replayed. macOS Focus and notification style can affect delivery; protection continues without alerts.",
+                       "지난 동작은 다시 알리지 않습니다. 집중 모드·표시 방식에 따라 알림이 보이지 않아도 보호는 계속됩니다."))
             }
         }
         .accessibilityElement(children: .contain)

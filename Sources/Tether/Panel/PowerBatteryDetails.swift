@@ -28,32 +28,36 @@ struct PowerBatteryDetails: View {
                     if !value.sensorRows.isEmpty {
                         Divider()
                         rows(value.sensorRows)
+                            .padding(.leading, WorkSessionMetrics.hierarchyIndent)
                     }
                     if let observed = value.observedText {
                         note(observed)
+                            .padding(.leading, WorkSessionMetrics.hierarchyIndent)
                             .accessibilityIdentifier("panel-power-observed-at")
                     }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, 6)
+            .padding(.leading, WorkSessionMetrics.disclosureContentInset)
+            .padding(.top, 8)
             .padding(.bottom, 2)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("panel-power-detail-content")
         } label: {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(value.title)
-                    .fixedSize(horizontal: false, vertical: true)
-                if !isExpanded {
-                    Spacer(minLength: 4)
-                    Text(value.summary)
-                        .font(TetherTypography.secondary)
-                        .foregroundStyle(Color.tetherSecondary)
-                        .monospacedDigit()
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("panel-power-summary")
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(value.title).fixedSize()
+                    if !isExpanded {
+                        Spacer(minLength: 4)
+                        summary(value.summary).fixedSize()
+                    }
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(value.title).fixedSize(horizontal: false, vertical: true)
+                    if !isExpanded { summary(value.summary) }
                 }
             }
+            .padding(.leading, WorkSessionMetrics.disclosureLabelInset)
             .frame(maxWidth: .infinity, alignment: .leading)
             .font(TetherTypography.body)
             .foregroundStyle(Color.tetherPrimary)
@@ -61,26 +65,43 @@ struct PowerBatteryDetails: View {
         .accessibilityIdentifier("panel-power-details")
     }
 
+    private func summary(_ value: String) -> some View {
+        Text(value)
+            .font(TetherTypography.secondary)
+            .foregroundStyle(Color.tetherSecondary)
+            .monospacedDigit()
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("panel-power-summary")
+    }
+
     private func group(title: String, rows values: [PowerBatteryPresentation.Row], note detail: String?,
                        noteIdentifier: String) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(title).font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
             rows(values)
-            if let detail { note(detail).accessibilityIdentifier(noteIdentifier) }
+                .padding(.leading, WorkSessionMetrics.hierarchyIndent)
+            if let detail {
+                note(detail)
+                    .padding(.leading, WorkSessionMetrics.hierarchyIndent)
+                    .accessibilityIdentifier(noteIdentifier)
+            }
         }
     }
 
     private func rows(_ values: [PowerBatteryPresentation.Row]) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             ForEach(values) { value in
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(value.title)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text(value.value)
-                        .font(TetherTypography.body.weight(value.prominent ? .semibold : .regular))
-                        .monospacedDigit()
-                        .fixedSize(horizontal: true, vertical: true)
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Text(value.title).fixedSize()
+                        Spacer(minLength: 0)
+                        reading(value).fixedSize()
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(value.title).fixedSize(horizontal: false, vertical: true)
+                        reading(value)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                    }
                 }
                 .font(TetherTypography.body)
                 .foregroundStyle(Color.tetherPrimary)
@@ -88,6 +109,13 @@ struct PowerBatteryDetails: View {
                 .accessibilityIdentifier("panel-power-\(value.id)")
             }
         }
+    }
+
+    private func reading(_ value: PowerBatteryPresentation.Row) -> some View {
+        Text(value.value)
+            .font(TetherTypography.body.weight(value.prominent ? .semibold : .regular))
+            .monospacedDigit()
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func note(_ value: String) -> some View {

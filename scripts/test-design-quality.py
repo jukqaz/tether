@@ -15,7 +15,7 @@ quality = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(quality)
 
 
-def bounds(x=0, y=0, width=380, height=400):
+def bounds(x=0, y=0, width=360, height=400):
     return {"x": x, "y": y, "width": width, "height": height}
 
 
@@ -55,9 +55,9 @@ class DesignQualityTests(unittest.TestCase):
         self.assertEqual(report["score"]["totalVerifiedPoints"], 60)
         self.assertEqual(report["coverage"]["weightedPercent"], 60)
         self.assertEqual(report["groups"]["interaction"]["knownWeight"], 0)
-        self.assertEqual(report["rubric"]["menuWidthPoints"], 380)
+        self.assertEqual(report["rubric"]["menuWidthPoints"], 360)
         self.assertEqual(report["rubric"]["menuWidthTolerancePoints"], 1)
-        self.assertIn("380±1pt", report["captures"][0]["rules"]["menu_width"]["reason"])
+        self.assertIn("360±1pt", report["captures"][0]["rules"]["menu_width"]["reason"])
         for rule in ["essential_text_visibility", "rendered_contrast", "keyboard_activation", "pointer_activation"]:
             self.assertEqual(report["captures"][0]["rules"][rule]["status"], "unknown")
 
@@ -237,9 +237,9 @@ class DesignQualityTests(unittest.TestCase):
                       audit_guide)
 
     def test_current_menu_width_has_inclusive_one_point_tolerance(self):
-        for width, expected in [(379, "pass"), (380, "pass"), (381, "pass"),
-                                (378.99, "fail"), (381.01, "fail"), (300, "fail"),
-                                (304, "fail"), (360, "fail")]:
+        for width, expected in [(359, "pass"), (360, "pass"), (361, "pass"),
+                                (358.99, "fail"), (361.01, "fail"), (300, "fail"),
+                                (304, "fail"), (380, "fail")]:
             with self.subTest(width=width):
                 capture = copy.deepcopy(self.capture)
                 capture["window"]["frame"]["width"] = width
