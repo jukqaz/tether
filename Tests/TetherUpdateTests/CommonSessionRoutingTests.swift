@@ -1,3 +1,4 @@
+import Combine
 import XCTest
 import Sparkle
 @testable import Tether
@@ -369,24 +370,45 @@ final class CommonSessionRoutingTests: XCTestCase {
         var observed = Self.portable
         let (name, defaults, _, controller, service, model) = fixture(capabilityProbe: { observed })
         defer { _ = controller.end(); defaults.removePersistentDomain(forName: name) }
-        await wait { service.gate.current != nil }
+        await wait { service.gate.current != nil && !model.lidCommandPending }
         model.startManualSession(minutes: 10)
-        await wait { model.clamshellActive && !model.lidCommandPending }
+        await wait { model.clamshellActive && !model.v4ManualApprovalPending && !model.lidCommandPending }
+        let request = controller.manualRequestID, deadline = controller.status.manualContinuousDeadline
+        let rejectedRelease = L("Closed-lid release is not confirmed: ", "덮개 유지 해제를 확인하지 못했습니다: ")
+            + ServiceFailure("powerVerificationFailed").localizedDescription
+        var rejectedReplies = 0
+        let observation = model.$coordinatedLidError.sink {
+            if $0 == rejectedRelease { rejectedReplies += 1 }
+        }
+        defer { observation.cancel() }
+
         service.omitDetachEffect = true
         observed = Self.unreadable; model.refresh()
-        await wait { service.requests.contains { $0.action == .detachApp } }
-        for _ in 0..<10 { await Task.yield() }
+        await wait { rejectedReplies == 1 }
+        XCTAssertEqual(service.requests.filter { $0.action == .detachApp }.count, 1)
+        XCTAssertTrue(service.reply().status?.ownsOverride == true)
         XCTAssertTrue(model.lidReleasePending); XCTAssertFalse(model.clamshellActive)
-        XCTAssertNotNil(model.coordinatedLidError); XCTAssertTrue(model.workSessionHolding)
-        XCTAssertTrue(model.generalSessionDetail.contains("확인"))
+        XCTAssertEqual(model.coordinatedLidError, rejectedRelease); XCTAssertTrue(model.workSessionHolding)
+        let originalLanguage = Localization.current
+        Localization.current = .english
+        XCTAssertEqual(model.generalSessionDetail, "General work continues; closed-lid release awaits confirmation")
+        Localization.current = .korean
+        XCTAssertEqual(model.generalSessionDetail, "일반 작업 유지 중 · 덮개 유지 해제 확인 중")
+        Localization.current = originalLanguage
         let receipt = model.userCommandReply(UserSessionRequest())
         XCTAssertEqual(receipt.lidSupport, .pending); XCTAssertNotNil(receipt.lidError)
         XCTAssertTrue(receipt.status?.holding == true)
+
         observed = Self.portable; model.refresh()
-        for _ in 0..<20 { await Task.yield() }
+        await wait { rejectedReplies == 2 }
+        XCTAssertEqual(service.requests.filter { $0.action == .detachApp }.count, 2)
         XCTAssertEqual(service.requests.filter { $0.action == .prepareWorkSession }.count, 1)
         service.omitDetachEffect = false; model.refresh()
         await wait { model.clamshellActive && !model.lidCommandPending }
+        XCTAssertEqual(service.requests.filter { $0.action == .detachApp }.count, 3)
+        XCTAssertEqual(service.requests.filter { $0.action == .prepareWorkSession }.count, 2)
+        XCTAssertEqual(controller.manualRequestID, request)
+        XCTAssertEqual(controller.status.manualContinuousDeadline, deadline)
     }
 
     @MainActor

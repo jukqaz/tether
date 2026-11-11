@@ -20,11 +20,24 @@ final class ControlTransactionTests: XCTestCase {
         let target = path
         DispatchQueue.concurrentPerform(iterations: 4) { _ in
             for _ in 0..<12 {
-                XCTAssertTrue(ControlStore.update(path: target) {
-                    let count = $0.sleepNowRequest ?? 0
-                    usleep(1_000) // expose the old read/modify/write lost-update window
-                    $0.sleepNowRequest = count + 1
-                })
+                var committed = false
+                for _ in 0..<4 {
+                    var enteredMutation = false
+                    committed = ControlStore.update(path: target) {
+                        enteredMutation = true
+                        let count = $0.sleepNowRequest ?? 0
+                        usleep(1_000) // expose the old read/modify/write lost-update window
+                        $0.sleepNowRequest = count + 1
+                    }
+                    if committed { break }
+                    // A bounded lock may reject a busy attempt before the
+                    // callback runs. A failed write must never be retried.
+                    guard !enteredMutation else {
+                        XCTFail("The store failed after entering the mutation")
+                        return
+                    }
+                }
+                XCTAssertTrue(committed, "The writer did not acquire the lock within four attempts")
             }
         }
         let control = try XCTUnwrap(JSONFile.read(Control.self, from: path))

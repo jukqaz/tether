@@ -34,21 +34,25 @@ final class WatchdogTests: XCTestCase {
         try FileManager.default.createDirectory(at: mockDirectory, withIntermediateDirectories: true)
         let mockWriter = mockDirectory.appendingPathComponent("pmset")
         try Data(#"""
-        #!/usr/bin/python3
-        import os,sys
-        from pathlib import Path
-        folder=Path(os.environ['FIXTURE_DIR'])
-        arguments=sys.argv[1:]
-        with (folder/'calls').open('a') as file: file.write(' '.join(arguments)+'\n')
-        if arguments==['-a','disablesleep','0']:
-            if os.environ['CLEAR_FAILS']=='1': sys.exit(1)
-            if os.environ['NO_EFFECT']=='1': sys.exit(0)
-            (folder/'cleared').touch()
-            if os.environ['REACQUIRED']=='1': Path(os.environ['TETHER_OWNERSHIP']).write_bytes((folder/'replacement.json').read_bytes())
-            if os.environ['RECOVERED']=='1': Path(os.environ['TETHER_STATUS']).write_text('{}')
-            sys.exit(0)
-        if arguments==['sleepnow']: sys.exit(1 if os.environ['SLEEP_FAILS']=='1' else 0)
-        sys.exit(99)
+        #!/bin/sh
+        # Use the same system shell as the watchdog; do not spend the native
+        # writer's two-second budget initializing the system Python interpreter.
+        printf '%s\n' "$*" >> "$FIXTURE_DIR/calls" || exit 1
+        case "$*" in
+          '-a disablesleep 0')
+            [ "$CLEAR_FAILS" = 1 ] && exit 1
+            [ "$NO_EFFECT" = 1 ] && exit 0
+            : > "$FIXTURE_DIR/cleared" || exit 1
+            if [ "$REACQUIRED" = 1 ]; then
+              /bin/cp "$FIXTURE_DIR/replacement.json" "$TETHER_OWNERSHIP" || exit 1
+            fi
+            if [ "$RECOVERED" = 1 ]; then
+              printf '{}' > "$TETHER_STATUS" || exit 1
+            fi
+            exit 0 ;;
+          sleepnow) [ "$SLEEP_FAILS" != 1 ] ;;
+          *) exit 99 ;;
+        esac
         """#.utf8).write(to: mockWriter)
         XCTAssertEqual(chmod(mockWriter.path, 0o755), 0)
         // The native executor reads a checked fixture only for this nonroot,
@@ -170,10 +174,10 @@ final class WatchdogTests: XCTestCase {
 
     func testAcceptedRestoreWithoutOSEffectRetainsOwnershipAndNeverSleeps() throws {
         let result = try runWatchdog(noEffect: true)
-        XCTAssertEqual(result.status, 1)
-        XCTAssertEqual(result.calls, ["-a disablesleep 0"])
-        XCTAssertTrue(result.ownership?.owned == true)
-        XCTAssertTrue(result.log.contains("not confirmed"))
+        XCTAssertEqual(result.status, 1, result.log)
+        XCTAssertEqual(result.calls, ["-a disablesleep 0"], result.log)
+        XCTAssertTrue(result.ownership?.owned == true, result.log)
+        XCTAssertTrue(result.log.contains("not confirmed"), result.log)
     }
 
     func testUnownedAndPreviousBootOverridesRemainUntouched() throws {
