@@ -82,8 +82,9 @@ try key.publicKey.rawRepresentation.base64EncodedData().write(to: folder.appendi
   feed=web/'appcast.xml'
   display_version=SOURCE_INFO['CFBundleShortVersionString'] if kind.startswith('same-version-') else '1.0.2'
   feed.write_text(f'''<?xml version="1.0"?><rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0"><channel><title>Fixture</title><item><title>{display_version}</title><sparkle:version>{candidate}</sparkle:version><sparkle:shortVersionString>{display_version}</sparkle:shortVersionString><sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion><enclosure url="{base}/Tether-update.zip" length="{archive.stat().st_size}" type="application/octet-stream" sparkle:edSignature="{signature}"/></item></channel></rss>''')
-  if kind in ['stable-rejects-beta','beta-accepts-beta']:
-   feed.write_text(feed.read_text().replace('<item>', '<item><sparkle:channel>beta</sparkle:channel>'))
+  if kind in ['stable-rejects-beta','stable-rejects-nightly']:
+   channel = 'beta' if kind == 'stable-rejects-beta' else 'nightly'
+   feed.write_text(feed.read_text().replace('<item>', f'<item><sparkle:channel>{channel}</sparkle:channel>'))
   signed_feed=run(TOOLS/'bin/sign_update','--ed-key-file',key,feed);assert signed_feed.returncode==0,signed_feed.stderr
   if kind=='tampered-archive':
    data=bytearray(archive.read_bytes());data[len(data)//2]^=1;archive.write_bytes(data)
@@ -95,14 +96,13 @@ try key.publicKey.rawRepresentation.base64EncodedData().write(to: folder.appendi
     first_failure=(datetime.datetime.now(datetime.timezone.utc)-datetime.timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S +0000')
     seeded=run('defaults','write',runner_id,'SUInitialFailedFeedSigningValidationDate_'+bundle_id,'-date',first_failure)
     assert seeded.returncode==0,seeded.stderr
-   options = ['--channels','beta'] if kind in ['beta-accepts-beta','beta-accepts-stable'] else []
-   result=run(runner,installed,'--check-immediately','--verbose','--user-agent-name','TetherLocalUpdateTest',*options,timeout=60)
+   result=run(runner,installed,'--check-immediately','--verbose','--user-agent-name','TetherLocalUpdateTest',timeout=60)
    version=plistlib.loads((installed/'Contents/Info.plist').read_bytes())['CFBundleVersion']
    LOG_DIR.mkdir(parents=True,exist_ok=True)
    (LOG_DIR/f'sparkle-{kind}.log').write_text(result.stdout+result.stderr)
-   if kind in ['success','same-version-next-build','beta-accepts-beta','beta-accepts-stable','legacy-aged-tampered-feed']:assert result.returncode==0 and version==str(candidate),(result.returncode,version,result.stderr)
+   if kind in ['success','same-version-next-build','legacy-aged-tampered-feed']:assert result.returncode==0 and version==str(candidate),(result.returncode,version,result.stderr)
    # Official sparkle-cli uses exit 4 for SUNoUpdateError, not generic success/failure.
-   elif kind in ['stable-rejects-beta','no-downgrade','same-build','same-version-older-build','same-version-same-build']:assert result.returncode==4 and version==str(initial) and 'No new update available!' in result.stdout+result.stderr,(kind,result.returncode,version,result.stderr)
+   elif kind in ['stable-rejects-beta','stable-rejects-nightly','no-downgrade','same-build','same-version-older-build','same-version-same-build']:assert result.returncode==4 and version==str(initial) and 'No new update available!' in result.stdout+result.stderr,(kind,result.returncode,version,result.stderr)
    else:
     # A cache/connection failure must not pass a signature-rejection test.
     expected_error = 4005 if kind == 'tampered-archive' else 1000
@@ -110,7 +110,7 @@ try key.publicKey.rawRepresentation.base64EncodedData().write(to: folder.appendi
    print('PASS native Sparkle',kind,'installed version',version,flush=True)
   finally:
    stop_server()
-CASES = ['success','tampered-archive','tampered-feed','aged-tampered-feed','legacy-aged-tampered-feed','stable-rejects-beta','beta-accepts-beta','beta-accepts-stable','no-downgrade','same-build','same-version-next-build','same-version-older-build','same-version-same-build']
+CASES = ['success','tampered-archive','tampered-feed','aged-tampered-feed','legacy-aged-tampered-feed','stable-rejects-beta','stable-rejects-nightly','no-downgrade','same-build','same-version-next-build','same-version-older-build','same-version-same-build']
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--case', choices=CASES, action='append', help='Run only the named case(s). Default: all cases.')
 parser.add_argument('--log-dir',type=Path,default=ROOT.parent,help='Directory for native updater logs.')

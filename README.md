@@ -24,6 +24,8 @@ Display-idle prevention does not promise unlocked display-off operation, defeat 
 
 General keep-awake works without the administrator helper. To use a MacBook with the lid closed, open the lid and prepare the helper in **Settings → Power & Lid**. Automatic start and closed-lid permission are separate choices.
 
+Tether checks one signed feed for stable updates. Beta releases are retained as release history; the next stable candidate is **2026.11.1, build 60**.
+
 [Published releases](https://github.com/jukqaz/tether/releases) · [Installation](docs/INSTALL-AND-TEST.ko.md) · [Validation checklist](docs/VALIDATION-CHECKLIST.ko.md) · [Release procedure](docs/RELEASING.ko.md)
 
 ## Build and test

@@ -86,12 +86,24 @@ def verify_packaged_runtime(app, info, state):
             try: helper.wait(timeout=10)
             except subprocess.TimeoutExpired: helper.kill(); helper.wait(); raise
 
+def verify_stable_identity(info, source_info, item, tag):
+    assert info.get('TetherReleaseChannel') == source_info.get('TetherReleaseChannel') == 'stable', (
+        'only stable source and bundles may be released')
+    assert 'TetherBetaIteration' not in info and 'TetherBetaIteration' not in source_info, (
+        'remove retired beta iteration metadata')
+    assert tag == f"v{info['CFBundleShortVersionString']}", 'stable tag/version mismatch'
+    assert item.find(SPARKLE + 'channel') is None, 'release feed must not contain a beta channel'
+    assert item.findtext(SPARKLE + 'shortVersionString') == info['CFBundleShortVersionString'], (
+        'stable feed/bundle display version mismatch')
+
+
 def verify(archive, tag, require_clean):
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     checksum = Path(str(archive) + '.sha256').read_text().strip().split()
     assert checksum == [digest, archive.name], 'archive checksum mismatch'
     feed = archive.parent / 'appcast.xml'
     items = ET.parse(feed).findall('./channel/item')
+    assert len(items) == 1, 'release feed must contain exactly one stable candidate'
     item = next((x for x in items if x.find('enclosure').get('url').endswith('/' + archive.name)), None)
     assert item is not None
     enclosure = item.find('enclosure')
@@ -115,16 +127,7 @@ def verify(archive, tag, require_clean):
         assert info['SURequireSignedFeed'] is True, 'signed feed verification must be enabled'
         assert info['SUSignedFeedFailureExpirationInterval'] == 0, 'invalid feeds must remain rejected indefinitely'
         assert info['SUVerifyUpdateBeforeExtraction'] is True, 'verify archives before extraction'
-        assert info['TetherReleaseChannel'] == source_info['TetherReleaseChannel']
-        assert info['TetherBetaIteration'] == source_info['TetherBetaIteration']
-        if info['TetherReleaseChannel'] == 'beta':
-            assert tag == f"v{info['CFBundleShortVersionString']}-beta.{info['TetherBetaIteration']}"
-            assert item.findtext(SPARKLE + 'channel') == 'beta'
-            assert item.findtext(SPARKLE + 'shortVersionString') == f"{info['CFBundleShortVersionString']} Beta {info['TetherBetaIteration']}"
-        else:
-            assert info['TetherReleaseChannel'] == 'stable'
-            assert tag == f"v{info['CFBundleShortVersionString']}"
-            assert item.findtext(SPARKLE + 'channel') is None
+        verify_stable_identity(info, source_info, item, tag)
         commit = run('git', 'rev-parse', 'HEAD', cwd=ROOT).stdout.strip()
         assert info['TetherSourceCommit'] == commit, 'archive is from a different source commit'
         if require_clean:

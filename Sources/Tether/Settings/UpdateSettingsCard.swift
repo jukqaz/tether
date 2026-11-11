@@ -42,21 +42,7 @@ struct UpdateSettingsCard: View {
                 }
                 Divider()
             }
-            SettingRow(title: L("Update channel", "업데이트 채널"), showsAccessibleTitle: false) {
-                Picker(L("Update channel", "업데이트 채널"), selection: Binding(get: { model.updateChannel }, set: { model.setUpdateChannel($0) })) {
-                    Text(L("Stable", "정식")).tag(UpdateChannel.stable)
-                    Text(L("Stable + Beta", "정식 + 베타")).tag(UpdateChannel.beta)
-                }.labelsHidden().frame(width: SettingsMetrics.controlWidth, alignment: .trailing)
-                    .disabled(model.developmentService || status.sessionInProgress)
-            }
-            Note(model.updateChannel == .beta
-                 ? L("Includes beta releases. Choose Stable to wait for the next stable release; your installed version will not be downgraded.", "베타도 함께 받습니다. 정식으로 바꾸면 현재 버전을 유지하고 더 새로운 정식 버전을 기다립니다.")
-                 : L("Only stable releases are offered. Your installed version will not be downgraded.", "정식 배포만 받습니다. 이미 설치한 버전보다 이전 버전으로 되돌리지 않습니다."))
-            if status.sessionInProgress {
-                Note(L("Finish or dismiss the current update before changing channels. Use View Update to open it.", "채널 변경은 진행 중인 업데이트를 마치거나 업데이트 창에서 ‘나중에’를 선택한 뒤 가능합니다."))
-            }
             if includesOverview {
-                Divider()
                 SettingsToggle(title: L("Check automatically each day", "하루에 한 번 자동 확인"), isOn: $model.checkUpdates).disabled(model.developmentService)
             }
             Note(model.capabilities.hardware == .portable

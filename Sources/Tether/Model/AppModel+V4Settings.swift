@@ -146,7 +146,7 @@ extension AppModel {
         prefs.disconnectAction = v3Settings.disconnectAction
         prefs.notifyHeat = notifyHeat; prefs.notifyBatteryProtection = notifyBatteryProtection
         prefs.launchAtLogin = launchAtLogin; prefs.language = language.rawValue
-        prefs.updateChannel = updateChannel.rawValue; prefs.automaticUpdateCheck = checkUpdates
+        prefs.automaticUpdateCheck = checkUpdates
         return V4SettingsDocument(generation: v4ConfigurationGeneration, settings: v4Settings, preferences: prefs)
     }
     /// Keep only the generation used to reject stale rule/import drafts.
@@ -200,11 +200,6 @@ extension AppModel {
     }
     private func applyV4Document(_ document: V4SettingsDocument) -> Bool {
         guard acceptingUserCommands else { return false }
-        let selectedChannel = UpdateChannel(rawValue: document.preferences.updateChannel)
-        guard selectedChannel == updateChannel || canSelectUpdateChannel else {
-            errorText = L("An update is in progress. Review this settings selection after it finishes.", "업데이트가 진행 중입니다. 끝난 뒤 선택한 설정을 다시 확인하세요.")
-            return false
-        }
         v4ConfigurationTransaction = true
         defer { v4ConfigurationTransaction = false; refreshV4ConfigurationGeneration() }
         guard userSession?.applyConfiguration(document) == true else {
@@ -214,7 +209,6 @@ extension AppModel {
         if let choice = LanguageChoice(rawValue: document.preferences.language) { language = choice }
         notifyHeat = document.preferences.notifyHeat
         notifyBatteryProtection = document.preferences.notifyBatteryProtection
-        if let channel = selectedChannel, channel != updateChannel { _ = setUpdateChannel(channel) }
         checkUpdates = document.preferences.automaticUpdateCheck
         if document.preferences.launchAtLogin != launchAtLogin { setLaunchAtLogin(document.preferences.launchAtLogin) }
         refreshV4ConfigurationGeneration()

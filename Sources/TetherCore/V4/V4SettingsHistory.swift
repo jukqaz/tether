@@ -9,7 +9,12 @@ public struct V4AppPreferences: Codable, Equatable, Sendable {
     public var nextManualMinutes: Int? = 30
     public var launchAtLogin = false
     public var language = "system"
-    public var updateChannel = "stable"
+    private var storedUpdateChannel = "stable"
+    /// Keep the legacy export key readable, but never restore the retired beta choice.
+    public var updateChannel: String {
+        get { storedUpdateChannel }
+        set { storedUpdateChannel = newValue == "beta" ? "stable" : newValue }
+    }
     public var automaticUpdateCheck = true
     public var disconnectAction: WorkSessionEndAction = .sleepIfClosed
     public var notifyHeat = true
@@ -31,7 +36,12 @@ public struct V4AppPreferences: Codable, Equatable, Sendable {
         nextManualMinutes = try c.decodeIfPresent(Int.self, forKey: .nextManualMinutes)
         launchAtLogin = try c.decode(Bool.self, forKey: .launchAtLogin)
         language = try c.decode(String.self, forKey: .language)
-        updateChannel = try c.decode(String.self, forKey: .updateChannel)
+        let channel = try c.decode(String.self, forKey: .updateChannel)
+        guard ["stable", "beta"].contains(channel) else {
+            throw DecodingError.dataCorruptedError(forKey: .updateChannel, in: c,
+                                                   debugDescription: "Unsupported update channel")
+        }
+        updateChannel = channel
         automaticUpdateCheck = try c.decode(Bool.self, forKey: .automaticUpdateCheck)
         disconnectAction = try c.decodeIfPresent(WorkSessionEndAction.self, forKey: .disconnectAction) ?? .sleepIfClosed
         notifyHeat = try c.decodeIfPresent(Bool.self, forKey: .notifyHeat) ?? true
@@ -39,6 +49,10 @@ public struct V4AppPreferences: Codable, Equatable, Sendable {
     }
 
     public func encode(to encoder: Encoder) throws {
+        guard updateChannel == "stable" else {
+            throw EncodingError.invalidValue(updateChannel, .init(codingPath: encoder.codingPath,
+                                                                 debugDescription: "Unsupported update channel"))
+        }
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(automaticEnabled, forKey: .automaticEnabled); try c.encode(allowDisplay, forKey: .allowDisplay)
         try c.encode(allowClosedLid, forKey: .allowClosedLid); try c.encode(batteryLowerBound, forKey: .batteryLowerBound)
@@ -115,7 +129,7 @@ public enum V4SettingsTransfer {
             issues.append(.init("invalid-manual-default"))
         }
         if !["system", "ko", "en"].contains(document.preferences.language) { issues.append(.init("unsupported-language")) }
-        if !["stable", "beta"].contains(document.preferences.updateChannel) { issues.append(.init("unsupported-update-channel")) }
+        if document.preferences.updateChannel != "stable" { issues.append(.init("unsupported-update-channel")) }
         if !["followOS", "sleepIfClosed"].contains(document.preferences.disconnectAction.rawValue) {
             issues.append(.init("unsupported-disconnect-action"))
         }

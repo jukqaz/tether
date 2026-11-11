@@ -1,18 +1,9 @@
 import Foundation
 
-public enum UpdateChannel: String, CaseIterable, Sendable {
-    case stable, beta
-    public static let preferenceKey = "updateChannel"
-    /// Explicit choices survive reinstalling a beta or switching back to stable.
-    public static func resolve(saved: String?, bundled: String?) -> UpdateChannel {
-        if let saved, let choice = Self(rawValue: saved) { return choice }
-        return bundled == "beta" ? .beta : .stable
-    }
-    public func accepts(candidateChannel: String?) -> Bool {
-        guard let candidateChannel else { return true }
-        return allowedChannels.contains(candidateChannel)
-    }
-    public var allowedChannels: Set<String> { self == .beta ? ["beta"] : [] }
+public enum UpdateReleasePolicy {
+    /// Sparkle's stable releases have no channel. Also check resumed downloads,
+    /// which may have been selected before the app became stable-only.
+    public static func accepts(candidateChannel: String?) -> Bool { candidateChannel == nil }
 }
 
 /// Unknown must never be mistaken for an open lid.

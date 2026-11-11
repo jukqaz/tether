@@ -104,7 +104,6 @@ final class AppModel: ObservableObject {
     @Published private(set) var launchAtLogin = false
     @Published var errorText: String?
     @Published private(set) var updateStatus = AppUpdateStatus()
-    @Published private(set) var updateChannel: UpdateChannel
     var v4PreviousDocument: V4SettingsDocument?
     var v4ConfigurationGeneration: UInt64 = 0
     var v4ImportCandidate: (Data, V4SettingsPreview)?
@@ -247,11 +246,7 @@ final class AppModel: ObservableObject {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? TetherPaths.version
     }
 
-    static var appDisplayVersion: String {
-        let beta = Bundle.main.object(forInfoDictionaryKey: "TetherReleaseChannel") as? String == "beta"
-        let iteration = Bundle.main.object(forInfoDictionaryKey: "TetherBetaIteration") as? Int ?? 1
-        return appVersion + (beta ? " Beta \(iteration)" : "")
-    }
+    static var appDisplayVersion: String { appVersion }
 
     static var appBuild: String { Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? String(TetherPaths.build) }
 
@@ -338,8 +333,6 @@ final class AppModel: ObservableObject {
         notifyHeat = defaults.bool(forKey: Key.notifyHeat)
         notifyBatteryProtection = defaults.bool(forKey: Key.notifyBatteryProtection)
         checkUpdates = (defaults.object(forKey: "SUEnableAutomaticChecks") as? Bool) ?? defaults.bool(forKey: Key.checkUpdates)
-        updateChannel = UpdateChannel.resolve(saved: defaults.string(forKey: UpdateChannel.preferenceKey),
-            bundled: Bundle.main.object(forInfoDictionaryKey: "TetherReleaseChannel") as? String)
         panelCompact = (preview ? compactSample : nil) ?? defaults.bool(forKey: Key.panelCompact)
         menuBarDetails = defaults.bool(forKey: Key.menuBarDetails)
         language = Localization.savedChoice
@@ -1639,22 +1632,8 @@ final class AppModel: ObservableObject {
             self.userSession?.refresh()
             return self.v4CanReplaceNow
         }
-        updater.start(automatically: checkUpdates, channel: updateChannel)
+        updater.start(automatically: checkUpdates)
         if force { updater.check() }
-    }
-
-    var canSelectUpdateChannel: Bool {
-        acceptingUserCommands && !preferencesMigrationFailed && !developmentService
-            && (renderOnly || updater.engine?.sessionInProgress != true)
-    }
-    @discardableResult
-    func setUpdateChannel(_ channel: UpdateChannel) -> Bool {
-        guard canSelectUpdateChannel else { return false }
-        if !renderOnly, !updater.select(channel) { return false }
-        updateChannel = channel
-        defaults.set(channel.rawValue, forKey: UpdateChannel.preferenceKey)
-        refreshV4ConfigurationGeneration()
-        return true
     }
 
     func resumeUpdateInstallation() { if acceptingUserCommands, !developmentService { updater.resumeInstallation() } }

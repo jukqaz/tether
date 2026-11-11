@@ -37,7 +37,7 @@
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>59</string>
+	<string>60</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>26.0</string>
 	<key>LSUIElement</key>
@@ -65,9 +65,7 @@
 	<key>SUVerifyUpdateBeforeExtraction</key>
 	<true/>
 	<key>TetherReleaseChannel</key>
-	<string>beta</string>
-	<key>TetherBetaIteration</key>
-	<integer>1</integer>
+	<string>stable</string>
 	<key>TetherDesignRevision</key>
 	<string>2026-11-11-native-sidebar</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>

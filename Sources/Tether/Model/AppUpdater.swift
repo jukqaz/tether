@@ -11,14 +11,13 @@ struct AppUpdateStatus {
     var error: String?
 }
 
-/// Sparkle owns signed downloads, replacement and UI. Tether supplies channel selection,
+/// Sparkle owns signed downloads, replacement and UI. Tether accepts stable releases,
 /// quiet reminders and a fresh lid check before giving up its power-management session.
 @MainActor
 final class AppUpdater: NSObject, SPUUpdaterDelegate, @preconcurrency SPUStandardUserDriverDelegate {
     private(set) var engine: SPUUpdater?
     private(set) var userDriver: UpdateUserDriver?
     private var observation: NSKeyValueObservation?
-    private var channel = UpdateChannel.stable
     private var status = AppUpdateStatus()
     private let changed: (AppUpdateStatus) -> Void
     private let gate: UpdateRelaunchGate
@@ -40,13 +39,13 @@ final class AppUpdater: NSObject, SPUUpdaterDelegate, @preconcurrency SPUStandar
         get { engine?.automaticallyChecksForUpdates ?? false }
         set { engine?.automaticallyChecksForUpdates = newValue }
     }
-    func start(automatically: Bool, channel: UpdateChannel) {
+    func start(automatically: Bool) {
         guard engine == nil else { return }
         if hostBundle == .main {
             guard hostBundle.bundleIdentifier == TetherPaths.bundleID,
                   TetherPaths.serviceSocket == TetherPaths.productionSocket else { return }
         }
-        self.channel = channel
+        defaults.removeObject(forKey: "updateChannel")
         // Sparkle ignores the download setter while automatic checks are disabled.
         // Clear the persisted choice before initialization so enabling checks later
         // cannot silently restore an old install-on-quit preference.
@@ -74,13 +73,13 @@ final class AppUpdater: NSObject, SPUUpdaterDelegate, @preconcurrency SPUStandar
     /// Building the adapter alone neither starts Sparkle nor touches an updater session.
     func makeUserDriver() -> UpdateUserDriver {
         return UpdateUserDriver(hostBundle: hostBundle, delegate: self,
-            accepts: { [weak self] in self?.channel.accepts(candidateChannel: $0) == true },
+            accepts: { UpdateReleasePolicy.accepts(candidateChannel: $0) },
             rejected: { [weak self] in
                 guard let self else { return }
                 self.status.availableVersion = nil
                 self.status.checking = false
-                self.status.error = L("A pending update from another channel was canceled. Check again for your selected channel.",
-                                      "선택한 채널과 다른 대기 중인 업데이트를 취소했습니다. 업데이트를 다시 확인해 주세요.")
+                self.status.error = L("The pending update was canceled. Check again for a stable release.",
+                                      "대기 중인 업데이트를 취소했습니다. 정식 업데이트를 다시 확인해 주세요.")
                 self.publish()
             }, preparingInstallation: { [weak self] in self?.gate.markInstallationRequested() },
             observedCandidate: { [weak self] item in self?.observeCandidate(item) },
@@ -90,15 +89,6 @@ final class AppUpdater: NSObject, SPUUpdaterDelegate, @preconcurrency SPUStandar
             })
     }
 
-    /// Never change channel underneath a candidate Sparkle already selected.
-    func select(_ channel: UpdateChannel) -> Bool {
-        guard engine?.sessionInProgress != true else { return false }
-        disableAutomaticDownloads()
-        self.channel = channel
-        status = AppUpdateStatus(); publish()
-        engine?.resetUpdateCycleAfterShortDelay()
-        return true
-    }
     func check() {
         guard let engine, engine.canCheckForUpdates else { return }
         status.error = nil; status.checking = !engine.sessionInProgress; publish()
@@ -121,7 +111,7 @@ final class AppUpdater: NSObject, SPUUpdaterDelegate, @preconcurrency SPUStandar
         publish()
     }
     private func publish() { status.waitingForOpenLid = gate.waiting; changed(status) }
-    func allowedChannels(for updater: SPUUpdater) -> Set<String> { channel.allowedChannels }
+    func allowedChannels(for updater: SPUUpdater) -> Set<String> { [] }
     var supportsGentleScheduledUpdateReminders: Bool { true }
     func standardUserDriverShouldHandleShowingScheduledUpdate(_ update: SUAppcastItem, andInImmediateFocus immediateFocus: Bool) -> Bool { false }
     func standardUserDriverWillHandleShowingUpdate(_ handleShowingUpdate: Bool, forUpdate update: SUAppcastItem, state: SPUUserUpdateState) {

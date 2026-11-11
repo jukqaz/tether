@@ -2,6 +2,76 @@ import XCTest
 @testable import TetherCore
 
 final class V4SettingsHistoryTests: XCTestCase {
+    func testLegacyBetaExportNormalizesOnlyItsChannelAndReexportsStable() throws {
+        var document = V4SettingsDocument(generation: 7)
+        document.settings = V4Fixture.settings([[.init(id: UUID(), kind: .timeWindow,
+            timeWindow: .init(startMinute: 60, endMinute: 120, weekdays: [1, 3]))]])
+        document.settings.generation = 7
+        document.preferences.automaticEnabled = true
+        document.preferences.allowDisplay = true; document.preferences.allowClosedLid = true
+        document.preferences.batteryLowerBound = 43; document.preferences.nextManualMinutes = 42
+        document.preferences.launchAtLogin = true; document.preferences.language = "en"
+        document.preferences.automaticUpdateCheck = false; document.preferences.disconnectAction = .followOS
+        document.preferences.notifyHeat = false; document.preferences.notifyBatteryProtection = false
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: V4SettingsTransfer.encode(document)) as? [String: Any])
+        var preferences = try XCTUnwrap(json["preferences"] as? [String: Any])
+        preferences["updateChannel"] = "beta"; json["preferences"] = preferences
+
+        let restored = try V4SettingsTransfer.decode(JSONSerialization.data(withJSONObject: json))
+        XCTAssertEqual(restored, document, "Migrating the retired channel must preserve all unrelated settings")
+        XCTAssertEqual(restored.preferences.updateChannel, "stable")
+        XCTAssertEqual(try V4SettingsTransfer.encode(restored), try V4SettingsTransfer.encode(document))
+        let exported = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(restored.preferences)) as? [String: Any])
+        XCTAssertEqual(exported["updateChannel"] as? String, "stable")
+    }
+    func testLegacyBetaAssignmentCannotCreateAChannelDiffOrBeRestoredByApplicationSelection() throws {
+        let current = V4SettingsDocument()
+        var source = current; source.preferences.updateChannel = "beta"
+        XCTAssertEqual(source.preferences.updateChannel, "stable")
+        XCTAssertTrue(V4SettingsTransfer.changedParts(from: current, to: source).isEmpty)
+        var history = V4SettingsHistory()
+        XCTAssertEqual(history.recordChange(before: current, after: source, id: UUID(), at: 0, source: .migration), .alreadyProcessed)
+        source.preferences.language = "en"; source.preferences.automaticUpdateCheck = false
+        let preview = V4SettingsTransfer.preview(source: source, current: current, selected: [.application], activeManual: true)
+        XCTAssertEqual(preview.changedParts, [.application])
+        let applied = try XCTUnwrap(V4SettingsTransfer.apply(preview, current: current, activeManual: true).document)
+        XCTAssertEqual(applied.preferences.updateChannel, "stable")
+        XCTAssertEqual(applied.preferences.language, "en"); XCTAssertFalse(applied.preferences.automaticUpdateCheck)
+        XCTAssertEqual(applied.preferences.disconnectAction, current.preferences.disconnectAction)
+        XCTAssertEqual(applied.preferences.nextManualMinutes, current.preferences.nextManualMinutes)
+    }
+    func testLegacyBetaImportPreservesCurrentGlobalsAndCreatesDisabledCopies() throws {
+        let condition = V4Condition(id: UUID(), kind: .timeWindow,
+            timeWindow: .init(startMinute: 0, endMinute: 60, weekdays: [1]))
+        var source = V4SettingsDocument(); source.settings = V4Fixture.settings([[condition]])
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: V4SettingsTransfer.encode(source)) as? [String: Any])
+        var preferences = try XCTUnwrap(json["preferences"] as? [String: Any])
+        preferences["updateChannel"] = "beta"; json["preferences"] = preferences
+        let imported = try V4SettingsTransfer.decode(JSONSerialization.data(withJSONObject: json))
+        var current = V4SettingsDocument(); current.preferences.allowDisplay = true
+        current.preferences.disconnectAction = .followOS; current.preferences.language = "ko"
+        let ids = source.settings.presets.map(\.id) + source.settings.presets.flatMap(\.groups).map(\.id) + [condition.id]
+        let preview = V4SettingsTransfer.previewImport(imported, current: current,
+            replacementIDs: Dictionary(uniqueKeysWithValues: ids.map { ($0, UUID()) }))
+        XCTAssertFalse(preview.issues.contains(where: \.blocking))
+        let applied = try XCTUnwrap(V4SettingsTransfer.apply(preview, current: current, activeManual: false).document)
+        XCTAssertEqual(applied.preferences, current.preferences)
+        XCTAssertEqual(applied.settings.presets.count, 1)
+        XCTAssertFalse(applied.settings.presets[0].enabled)
+        XCTAssertNotEqual(applied.settings.presets[0].id, source.settings.presets[0].id)
+    }
+    func testUnknownUpdateChannelAndWrongTypeRemainRejected() throws {
+        let baseline = try XCTUnwrap(JSONSerialization.jsonObject(with: V4SettingsTransfer.encode(.init())) as? [String: Any])
+        for value in ["nightly" as Any, 1 as Any, NSNull()] {
+            var json = baseline
+            var preferences = try XCTUnwrap(json["preferences"] as? [String: Any])
+            preferences["updateChannel"] = value; json["preferences"] = preferences
+            XCTAssertThrowsError(try V4SettingsTransfer.decode(JSONSerialization.data(withJSONObject: json)))
+        }
+        var invalid = V4SettingsDocument(); invalid.preferences.updateChannel = "nightly"
+        XCTAssertTrue(V4SettingsTransfer.validate(invalid).contains(.init("unsupported-update-channel")))
+        XCTAssertThrowsError(try V4SettingsTransfer.encode(invalid))
+    }
     func testTypedExportRoundTripIsCanonicalAndContainsNoRuntimeState() throws {
         var document = V4SettingsDocument()
         let condition = V4Condition(id: UUID(), kind: .timeWindow, timeWindow: .init(startMinute: 0, endMinute: 60, weekdays: [7, 1, 3]))

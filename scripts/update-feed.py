@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Build a two-channel appcast from a newly generated item and a previously verified feed.
-The caller must verify the old feed before invoking this script, and sign the result after.
+"""Build a stable-only appcast from a new item and previously verified release history.
+The caller verifies the previous feed before invoking this script and signs the result after.
+Historical beta items are ordering evidence only and never enter the new feed.
 """
 import argparse
-import copy
 import json
 import plistlib
 import re
@@ -25,11 +25,9 @@ def calendar_version(value):
 def identity(info):
     version = info['CFBundleShortVersionString']; calendar_version(version)
     build = int(info['CFBundleVersion']); assert build > 41, 'never reset the build counter'
-    channel = info['TetherReleaseChannel']; assert channel in ['stable', 'beta']
-    beta = info.get('TetherBetaIteration', 0)
-    assert isinstance(beta, int) and (beta > 0 if channel == 'beta' else beta == 0), 'invalid beta iteration'
-    suffix = f'-beta.{beta}' if channel == 'beta' else ''
-    return f'v{version}{suffix}', f'Tether-{version}{suffix}-arm64.zip'
+    assert info.get('TetherReleaseChannel') == 'stable', 'only stable releases may be generated'
+    assert 'TetherBetaIteration' not in info, 'remove retired beta iteration metadata'
+    return f'v{version}', f'Tether-{version}-arm64.zip'
 
 def minimum_macos(value):
     assert value and re.fullmatch(r'[0-9]+(?:\.[0-9]+){1,2}', value), 'missing or invalid minimum macOS'
@@ -43,6 +41,7 @@ def merge(generated, previous, info, destination):
     item = fresh[0]; build = int(info['CFBundleVersion']); version = info['CFBundleShortVersionString']
     assert item.findtext(S + 'version') == str(build), 'build mismatch'
     assert item.findtext(S + 'shortVersionString') == version, 'version mismatch'
+    assert item.find(S + 'channel') is None, 'new stable items must not declare an update channel'
     assert minimum_macos(item.findtext(S + 'minimumSystemVersion')) == minimum_macos(info.get('LSMinimumSystemVersion')), 'minimum macOS mismatch'
     enclosure = item.find('enclosure'); assert enclosure is not None
     assert enclosure.get('url') == f'{REPO}/releases/download/{tag}/{archive}'
@@ -51,39 +50,35 @@ def merge(generated, previous, info, destination):
     for old in existing:
         old_build = int(old.findtext(S + 'version')); assert old_build not in seen, 'duplicate build'
         seen.add(old_build)
-        assert old_build < build, 'build must increase across both channels'
-        old_version = old.findtext(S + 'shortVersionString').split(' Beta ')[0]
+        assert old_build < build, 'build must increase across all historical releases'
+        old_channel = old.findtext(S + 'channel')
+        assert old_channel in [None, 'beta'], 'unknown historical update channel'
+        old_display = old.findtext(S + 'shortVersionString')
+        if old_channel == 'beta':
+            match = re.fullmatch(r'(.+) Beta ([1-9][0-9]*)', old_display or '')
+            assert match, 'invalid historical beta version'
+            old_version = match[1]
+        else:
+            old_version = old_display
         assert calendar_version(old_version) <= calendar_version(version), 'display version must not go backwards'
-        assert old.findtext(S + 'channel') in [None, 'beta'], 'unknown update channel'
         if old_version == version:
-            assert old.findtext(S + 'channel') == 'beta', 'stable display version already released'
-            if info['TetherReleaseChannel'] == 'beta':
-                old_iteration = int(old.findtext(S + 'shortVersionString').split(' Beta ')[1])
-                assert old_iteration < info['TetherBetaIteration'], 'beta iteration must increase'
-    if info['TetherReleaseChannel'] == 'beta':
-        ET.SubElement(item, S + 'channel').text = 'beta'
-        item.find(S + 'shortVersionString').text = f"{version} Beta {info['TetherBetaIteration']}"
-    item.find('title').text = 'Tether ' + item.findtext(S + 'shortVersionString')
-    # Keep one current item per channel; stable clients must retain a stable candidate.
-    all_items = sorted([item] + existing, key=lambda x: int(x.findtext(S+'version')), reverse=True)
-    for old in channel.findall('item'): channel.remove(old)
-    retained = {}; downloads = {}
-    for candidate in all_items:
-        name = candidate.findtext(S+'channel') or 'stable'
-        if name in retained: continue
-        retained[name] = candidate; channel.append(copy.deepcopy(candidate))
-        downloads[name] = dict(version=candidate.findtext(S+'shortVersionString'), build=int(candidate.findtext(S+'version')),
-                               url=candidate.find('enclosure').get('url'),
-                               minimum_macos=minimum_macos(candidate.findtext(S+'minimumSystemVersion')))
+            assert old_channel == 'beta', 'stable display version already released'
+    item.find('title').text = 'Tether ' + version
+    # The previous signed feed may contain beta releases. Their ordering was
+    # checked above, but the new signed feed contains only the fresh stable item.
+    downloads = {'stable': dict(version=version, build=build, url=enclosure.get('url'),
+                                minimum_macos=info['LSMinimumSystemVersion'])}
     destination.mkdir(parents=True, exist_ok=True)
     ET.indent(root)
     ET.ElementTree(root).write(destination/'appcast.xml', encoding='utf-8', xml_declaration=True)
     (destination/'downloads.json').write_text(json.dumps(downloads, indent=2)+'\n')
-    rows = []
-    for name, title in [('stable','정식'),('beta','베타')]:
-        value = downloads.get(name)
-        rows.append(f"| {title} | [{value['version']}]({value['url']}) | macOS {value['minimum_macos']} 이상 |" if value else f'| {title} | 아직 배포되지 않음 | — |')
-    (destination/'README.md').write_text('# Tether 다운로드\n\nApple Silicon · 최소 macOS는 각 설치 파일을 기준으로 표시합니다.\n\n| 채널 | 다운로드 | 최소 OS |\n|---|---|---|\n'+'\n'.join(rows)+'\n\n앱 설정에서 정식 / 정식 + 베타를 선택할 수 있습니다. 설치본보다 낮은 빌드로 자동 변경하지 않습니다.\n\n이 페이지와 appcast.xml은 검증된 릴리스 자산을 업로드한 후 함께 갱신합니다.\n')
+    value = downloads['stable']
+    (destination/'README.md').write_text(
+        '# Tether 다운로드\n\nApple Silicon · 정식 업데이트만 제공합니다.\n\n'
+        '| 버전 | 다운로드 | 최소 OS |\n|---|---|---|\n'
+        f"| {value['version']} | [설치 파일]({value['url']}) | macOS {value['minimum_macos']} 이상 |\n"
+        '\n설치본보다 낮은 빌드로 자동 변경하지 않습니다.\n\n'
+        '이 페이지와 appcast.xml은 검증된 릴리스 자산을 업로드한 후 함께 갱신합니다.\n')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)

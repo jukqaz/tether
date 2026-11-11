@@ -112,7 +112,7 @@ final class AppCoordinatorStartupTests: XCTestCase {
             model.startManualSession(minutes: 30); model.setEnabled(true); model.setUserAutomatic(true)
             model.setTriggerEnabled(true); model.setPowerCondition(.ac); model.finishOnboarding()
             model.panelCompact.toggle(); model.notifyHeat.toggle(); model.menuBarDetails.toggle()
-            model.checkUpdates.toggle(); model.setUpdateChannel(.stable)
+            model.checkUpdates.toggle(); model.checkForUpdates(force: true)
             model.handle(url: try XCTUnwrap(URL(string: "tether://manual/30m")))
             model.handle(url: try XCTUnwrap(URL(string: "tether://on")))
             XCTAssertEqual((defaults.persistentDomain(forName: domain) ?? [:]) as NSDictionary, currentBefore as NSDictionary)

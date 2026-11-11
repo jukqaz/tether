@@ -72,7 +72,7 @@ enum OptionCatalog {
             e("O22", "Menu and controls", "메뉴와 조작", "Show the icon alone or include the time remaining.", "메뉴바에 아이콘만 또는 남은 시간도 표시합니다.", .partial, .app, support: ("Icon or remaining time. Custom menu layouts, global shortcuts and click actions are unavailable.", "아이콘·남은 시간 표시를 선택합니다. 자유 배치·전역 단축키·클릭 동작은 아직 미지원입니다.")),
             e("O23", "History and diagnostics", "통계와 진단", "Review usage, recent events, other app requests and reports.", "사용 통계·최근 동작·다른 앱 요청·보고서를 확인합니다.", .connected, .protection),
             e("O24", "General and settings transfer", "일반·설정 가져오기·내보내기", "Set language and startup, or import and export settings.", "언어·시작 동작을 정하고 설정을 가져오거나 내보냅니다.", .connected, .app),
-            e("O25", "Updates and helper", "업데이트와 도우미", "Check updates, choose a channel and prepare the lid helper.", "업데이트·배포 채널·덮개 도우미를 관리합니다.", .partial, .app, support: ("Update channels, user-initiated installation and helper setup are available. Widgets and Control Center integration are not implemented.", "업데이트 채널 선택·직접 설치·도우미 준비를 지원합니다. 위젯·제어 센터는 아직 지원하지 않습니다.")),
+            e("O25", "Updates and helper", "업데이트와 도우미", "Check stable updates and prepare the lid helper.", "정식 업데이트·덮개 도우미를 관리합니다.", .partial, .app, support: ("Stable updates, user-initiated installation and helper setup are available.", "정식 업데이트·직접 설치·도우미 준비를 지원합니다.")),
             e("O26", "Additional tools", "추가 도구 후보", "Keyboard cleaning, fan/network/game controls and virtual displays require separate implementations.", "키보드 청소·팬/네트워크/게임 제어·가상 화면은 별도 구현이 필요한 후보입니다.", .notImplemented, nil)
         ]
     }

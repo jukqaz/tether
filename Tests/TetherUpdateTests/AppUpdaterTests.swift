@@ -52,17 +52,19 @@ final class AppUpdaterTests: XCTestCase {
             defaults.set(checked, forKey: "SULastCheckTime")
             defaults.set(true, forKey: "SUAutomaticallyUpdate")
             defaults.set("preserved", forKey: "unrelatedSetting")
+            defaults.set("beta", forKey: "updateChannel")
             var snapshots: [AppUpdateStatus] = []
             let subject = AppUpdater(hostBundle: bundle, defaults: defaults, lidClosed: { false }) { snapshots.append($0) }
-            subject.start(automatically: false, channel: .beta)
+            subject.start(automatically: false)
             let engine = try XCTUnwrap(subject.engine)
             XCTAssertEqual(engine.hostBundle, bundle)
             XCTAssertTrue(engine.canCheckForUpdates, "SPUUpdater.start must complete configuration validation")
             XCTAssertEqual(engine.feedURL?.absoluteString, "http://127.0.0.1:1/appcast.xml")
             XCTAssertNil(defaults.object(forKey: "SUFeedURL"))
+            XCTAssertNil(defaults.object(forKey: "updateChannel"))
             XCTAssertFalse(engine.automaticallyChecksForUpdates)
             XCTAssertFalse(engine.automaticallyDownloadsUpdates)
-            XCTAssertEqual(subject.allowedChannels(for: engine), ["beta"])
+            XCTAssertEqual(subject.allowedChannels(for: engine), [])
             XCTAssertEqual(defaults.object(forKey: "SUEnableAutomaticChecks") as? Bool, false)
             XCTAssertEqual(defaults.object(forKey: "SUAutomaticallyUpdate") as? Bool, false)
             try await waitForLifecycle { snapshots.count >= 2 && defaults.bool(forKey: "SUHasLaunchedBefore") }
@@ -70,11 +72,11 @@ final class AppUpdaterTests: XCTestCase {
             XCTAssertEqual(snapshots.last?.lastChecked, checked)
             XCTAssertEqual(defaults.string(forKey: "unrelatedSetting"), "preserved")
             XCTAssertEqual(defaults.object(forKey: "SULastCheckTime") as? Date, checked)
-            // An accidental second start must not replace the engine or change the chosen channel.
-            subject.start(automatically: true, channel: .stable)
+            // An accidental second start must preserve the existing scheduler.
+            subject.start(automatically: true)
             XCTAssertTrue(subject.engine === engine)
             XCTAssertFalse(subject.automaticallyChecks)
-            XCTAssertEqual(subject.allowedChannels(for: engine), ["beta"])
+            XCTAssertEqual(subject.allowedChannels(for: engine), [])
         }
     }
 
@@ -82,7 +84,7 @@ final class AppUpdaterTests: XCTestCase {
         try await withStartupFixture(publicKey: "invalid-public-key") { bundle, defaults in
             var snapshots: [AppUpdateStatus] = []
             let subject = AppUpdater(hostBundle: bundle, defaults: defaults) { snapshots.append($0) }
-            subject.start(automatically: false, channel: .stable)
+            subject.start(automatically: false)
             let engine = try XCTUnwrap(subject.engine)
             XCTAssertFalse(engine.canCheckForUpdates)
             XCTAssertTrue(snapshots.last?.error?.contains("EdDSA") == true)
@@ -100,14 +102,14 @@ final class AppUpdaterTests: XCTestCase {
             defaults.set(true, forKey: "SUAutomaticallyUpdate")
             var snapshots: [AppUpdateStatus] = []
             let subject = AppUpdater(hostBundle: bundle, defaults: defaults) { snapshots.append($0) }
-            subject.start(automatically: false, channel: .stable)
+            subject.start(automatically: false)
             let engine = try XCTUnwrap(subject.engine)
             XCTAssertTrue(engine.canCheckForUpdates)
             try await waitForLifecycle { defaults.bool(forKey: "SUHasLaunchedBefore") && snapshots.count >= 2 }
             snapshots.removeAll()
             engine.checkForUpdateInformation()
             XCTAssertTrue(engine.sessionInProgress)
-            XCTAssertFalse(subject.select(.beta))
+            XCTAssertEqual(subject.allowedChannels(for: engine), [])
             try await waitForLifecycle { snapshots.contains(where: { $0.sessionInProgress }) && snapshots.last?.error != nil && snapshots.last?.sessionInProgress == false }
             XCTAssertTrue(engine.canCheckForUpdates)
             XCTAssertFalse(engine.sessionInProgress)
@@ -117,6 +119,7 @@ final class AppUpdaterTests: XCTestCase {
             XCTAssertNil(snapshots.last?.availableVersion)
             XCTAssertTrue(subject.canTerminateForUpdate)
             XCTAssertNil(defaults.object(forKey: "SUFeedURL"))
+            XCTAssertNil(defaults.object(forKey: "updateChannel"))
             // A later opt-in to checks must not revive the legacy automatic-download choice.
             // This fixture has no feed, and both changes precede Sparkle's delayed scheduler.
             subject.automaticallyChecks = true
@@ -126,18 +129,16 @@ final class AppUpdaterTests: XCTestCase {
         }
     }
 
-    func testResumedBetaIsCanceledAtEveryStageAfterSelectingStable() throws {
-        var channel = UpdateChannel.beta
+    func testResumedBetaIsCanceledAtEveryStage() throws {
         var rejections = 0
         let driver = UpdateUserDriver(hostBundle: .main, delegate: nil,
-            accepts: { channel.accepts(candidateChannel: $0) }, rejected: { rejections += 1 })
+            accepts: { UpdateReleasePolicy.accepts(candidateChannel: $0) }, rejected: { rejections += 1 })
         // Only system-independent metadata is used from this deprecated fixture initializer.
         let item = try XCTUnwrap(SUAppcastItem(dictionary: [
             "sparkle:channel": "beta", "sparkle:version": "43",
             "enclosure": ["url": "https://example.invalid/Tether.zip", "sparkle:version": "43"]
         ]))
         XCTAssertEqual(item.channel, "beta")
-        channel = .stable
         for stage: SPUUserUpdateStage in [.notDownloaded, .downloaded, .installing] {
             let state = try makeState(stage)
             XCTAssertEqual(state.stage, stage)
@@ -216,13 +217,9 @@ final class AppUpdaterTests: XCTestCase {
         lid = false; subject.resumeInstallation()
         XCTAssertTrue(subject.canTerminateForUpdate)
     }
-    func testSelectedChannelsReachSparkleAndStableIsDefault() {
+    func testSparkleReceivesOnlyStableReleases() {
         let subject = AppUpdater { _ in }
         let controller = SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: subject, userDriverDelegate: subject)
-        XCTAssertEqual(subject.allowedChannels(for: controller.updater), [])
-        XCTAssertTrue(subject.select(.beta))
-        XCTAssertEqual(subject.allowedChannels(for: controller.updater), ["beta"])
-        XCTAssertTrue(subject.select(.stable))
         XCTAssertEqual(subject.allowedChannels(for: controller.updater), [])
     }
     func testScheduledReminderNeverOpensWindowInEitherFocusState() {

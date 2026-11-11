@@ -55,7 +55,7 @@ struct SystemPage: View {
                 SettingRow(title: updateSummary) { updateCheckButton }
                 SettingsToggle(title: L("Check for updates automatically", "업데이트 자동 확인"), isOn: $model.checkUpdates)
                     .disabled(model.userCommandsArePreview || model.developmentService)
-                SettingsDisclosure(title: L("Channel & Installation", "채널과 설치"),
+                SettingsDisclosure(title: L("Installation Details", "설치 안내"),
                     isExpanded: updateExpansion, groupsSection: false) { updateDetails }
                     .accessibilityIdentifier("settings-updates-details")
             }

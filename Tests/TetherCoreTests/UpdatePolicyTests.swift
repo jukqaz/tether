@@ -22,20 +22,11 @@ final class UpdatePolicyTests: XCTestCase {
         XCTAssertFalse(HelperUpgradeAttempt.claim(in: defaults))
     }
 
-    func testCandidateChannelMatchesTheCurrentChoice() {
-        for channel in UpdateChannel.allCases {
-            XCTAssertTrue(channel.accepts(candidateChannel: nil))
-            XCTAssertEqual(channel.accepts(candidateChannel: "beta"), channel == .beta)
-            XCTAssertFalse(channel.accepts(candidateChannel: "nightly"))
+    func testOnlyUnchanneledStableReleasesAreAccepted() {
+        XCTAssertTrue(UpdateReleasePolicy.accepts(candidateChannel: nil))
+        for channel in ["beta", "nightly", "preview", "stable", ""] {
+            XCTAssertFalse(UpdateReleasePolicy.accepts(candidateChannel: channel))
         }
-    }
-    func testExplicitChannelSurvivesChangingInstalledChannel() {
-        XCTAssertEqual(UpdateChannel.resolve(saved: "stable", bundled: "beta"), .stable)
-        XCTAssertEqual(UpdateChannel.resolve(saved: "beta", bundled: "stable"), .beta)
-        XCTAssertEqual(UpdateChannel.resolve(saved: nil, bundled: "beta"), .beta)
-        XCTAssertEqual(UpdateChannel.resolve(saved: "invalid", bundled: nil), .stable)
-        XCTAssertEqual(UpdateChannel.stable.allowedChannels, [])
-        XCTAssertEqual(UpdateChannel.beta.allowedChannels, ["beta"])
     }
     @MainActor func testClosedAndUnknownLidDeferWithoutAutomaticResume() {
         for initial: Bool? in [true, nil] {

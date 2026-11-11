@@ -2,6 +2,11 @@
 # Build a signed Sparkle update, its checksum and appcast. Does not publish anything.
 set -eu
 cd "$(dirname "$0")/.."
+[ "$#" -le 1 ] || { echo 'Usage: scripts/release.sh [--stable]' >&2; exit 2; }
+case "${1:---stable}" in
+  --stable) ;;
+  *) echo 'Usage: scripts/release.sh [--stable]' >&2; exit 2 ;;
+esac
 # Local candidate builds may be dirty; signed release preparation must use a
 # reviewable commit. Reject before reading a signing key or generating artifacts.
 RELEASE_SOURCE_STATUS=$(git status --porcelain)
@@ -13,14 +18,6 @@ fi
 : "${SPARKLE_TOOLS_DIR:?Set the path to the official Sparkle 2.10.0 tools}"
 VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Resources/Info.plist)
 BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" Resources/Info.plist)
-CHANNEL=$(/usr/libexec/PlistBuddy -c "Print :TetherReleaseChannel" Resources/Info.plist)
-BETA=$(/usr/libexec/PlistBuddy -c "Print :TetherBetaIteration" Resources/Info.plist)
-case "${1:---$CHANNEL}" in
-  --beta|--prerelease) [ "$CHANNEL" = beta ] || { echo 'Info.plist is not a beta release.' >&2; exit 2; } ;;
-  --stable) [ "$CHANNEL" = stable ] || { echo 'Info.plist is not a stable release.' >&2; exit 2; } ;;
-  *) echo 'Usage: scripts/release.sh [--prerelease|--stable]' >&2; exit 2 ;;
-esac
-[ "$#" -le 1 ] || { echo 'Too many arguments.' >&2; exit 2; }
 # Validate the release identity before building; it must match both app and helper.
 python3 - <<'PYCODE'
 import importlib.util, plistlib, re
@@ -33,7 +30,6 @@ assert re.search(r'build = (\d+)',s)[1] == i['CFBundleVersion']
 assert i['SUFeedURL'] == m.FEED_URL
 PYCODE
 TAG="v$VERSION"
-[ "$CHANNEL" != beta ] || TAG="$TAG-beta.$BETA"
 ZIP="Tether-${TAG#v}-arm64.zip"
 if [ -n "${TETHER_PREVIOUS_APPCAST:-}" ]; then
   "$SPARKLE_TOOLS_DIR/bin/sign_update" --ed-key-file "$TETHER_SIGNING_KEY_FILE" --verify "$TETHER_PREVIOUS_APPCAST"
