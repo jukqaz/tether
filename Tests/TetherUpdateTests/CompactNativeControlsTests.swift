@@ -6,27 +6,50 @@ import XCTest
 /// Test native callbacks across SwiftUI refreshes. These callbacks must use the
 /// latest command/choice gates rather than stale closures from menu creation.
 final class CompactNativeControlsTests: XCTestCase {
-    func testPopupUsesLatestBindingAndRejectsUnavailableOrStaleSelection() async {
-        await MainActor.run {
+    func testPopupUsesLatestBindingAndRejectsUnavailableOrStaleSelection() async throws {
+        try await MainActor.run {
             var first = 30
             var second = 60
-            let old = CompactPopUp(title: "Duration", selection: .init(get: { first }, set: { first = $0 }),
-                choices: [PopupChoice(30, "30m"), PopupChoice(60, "1h")])
-            let coordinator = old.makeCoordinator()
-            let button = NSPopUpButton(frame: .zero, pullsDown: false)
-            button.addItems(withTitles: ["30m", "1h"])
-            coordinator.parent = CompactPopUp(title: "Duration", selection: .init(get: { second }, set: { second = $0 }),
-                choices: [PopupChoice(30, "30m"), PopupChoice(60, "1h", enabled: false)])
+            var oldWrites: [Int] = []
+            var currentWrites: [Int] = []
+            let host = Self.host(AnyView(CompactPopUp(title: "Duration", selection: .init(
+                get: { first }, set: { first = $0; oldWrites.append($0) }),
+                choices: [PopupChoice(30, "30m"), PopupChoice(60, "1h")]).disabled(false)))
+            let button = try XCTUnwrap(Self.popup(in: host))
+
+            host.rootView = AnyView(CompactPopUp(title: "Duration", selection: .init(
+                get: { second }, set: { second = $0; currentWrites.append($0) }),
+                choices: [PopupChoice(30, "30m"), PopupChoice(60, "1h", enabled: false)]).disabled(false))
+            Self.settle(host)
+            XCTAssertTrue(try XCTUnwrap(Self.popup(in: host)) === button,
+                "A SwiftUI refresh must update the existing native control and coordinator")
+            XCTAssertEqual(button.indexOfSelectedItem, 1)
+            XCTAssertFalse(try XCTUnwrap(button.item(at: 1)).isEnabled)
             button.selectItem(at: 1)
-            coordinator.changed(button)
+            try Self.sendNativeAction(button)
             XCTAssertEqual(second, 60, "An unavailable item cannot issue a new selection")
+            XCTAssertTrue(currentWrites.isEmpty)
             button.selectItem(at: 0)
-            coordinator.changed(button)
+            try Self.sendNativeAction(button)
             XCTAssertEqual(second, 30)
             XCTAssertEqual(first, 30, "Callbacks must not use the previous SwiftUI binding")
+            XCTAssertTrue(oldWrites.isEmpty)
+            XCTAssertEqual(currentWrites, [30])
             button.selectItem(at: -1)
-            coordinator.changed(button)
+            try Self.sendNativeAction(button)
             XCTAssertEqual(second, 30)
+            XCTAssertEqual(currentWrites, [30], "A stale or missing native selection must be ignored")
+
+            host.rootView = AnyView(CompactPopUp(title: "Duration", selection: .init(
+                get: { second }, set: { second = $0; currentWrites.append($0) }),
+                choices: [PopupChoice(30, "30m"), PopupChoice(60, "1h")]).disabled(true))
+            Self.settle(host)
+            XCTAssertTrue(try XCTUnwrap(Self.popup(in: host)) === button)
+            XCTAssertFalse(button.isEnabled)
+            button.selectItem(at: 1)
+            try Self.sendNativeAction(button)
+            XCTAssertEqual(second, 30)
+            XCTAssertEqual(currentWrites, [30], "The latest disabled environment must gate even a queued native callback")
         }
     }
 
@@ -55,15 +78,39 @@ final class CompactNativeControlsTests: XCTestCase {
         }
     }
 
-    func testPushButtonUsesCurrentActionAfterRefresh() async {
-        await MainActor.run {
+    func testPushButtonUsesCurrentActionAfterRefresh() async throws {
+        try await MainActor.run {
             var original = 0
             var current = 0
-            let coordinator = CompactPushButton("End") { original += 1 }.makeCoordinator()
-            coordinator.parent = CompactPushButton("End") { current += 1 }
-            coordinator.clicked(NSButton())
+            let host = Self.host(AnyView(CompactPushButton("End", prominent: true) { original += 1 }.disabled(false)))
+            let button = try XCTUnwrap(Self.pushButton(in: host))
+            XCTAssertEqual(button.keyEquivalent, "\r")
+
+            host.rootView = AnyView(CompactPushButton("End", prominent: true) { current += 1 }.disabled(false))
+            Self.settle(host)
+            XCTAssertTrue(try XCTUnwrap(Self.pushButton(in: host)) === button)
+            try Self.sendNativeAction(button)
             XCTAssertEqual(original, 0)
             XCTAssertEqual(current, 1)
+
+            host.rootView = AnyView(CompactPushButton("End", prominent: true) { current += 1 }.disabled(true))
+            Self.settle(host)
+            XCTAssertTrue(try XCTUnwrap(Self.pushButton(in: host)) === button)
+            XCTAssertFalse(button.isEnabled)
+            XCTAssertEqual(button.keyEquivalent, "", "A disabled button must relinquish the Return role")
+            try Self.sendNativeAction(button)
+            XCTAssertEqual(current, 1, "A queued native callback must obey the latest disabled environment")
+
+            host.rootView = AnyView(CompactPushButton("End", prominent: false) { current += 1 }.disabled(false))
+            Self.settle(host)
+            XCTAssertTrue(button.isEnabled)
+            XCTAssertEqual(button.keyEquivalent, "", "An ordinary enabled button must not claim Return")
+            host.rootView = AnyView(CompactPushButton("End", prominent: true) { current += 1 }.disabled(false))
+            Self.settle(host)
+            XCTAssertEqual(button.keyEquivalent, "\r")
+            XCTAssertEqual(button.keyEquivalentModifierMask, [])
+            try Self.sendNativeAction(button)
+            XCTAssertEqual(current, 2)
         }
     }
 
@@ -81,13 +128,57 @@ final class CompactNativeControlsTests: XCTestCase {
                     let button = try XCTUnwrap(Self.popup(in: host))
                     XCTAssertEqual(button.selectedItem?.title, title)
                     XCTAssertEqual(button.font?.pointSize, 14)
-                    XCTAssertGreaterThanOrEqual(button.bounds.height, 30)
+                    XCTAssertEqual(button.bounds.height, button.intrinsicContentSize.height, accuracy: 0.5,
+                        "Regular controls must retain their native height without an extra 30pt wrapper")
                     XCTAssertGreaterThan(button.intrinsicContentSize.width, 80)
                     XCTAssertGreaterThanOrEqual(button.bounds.width + 0.5, button.intrinsicContentSize.width,
                         "A popup must report its native minimum instead of accepting a truncating proposal: \(title)")
                 }
             }
         }
+    }
+
+    func testPopupAndPushButtonExposeTheirNativeTextBaselineToSwiftUILayout() async throws {
+        try await MainActor.run {
+            for control in [AnyView(CompactPopUp(title: "Duration", selection: .constant(30),
+                                choices: [PopupChoice(30, "30m")])),
+                            AnyView(CompactPushButton("Apply") {})] {
+                let measurement = NativeBaselineMeasurement()
+                let host = Self.host(AnyView(NativeBaselineProbe(measurement: measurement) { control }))
+                let button = try XCTUnwrap(Self.nativeButton(in: host))
+                let nativeBaseline = button.alignmentRectInsets.top + button.firstBaselineOffsetFromTop
+                XCTAssertTrue(nativeBaseline.isFinite)
+                XCTAssertGreaterThan(nativeBaseline, 0)
+                XCTAssertLessThan(nativeBaseline, button.bounds.height)
+                XCTAssertEqual(try XCTUnwrap(measurement.baseline), nativeBaseline, accuracy: 0.5,
+                    "A firstTextBaseline row must align with AppKit's rendered title, not the representable's frame edge")
+            }
+        }
+    }
+
+    @MainActor
+    private static func host(_ rootView: AnyView) -> NSHostingView<AnyView> {
+        let host = NSHostingView(rootView: rootView)
+        host.frame = NSRect(x: 0, y: 0, width: 400, height: 100)
+        settle(host)
+        return host
+    }
+
+    @MainActor
+    private static func settle(_ host: NSView) {
+        host.layoutSubtreeIfNeeded()
+        // Native baseline publication is intentionally deferred past the
+        // representable update. Drain that update before inspecting layout.
+        RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+        host.layoutSubtreeIfNeeded()
+    }
+
+    @MainActor
+    private static func sendNativeAction(_ control: NSControl) throws {
+        let action = try XCTUnwrap(control.action)
+        // Send target/action directly so the coordinator's gate is tested even
+        // for a callback queued before the native control became disabled.
+        XCTAssertTrue(NSApplication.shared.sendAction(action, to: control.target, from: control))
     }
 
     func testSettingsRowExpandsLongChoicesAndStacksWhenTheRowIsNarrow() async throws {
@@ -141,5 +232,41 @@ final class CompactNativeControlsTests: XCTestCase {
             if let button = popup(in: subview) { return button }
         }
         return nil
+    }
+
+    @MainActor
+    private static func nativeButton(in view: NSView) -> NSButton? {
+        if let button = view as? NSButton { return button }
+        for subview in view.subviews {
+            if let button = nativeButton(in: subview) { return button }
+        }
+        return nil
+    }
+
+    @MainActor
+    private static func pushButton(in view: NSView) -> NSButton? {
+        guard let button = nativeButton(in: view), !(button is NSPopUpButton) else { return nil }
+        return button
+    }
+}
+
+private final class NativeBaselineMeasurement {
+    var baseline: CGFloat?
+}
+
+/// Inspect the baseline SwiftUI actually receives from the production wrapper.
+private struct NativeBaselineProbe: Layout {
+    let measurement: NativeBaselineMeasurement
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let child = subviews.first else { return .zero }
+        let dimensions = child.dimensions(in: proposal)
+        return CGSize(width: dimensions.width, height: dimensions.height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard let child = subviews.first else { return }
+        measurement.baseline = child.dimensions(in: proposal)[.firstTextBaseline]
+        child.place(at: bounds.origin, proposal: proposal)
     }
 }
