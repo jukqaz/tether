@@ -5,12 +5,19 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      package_only:
+        description: Recheck packaging after a packaging-only change
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
   build:
+    if: ${{ !inputs.package_only }}
+    needs: package
     runs-on: macos-26
     timeout-minutes: 30
     steps:
@@ -67,6 +74,11 @@ jobs:
         run: python3 scripts/test-upgrade.py
       - name: Uninstall and ownership recovery integration
         run: python3 scripts/test-uninstall.py
+  package:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - name: Build the app bundle
         run: scripts/build.sh
       - name: Packaged helper and CLI common-session regressions
@@ -80,5 +92,6 @@ jobs:
         run: python3 scripts/test-redesign-helper.py
       - name: Native finite idle lease after a stopped test driver
         run: |
+          swift build --product TetherWriterFixture
           BIN=$(swift build --show-bin-path)
           python3 scripts/test-idle-lease.py --fixture "$BIN/TetherWriterFixture" --output .build/verification/ci-native-idle
