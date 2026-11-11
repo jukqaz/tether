@@ -15,9 +15,6 @@ struct ProtectionPage: View {
                 ProblemBanner(problem: problem, model: model, compact: false, embeddedInForm: true)
                     .accessibilityIdentifier("settings-error-context")
             }
-            Note(L("Saves immediately · Protection applies to current and future work.",
-                   "즉시 저장 · 현재·다음 유지에 보호 기준을 적용합니다."))
-                .accessibilityIdentifier("settings-protection-save-scope")
             if let reason = model.workProtectionReason {
                 WorkSessionNote(title: L("Stopped for protection", "보호를 위해 중지됨"),
                     detail: protectionReason(reason), symbol: "exclamationmark.circle", color: .tetherWarning)
@@ -31,7 +28,8 @@ struct ProtectionPage: View {
                 }
             }
             activeRecordingStatus
-            SettingsContentGroup(L("Device Protection", "기기 보호")) {
+            SettingsContentGroup(L("Device Protection", "기기 보호"),
+                summary: L("Saves immediately", "즉시 저장"), summaryIdentifier: "settings-protection-save-scope") {
                 ProtectionSettingsContent(model: model)
             }.accessibilityIdentifier("settings-protection-rules-details")
             ProtectionBasisView(model: model, expansion: disclosures?.protectionBasis)

@@ -124,7 +124,7 @@ enum DesignPreview {
         app.activate(); app.run()
     }
 
-    private static func makeWindow<V: View>(title: String, size: NSSize, dark: Bool, view: V) -> NSWindow {
+    static func makeWindow<V: View>(title: String, size: NSSize, dark: Bool, view: V) -> NSWindow {
         let window = NSWindow(contentRect: NSRect(origin: .zero, size: size),
             styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = title; window.isReleasedWhenClosed = false

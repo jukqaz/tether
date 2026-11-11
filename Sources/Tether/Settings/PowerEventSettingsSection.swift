@@ -15,13 +15,19 @@ struct PowerEventSettingsSection<Content: View, Status: View>: View {
                 VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) { content }
                     .padding(.leading, 12).padding(.top, 8)
             } label: {
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        titleText.fixedSize()
-                        Spacer(minLength: 12)
-                        outcomeText.fixedSize()
+                Group {
+                    if isExpanded {
+                        titleText
+                    } else {
+                        ViewThatFits(in: .horizontal) {
+                            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                                titleText.fixedSize()
+                                Spacer(minLength: 12)
+                                outcomeText.fixedSize()
+                            }
+                            VStack(alignment: .leading, spacing: 4) { titleText; outcomeText }
+                        }
                     }
-                    VStack(alignment: .leading, spacing: 4) { titleText; outcomeText }
                 }
                 .frame(maxWidth: .infinity, minHeight: SettingsMetrics.rowHeight, alignment: .leading)
             }
@@ -35,11 +41,11 @@ struct PowerEventSettingsSection<Content: View, Status: View>: View {
     private var titleText: some View {
         Text(title).font(TetherTypography.settingsBody)
             .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier(outcomeIdentifier ?? "settings-power-event-outcome")
     }
     private var outcomeText: some View {
         Text(outcome).font(TetherTypography.settingsSecondary)
             .foregroundStyle(Color.tetherSecondary)
             .fixedSize(horizontal: false, vertical: true)
-            .accessibilityIdentifier(outcomeIdentifier ?? "settings-power-event-outcome")
     }
 }

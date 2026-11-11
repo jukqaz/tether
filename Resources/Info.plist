@@ -67,7 +67,7 @@
 	<key>TetherReleaseChannel</key>
 	<string>stable</string>
 	<key>TetherDesignRevision</key>
-	<string>2026-11-11-native-sidebar</string>
+	<string>2026-11-11-native-utility</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Tether needs full Calendar access to read only the time and availability of the calendars you select. It does not create or edit events.</string>
 </dict>

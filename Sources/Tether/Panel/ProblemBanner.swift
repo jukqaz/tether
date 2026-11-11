@@ -40,10 +40,10 @@ struct ProblemBanner: View {
                 .font(.body).foregroundStyle(problem.color).frame(width: 16)
                 .padding(.top, 2).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
-                Text(problem.title).font((compact ? Font.callout : .body).weight(.medium))
+                Text(problem.title).font(TetherTypography.body.weight(.medium))
                     .fixedSize(horizontal: false, vertical: true)
                 if !compact {
-                    Text(problem.message).font(.callout).foregroundStyle(.secondary)
+                    Text(problem.message).font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
                         .lineSpacing(2).fixedSize(horizontal: false, vertical: true)
                 }
             }

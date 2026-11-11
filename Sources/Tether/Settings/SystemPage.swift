@@ -44,15 +44,13 @@ struct SystemPage: View {
                 }
             }
 
-            SettingsContentGroup(L("Notifications", "알림")) {
-                SettingsDisclosure(title: L("Completion & Protection Notices", "종료·보호 알림"),
-                    summary: notificationSummary, isExpanded: notificationExpansion, groupsSection: false) {
-                    NotificationSettingsView(model: model, monitor: model.notificationSettings)
-                }.accessibilityIdentifier("settings-notifications-details")
-            }
+            SettingsDisclosure(title: L("Notifications", "알림"),
+                summary: notificationSummary, isExpanded: notificationExpansion) {
+                NotificationSettingsView(model: model, monitor: model.notificationSettings)
+            }.accessibilityIdentifier("settings-notifications-details")
 
             SettingsContentGroup(L("Updates", "업데이트")) {
-                SettingRow(title: updateSummary) { updateCheckButton }
+                SettingRow(title: L("Update status", "업데이트 상태"), detail: updateSummary) { updateCheckButton }
                 SettingsToggle(title: L("Check for updates automatically", "업데이트 자동 확인"), isOn: $model.checkUpdates)
                     .disabled(model.userCommandsArePreview || model.developmentService)
                 SettingsDisclosure(title: L("Installation Details", "설치 안내"),

@@ -72,13 +72,12 @@ struct ManualDefaultsOptionsView: View {
             SettingsToggle(title: L("Keep the display on", "화면 켜두기"),
                 isOn: $draft.nextManualOptions.display, identifier: "manual-defaults-display")
                 .disabled(controlsDisabled)
-            SettingRow(title: L("Stop keeping the display on after inactivity", "입력이 없으면 화면 켜두기 해제")) {
+            SettingRow(title: L("Release display after inactivity", "입력이 없으면 화면 켜두기 해제")) {
                 CompactPopUp(title: L("Display inactivity timeout", "입력 없이 대기할 시간"),
                     selection: $draft.nextManualOptions.releaseDisplayAfterIdle,
                     choices: idleChoices, identifier: "manual-defaults-display-idle")
                     .disabled(controlsDisabled || !draft.nextManualOptions.display)
             }
-            .padding(.leading, SettingsMetrics.rowSpacing)
             if !model.capabilities.generalIdleAvailable || draft.nextManualOptions.display && !model.v3Settings.keepDisplayAwake {
                 Note(displayApplicationDetail(for: draft.nextManualOptions))
                     .accessibilityIdentifier("manual-defaults-display-global-note")

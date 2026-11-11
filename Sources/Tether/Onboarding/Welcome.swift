@@ -71,15 +71,15 @@ struct WelcomeView: View {
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(alignment: .top, spacing: 10) {
                         Image(nsImage: NSApp.applicationIconImage)
-                            .resizable().frame(width: 44, height: 44)
+                            .resizable().frame(width: 32, height: 32)
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(setupAlreadyCompleted
                                 ? L("Check setup", "준비 상태 확인")
-                                : L("Choose how Tether starts", "처음 사용할 동작"))
+                                : L("Choose your starting options", "기본 동작 선택"))
                                 .font(TetherTypography.page)
                             Note(setupAlreadyCompleted
                                 ? L("Review your saved choices.", "저장된 선택을 확인하세요.")
@@ -110,7 +110,7 @@ struct WelcomeView: View {
                         PolicyNote(L("Tether requires Apple Silicon and macOS 26 or later.", "Tether는 Apple Silicon과 macOS 26 이상이 필요합니다."))
                     }
                     if let applyError { Note(applyError, color: .tetherError) }
-                }.padding(.horizontal, 28).padding(.vertical, 22)
+                }.padding(.horizontal, 24).padding(.vertical, 18)
             }.scrollEdgeEffectHidden(true, for: .top)
             Divider()
             HStack(spacing: 12) {
@@ -128,7 +128,7 @@ struct WelcomeView: View {
                 }.actionButton(prominent: true).keyboardShortcut(.defaultAction)
                     .disabled(!canConfirmChoices || model.commandPending || model.helperInstallInFlight)
                     .accessibilityIdentifier("welcome-confirm-choices")
-            }.padding(.horizontal, 28).padding(.vertical, 12).background(Color.tetherBackground)
+            }.padding(.horizontal, 24).padding(.vertical, 12).background(Color.tetherBackground)
         }.frame(width: 560, height: 448)
             .font(TetherTypography.body).foregroundStyle(Color.tetherPrimary)
             .background(Color.tetherBackground)
@@ -156,7 +156,7 @@ struct WelcomeView: View {
     }
     private var choiceResults: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(setupAlreadyCompleted ? L("After you finish", "완료 후 동작") : L("After saving", "저장 후 동작"))
+            Text(L("Start or end manual keep-awake from the menu bar.", "메뉴바에서 수동 유지를 시작·종료할 수 있습니다."))
                 .font(TetherTypography.secondary.weight(.medium))
             choiceResult(L("Automatic", "자동 유지"), automaticResult)
                 .accessibilityIdentifier("welcome-automatic-result")
@@ -205,7 +205,7 @@ struct WelcomeView: View {
     private var helperPreparation: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                Text(L("Required for closed-lid work", "덮개 유지에 필요한 도우미"))
+                Text(L("Closed-lid helper", "덮개 사용 도우미"))
                 Spacer(minLength: 8)
                 if model.helperSetupConfirmed {
                     Text(L("Ready", "준비됨")).foregroundStyle(Color.tetherSecondary)

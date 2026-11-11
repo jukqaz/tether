@@ -10,7 +10,8 @@ struct GeneralPage: View {
 
     var body: some View {
         SettingsForm {
-            SettingsContentGroup(model.showsLidOptions ? L("Display & Lid", "화면·덮개") : L("Display", "화면")) {
+            SettingsContentGroup(model.showsLidOptions ? L("Display & Lid", "화면·덮개") : L("Display", "화면"),
+                summary: L("Apply to next start", "다음 시작에 적용")) {
                 ManualDefaultsOptionsView(model: model, embedded: true, applicationDetails: disclosures?.manualApplication)
             }
             if model.hasInternalBattery {
@@ -87,15 +88,13 @@ struct ProtectionSettingsContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
-            SettingRow(title: L("Thermal protection", "열 보호")) {
-                Text(L("Critical is always on", "위험 단계는 항상 켬")).foregroundStyle(Color.tetherSecondary)
+            SettingRow(title: L("Thermal protection", "열 보호"),
+                detail: L("Critical thermal pressure always stops work", "위험 단계에서는 항상 중지합니다")) {
+                Text(model.observedThermalSummary).foregroundStyle(thermalColor)
             }
             SettingsToggle(title: L("Also stop at serious thermal pressure", "심각한 열 상태에서도 중지"),
                 isOn: Binding(get: { model.v3Settings.stopOnSeriousThermal }, set: { model.setStopOnSeriousThermal($0) }))
                 .disabled(model.commandPending || !model.acceptingUserCommands)
-            SettingRow(title: L("Current thermal state", "현재 열 상태")) {
-                Text(model.observedThermalSummary).foregroundStyle(thermalColor)
-            }
             if model.hasInternalBattery {
                 SettingRow(title: L("Stop below battery level", "배터리가 이보다 낮으면 끝내기"), showsAccessibleTitle: false) {
                     CompactPopUp(title: L("Stop below", "잔량 하한"), selection: Binding(
@@ -111,8 +110,6 @@ struct ProtectionSettingsContent: View {
                 isOn: Binding(get: { model.v4Settings.stopOnLowPowerMode }, set: { model.setV4StopOnLowPowerMode($0) }))
                 .disabled(model.commandPending || !model.acceptingUserCommands)
                 .accessibilityIdentifier("settings-low-power-stop")
-            Note(L("Thermal state comes from macOS, not a Celsius reading. Critical always stops work; turning off notifications never disables protection.",
-                   "열 상태는 macOS 기준이며 섭씨 온도가 아닙니다. 위험 단계는 항상 중지하고, 알림을 꺼도 보호는 계속됩니다."))
         }
     }
 

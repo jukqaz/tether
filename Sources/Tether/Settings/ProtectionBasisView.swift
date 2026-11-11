@@ -10,10 +10,12 @@ struct ProtectionBasisView: View {
     var body: some View {
         SettingsDisclosure(title: L("Protection Limits & Sources", "보호 기준과 출처"), isExpanded: detailsExpansion) {
             VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
+                Note(L("Protection settings save immediately and apply to current and future work. Turning off notifications never disables protection.",
+                       "보호 설정은 즉시 저장되어 현재·다음 유지에 적용됩니다. 알림을 꺼도 보호는 계속됩니다."))
                 Note(L("Tether stops only its own keep-awake session. It does not change the system's energy or fan controls.", "Tether가 유지하던 잠자기 방지만 중단합니다. 시스템 전원 모드나 팬 설정은 바꾸지 않습니다."))
                 basis(L("macOS thermal state", "macOS 시스템 발열"),
-                      L("Critical thermal pressure always stops Tether keep-awake; stopping at the serious level is optional. Automatic conditions can be checked again after safe recovery if enabled.",
-                        "위험 단계에서는 항상 Tether 유지를 중지합니다. 심각 단계에서 중지할지도 선택할 수 있습니다. 보호 중지 후 재개 옵션을 켜면 안전해진 뒤 자동 조건을 다시 확인합니다."))
+                      L("Thermal state comes from macOS, not a Celsius reading. Critical thermal pressure always stops Tether keep-awake; stopping at the serious level is optional. Automatic conditions can be checked again after safe recovery if enabled.",
+                        "열 상태는 macOS 기준이며 섭씨 온도가 아닙니다. 위험 단계에서는 항상 Tether 유지를 중지합니다. 심각 단계에서 중지할지도 선택할 수 있습니다. 보호 중지 후 재개 옵션을 켜면 안전해진 뒤 자동 조건을 다시 확인합니다."))
                 if model.hasInternalBattery {
                     basis(L("Optional battery sensor", "참고용 배터리 온도"),
                           L("Available sensor readings appear in diagnostics. Missing or model-specific Celsius readings do not set the protection cutoff.",

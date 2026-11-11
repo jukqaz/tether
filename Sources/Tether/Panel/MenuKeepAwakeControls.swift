@@ -77,7 +77,7 @@ struct MenuKeepAwakeControls: View {
         VStack(alignment: .leading, spacing: 12) {
             if model.showsLidOptions {
                 VStack(alignment: .leading, spacing: 4) {
-                    option(WorkPermissionText.lidTitle, symbol: "laptopcomputer", selection: lidBinding,
+                    option(WorkPermissionText.lidTitle, selection: lidBinding,
                            identifier: "panel-allow-closed-lid")
                         .disabled(lidControlDisabled)
                         .help(WorkPermissionText.lidHelp)
@@ -87,13 +87,13 @@ struct MenuKeepAwakeControls: View {
                         Button(L("Set up…", "도우미 설정…"), action: openHelperSetup)
                             .buttonStyle(.link)
                             .font(TetherTypography.secondary)
-                            .padding(.leading, 36)
+                            .padding(.leading, 22)
                             .accessibilityIdentifier("panel-prepare-lid-helper")
                     }
                 }
             }
             VStack(alignment: .leading, spacing: 4) {
-                option(WorkPermissionText.displayTitle, symbol: "sun.max", selection: displayBinding,
+                option(WorkPermissionText.displayTitle, selection: displayBinding,
                        identifier: "panel-keep-display-awake")
                     .disabled(controlsDisabled)
                     .help(WorkPermissionText.displayHelp)
@@ -102,7 +102,7 @@ struct MenuKeepAwakeControls: View {
             }
         }
         .font(TetherTypography.body)
-        .toggleStyle(.switch).tint(.tetherAction).controlSize(.regular)
+        .toggleStyle(.checkbox).tint(.tetherAction).controlSize(.regular)
     }
 
     private func permissionDetail(_ text: String) -> some View {
@@ -111,17 +111,13 @@ struct MenuKeepAwakeControls: View {
             .foregroundStyle(Color.tetherSecondary)
             .lineSpacing(2)
             .fixedSize(horizontal: false, vertical: true)
-            .padding(.leading, 36)
+            .padding(.leading, 22)
     }
 
-    private func option(_ title: String, symbol: String, selection: Binding<Bool>, identifier: String) -> some View {
+    private func option(_ title: String, selection: Binding<Bool>, identifier: String) -> some View {
         Toggle(isOn: selection) {
-            HStack(spacing: 12) {
-                Image(systemName: symbol).font(.system(size: 20))
-                    .frame(width: 24).accessibilityHidden(true)
-                Text(title).fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+            Text(title).fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityIdentifier(identifier)

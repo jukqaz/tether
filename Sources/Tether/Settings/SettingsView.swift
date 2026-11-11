@@ -52,7 +52,7 @@ struct SettingsNavigation: View {
                         .fixedSize(horizontal: false, vertical: true)
                 } icon: {
                     Image(systemName: page.symbol)
-                        .font(.system(size: 18))
+                        .font(.system(size: 16))
                         .foregroundStyle(.secondary)
                 }
                 .tag(page)
@@ -61,15 +61,16 @@ struct SettingsNavigation: View {
             }
             .listStyle(.sidebar)
             .scrollContentBackground(.hidden)
-            .environment(\.defaultMinListRowHeight, 44)
+            .environment(\.defaultMinListRowHeight, 36)
             .toolbar(removing: .sidebarToggle)
-            .navigationSplitViewColumnWidth(min: 176, ideal: 190, max: 220)
+            .navigationSplitViewColumnWidth(min: 168, ideal: 176, max: 208)
             .background(Color(nsColor: .windowBackgroundColor))
             .accessibilityIdentifier("settings-sidebar")
         } detail: {
-            model.settingsPage.page(model: model, disclosures: $disclosures)
-                .accessibilityIdentifier("settings-page-\(model.settingsPage.rawValue)")
-                .safeAreaInset(edge: .top, spacing: 0) {
+            // Keep the native detail host's minimum independent of its scroll
+            // document. Long pages must not enlarge the whole split view.
+            GeometryReader { _ in
+                VStack(spacing: 0) {
                     VStack(alignment: .leading, spacing: 5) {
                         Text(model.settingsPage.title).font(TetherTypography.page)
                             .foregroundStyle(Color.tetherPrimary)
@@ -81,10 +82,13 @@ struct SettingsNavigation: View {
                     }
                     .frame(maxWidth: SettingsMetrics.contentWidth, alignment: .leading)
                     .padding(.horizontal, SettingsMetrics.gutter)
-                    .padding(.top, 22).padding(.bottom, 18)
+                    .padding(.top, 18).padding(.bottom, 12)
                     .frame(maxWidth: .infinity)
                     .background(Color(nsColor: .windowBackgroundColor))
+                    model.settingsPage.page(model: model, disclosures: $disclosures)
+                        .accessibilityIdentifier("settings-page-\(model.settingsPage.rawValue)")
                 }
+            }
                 // A stable reading surface belongs to the detail pane only;
                 // the native sidebar and titlebar retain their own materials.
                 .background(Color(nsColor: .windowBackgroundColor))

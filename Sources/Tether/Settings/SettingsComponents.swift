@@ -12,14 +12,16 @@ struct Page<Content: View>: View {
 
 /// One content column for headings and scroll content, including wide windows.
 enum SettingsMetrics {
-    static let contentWidth: CGFloat = 620
+    static let contentWidth: CGFloat = 560
     static let gutter: CGFloat = 24
-    static let sectionSpacing: CGFloat = 22
+    static let contentTopInset: CGFloat = 12
+    static let sectionSpacing: CGFloat = 18
     static let cardInset: CGFloat = 12
-    static let rowHeight: CGFloat = 48
-    static let rowSpacing: CGFloat = 12
-    static let controlWidth: CGFloat = 240
+    static let rowHeight: CGFloat = 36
+    static let rowSpacing: CGFloat = 8
+    static let controlWidth: CGFloat = 200
     static let conditionWidth: CGFloat = 190
+    static let checkboxTextInset: CGFloat = 20
 
     /// Keep the scroll viewport as wide as its toolbar. Only the readable
     /// column narrows; constraining the Form itself truncates its edge effect.
@@ -39,12 +41,14 @@ struct SettingsForm<Content: View>: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SettingsMetrics.sectionSpacing) { content }
                 .frame(maxWidth: SettingsMetrics.contentWidth, alignment: .leading)
-                .padding(SettingsMetrics.gutter)
+                .padding(.horizontal, SettingsMetrics.gutter)
+                .padding(.top, SettingsMetrics.contentTopInset)
+                .padding(.bottom, SettingsMetrics.gutter)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .font(settingsStyle ? TetherTypography.settingsBody : TetherTypography.body)
         .toggleStyle(.checkbox)
-        .controlSize(.small)
+        .controlSize(.regular)
         .defaultScrollAnchor(scrollToEnd ? .bottom : .top)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -59,8 +63,9 @@ struct SettingsScroll<Content: View>: View {
             PageHeading(title: title, subtitle: subtitle)
                 .frame(maxWidth: SettingsMetrics.contentWidth, alignment: .leading)
                 .padding(.horizontal, SettingsMetrics.gutter)
-                .padding(.vertical, 16)
-                .frame(maxWidth: .infinity)
+                .padding(.top, 18)
+                .padding(.bottom, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
             Divider()
             if #available(macOS 26.0, *) {
                 scrollContent.scrollEdgeEffectHidden(true, for: .top)
@@ -75,8 +80,9 @@ struct SettingsScroll<Content: View>: View {
             VStack(alignment: .leading, spacing: SettingsMetrics.sectionSpacing) { content }
                 .frame(maxWidth: SettingsMetrics.contentWidth, alignment: .leading)
                 .padding(.horizontal, SettingsMetrics.gutter)
-                .padding(.vertical, 16)
-                .frame(maxWidth: .infinity)
+                .padding(.top, SettingsMetrics.contentTopInset)
+                .padding(.bottom, SettingsMetrics.gutter)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
         }
     }
 }
@@ -155,7 +161,7 @@ struct SettingsContentGroup<Content: View>: View {
                 }
             }
             content
-            Divider().padding(.top, 6)
+            Divider().padding(.top, 4)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -324,20 +330,18 @@ struct SettingsToggle: View {
     var detailIdentifier: String? = nil
     @Environment(\.tetherSettingsStyle) private var settingsStyle
     var body: some View {
-        HStack(alignment: .center, spacing: 16) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(title).font(settingsStyle ? TetherTypography.settingsBody : TetherTypography.body)
-                    .fixedSize(horizontal: false, vertical: true)
-                if let detail {
+        VStack(alignment: .leading, spacing: 4) {
+            identifiedToggle
+            if let detail {
+                Group {
                     if let detailIdentifier {
                         Note(detail).accessibilityIdentifier(detailIdentifier)
                     } else {
                         Note(detail)
                     }
                 }
+                .padding(.leading, SettingsMetrics.checkboxTextInset)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            identifiedToggle.fixedSize()
         }
         .frame(maxWidth: .infinity, minHeight: SettingsMetrics.rowHeight, alignment: .leading)
     }
@@ -348,8 +352,11 @@ struct SettingsToggle: View {
     }
 
     private var nativeToggle: some View {
-        Toggle(title, isOn: $isOn).labelsHidden().toggleStyle(.switch).controlSize(.regular)
-            .font(settingsStyle ? TetherTypography.settingsBody : TetherTypography.body)
+        Toggle(isOn: $isOn) {
+            Text(title).font(settingsStyle ? TetherTypography.settingsBody : TetherTypography.body)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+            .toggleStyle(.checkbox).controlSize(.regular)
             .accessibilityLabel(title)
             .accessibilityHint(hint ?? detail ?? "")
     }

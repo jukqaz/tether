@@ -18,6 +18,5 @@ struct DesignPreviewSettings: View {
     }
     var body: some View {
         SettingsView(model: state.model, screenshot: snapshot)
-            .frame(minWidth: WorkSessionMetrics.settingsMinimum.width, minHeight: WorkSessionMetrics.settingsMinimum.height)
     }
 }

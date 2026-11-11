@@ -36,16 +36,16 @@ struct TetherPanel: View {
     var body: some View {
         VStack(spacing: 0) {
             header.padding(.horizontal, WorkSessionMetrics.panelInset)
-                .padding(.vertical, 10)
+                .padding(.vertical, 6)
                 .background { chromeMeasurement }
             Divider()
             // Reserve the measured chrome, including wrapped footer text.
             MenuPanelBody(maximumHeight: max(1, (maximumHeight ?? screenHeightLimit) - chromeHeight)) {
-                panelContent.padding(.horizontal, WorkSessionMetrics.panelInset).padding(.vertical, 18)
+                panelContent.padding(.horizontal, WorkSessionMetrics.panelInset).padding(.vertical, 14)
             }
             .background(Color(nsColor: .windowBackgroundColor))
             Divider()
-            footer.padding(.horizontal, WorkSessionMetrics.panelInset).padding(.vertical, 12)
+            footer.padding(.horizontal, WorkSessionMetrics.panelInset).padding(.vertical, 10)
                 .background { chromeMeasurement }
         }
         .frame(width: WorkSessionMetrics.panelWidth)
@@ -75,10 +75,7 @@ struct TetherPanel: View {
     }
 
     private var header: some View {
-        HStack(spacing: 10) {
-            Image(nsImage: NSApplication.shared.applicationIconImage)
-                .resizable().frame(width: 22, height: 22)
-                .accessibilityHidden(true)
+        HStack(spacing: 8) {
             Text("Tether").font(TetherTypography.body.weight(.semibold))
             Spacer(minLength: 8)
             moreActions
@@ -86,25 +83,19 @@ struct TetherPanel: View {
     }
 
     private var statusSummary: some View {
-        HStack(alignment: .top, spacing: 12) {
-            StateIcon(icon: model.presentation.icon, size: 18)
-                .foregroundStyle(model.presentation.color)
-                .frame(width: 24, height: 24).padding(.top, 2)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 6) {
-                Text(statusTitle).font(TetherTypography.status)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(statusExplanation)
-                    .font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier(automaticStartWaitingDetail == nil
-                        ? "panel-status-detail" : "panel-automatic-waiting")
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(.isHeader)
-            .accessibilityIdentifier("panel-status")
+        VStack(alignment: .leading, spacing: 4) {
+            Text(statusTitle).font(TetherTypography.status)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(statusExplanation)
+                .font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier(automaticStartWaitingDetail == nil
+                    ? "panel-status-detail" : "panel-automatic-waiting")
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+        .accessibilityIdentifier("panel-status")
     }
 
     private var panelContent: some View {
@@ -154,7 +145,7 @@ struct TetherPanel: View {
             }
             if showsDisplayRecoveryWarning { displayRecoveryAttention }
             if actionVisibility.showsNewManual {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 8) {
                     sectionTitle(model.automaticWorkReasonActive
                         ? L("Add manual keep-awake", "추가 수동 유지")
                         : L("Manual keep-awake", "수동 유지"))
@@ -164,24 +155,32 @@ struct TetherPanel: View {
                 }
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("panel-new-manual-section")
-                Divider()
             }
             if actionVisibility.showsStartBlockedReason {
                 Note(model.manualStartBlockedDetail)
             }
-            if model.manualSessionActive { Divider() }
-            if actionVisibility.showsQuickOptions || model.workPaused || model.workProtectionReason != nil {
-                MenuKeepAwakeControls(model: model, canEdit: actionVisibility.showsQuickOptions,
-                    openHelperSetup: { showSettings(page: .safety) })
+            if actionVisibility.showsQuickOptions || model.workPaused || model.workProtectionReason != nil
+                || actionVisibility.showsAutomaticRest {
+                VStack(alignment: .leading, spacing: 12) {
+                    if actionVisibility.showsQuickOptions || model.workPaused || model.workProtectionReason != nil {
+                        MenuKeepAwakeControls(model: model, canEdit: actionVisibility.showsQuickOptions,
+                            openHelperSetup: { showSettings(page: .safety) })
+                    }
+                    if actionVisibility.showsAutomaticRest {
+                        AutomaticPauseControls(model: model, compact: true)
+                    }
+                }
             }
-            if actionVisibility.showsAutomaticRest {
-                AutomaticPauseControls(model: model, compact: true)
+            if model.capabilities.internalBattery == true || actionVisibility.showsWorkDetails
+                || actionVisibility.showsAutomaticToggle {
+                VStack(alignment: .leading, spacing: 10) {
+                    if model.capabilities.internalBattery == true {
+                        Divider()
+                        PowerBatteryDetails(monitor: powerBattery, isExpanded: $powerDetailsExpanded)
+                    }
+                    if actionVisibility.showsWorkDetails || actionVisibility.showsAutomaticToggle { workDetails }
+                }
             }
-            if model.capabilities.internalBattery == true {
-                Divider()
-                PowerBatteryDetails(monitor: powerBattery, isExpanded: $powerDetailsExpanded)
-            }
-            if actionVisibility.showsWorkDetails || actionVisibility.showsAutomaticToggle { workDetails }
             if let summary = model.otherAppKeepAwakeSummary {
                 Button(summary) {
                     if settingsNavigationAction != nil {
@@ -287,7 +286,7 @@ struct TetherPanel: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-                .toggleStyle(.switch).controlSize(.regular)
+                .toggleStyle(.checkbox).controlSize(.regular)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier("panel-automatic")
                 .accessibilityLabel(L("Allow automatic starts", "자동 시작 허용"))
@@ -416,7 +415,7 @@ struct TetherPanel: View {
                     .help(model.disconnectPolicyDetail)
                     .accessibilityIdentifier("panel-closed-lid-policy")
             }
-            .font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
+            .font(TetherTypography.body).foregroundStyle(Color.tetherPrimary)
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("panel-active-work-details")

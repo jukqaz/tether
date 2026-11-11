@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import XCTest
 import TetherCore
 @testable import Tether
@@ -20,6 +21,50 @@ final class DesignPreviewStateTests: XCTestCase {
             await Task.yield()
         }
         XCTFail("Isolated design helper did not settle", file: file, line: line)
+    }
+
+    @MainActor
+    func testSettingsPreviewKeepsWindowBoundsAcrossLongPages() async throws {
+        let previous = Localization.current
+        defer { Localization.current = previous }
+        for language in [Language.korean, .english] {
+            Localization.current = language
+            let state = DesignPreviewState(scenario: .automatic)
+            defer { state.close() }
+            await waitForPreparedPreview(state)
+            for size in [WorkSessionMetrics.settingsDefault, WorkSessionMetrics.settingsMinimum] {
+                let window = DesignPreview.makeWindow(title: "Settings layout regression",
+                    size: size, dark: false,
+                    view: DesignPreviewSettings(state: state, page: .app, snapshot: true))
+                defer { window.close() }
+                for _ in 0..<20 { await Task.yield() }
+                settleLayout(window)
+                let frame = window.frame
+                for page in [SettingsPage.safety, .general, .protection, .system, .safety] {
+                    state.model.settingsPage = page
+                    for _ in 0..<20 { await Task.yield() }
+                    settleLayout(window)
+                    let host = try XCTUnwrap(window.contentView)
+                    XCTAssertFalse(host.subviews.isEmpty, "The native split view must be mounted")
+                    for child in host.subviews {
+                        XCTAssertLessThanOrEqual(child.frame.height, host.bounds.height + 0.5,
+                            "Long settings must scroll inside the viewport: \(language), \(page), \(size)")
+                        XCTAssertEqual(child.frame.minY, 0, accuracy: 0.5,
+                            "Page changes must not shift the sidebar and heading outside the viewport")
+                    }
+                    XCTAssertEqual(window.frame, frame, "Changing pages must preserve the user's window")
+                }
+                XCTAssertFalse(window.isVisible, "This geometry regression must not show a window")
+            }
+        }
+    }
+
+    @MainActor
+    private func settleLayout(_ window: NSWindow) {
+        window.contentView?.layoutSubtreeIfNeeded()
+        // Drain deferred native-control baseline and split-view measurements.
+        RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+        window.contentView?.layoutSubtreeIfNeeded()
     }
 
     @MainActor

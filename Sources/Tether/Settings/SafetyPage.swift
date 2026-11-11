@@ -19,21 +19,16 @@ struct SafetyPage: View {
             SettingsContentGroup(L("Automatic keep-awake", "자동 유지"),
                 summary: L("Saves immediately", "즉시 저장"), summaryIdentifier: "settings-power-save-scope") {
                 SettingsToggle(title: L("Allow automatic start", "자동 시작 허용"),
-                    detail: automaticConditionSummary,
+                    detail: automaticStatusSummary,
                     isOn: Binding(get: { model.automaticEnabled }, set: { model.setAutomaticEnabled($0) }),
-                    identifier: "automatic-ac-toggle", detailIdentifier: "settings-automatic-mode-summary")
+                    identifier: "automatic-ac-toggle", detailIdentifier: "settings-automatic-start-state")
                     .disabled(settingsControlsDisabled)
-                HStack(alignment: .center, spacing: 12) {
-                    Text(automaticStatusSummary)
-                        .font(TetherTypography.settingsBody).foregroundStyle(.primary)
-                        .lineLimit(nil).fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .help(model.automaticStartStateDetail)
-                        .accessibilityIdentifier("settings-automatic-start-state")
+                    .help(model.automaticStartStateDetail)
+                SettingRow(title: automaticConditionSummary) {
                     CompactPushButton(L("Conditions…", "조건 설정…"),
                         identifier: "settings-automatic-rules") { showAutomaticConditions = true }
                         .disabled(settingsControlsDisabled)
-                }
+                }.accessibilityIdentifier("settings-automatic-mode-summary")
             }
 
             SettingsContentGroup(L("Power & lid behavior", "전원·덮개 동작")) {
@@ -69,8 +64,9 @@ struct SafetyPage: View {
                         outcome: closedLidEventSummary, outcomeIdentifier: "settings-closed-lid-saved-summary",
                         isExpanded: closedLidDisplayExpansion) {
                         SettingsToggle(title: WorkPermissionText.lidTitle,
-                            detail: L("Used only during valid keep-awake.", "유효한 유지에만 사용합니다."),
-                            isOn: GeneralPage(model: model).lidBinding, identifier: "closed-lid-allow-toggle")
+                            detail: lidStatusNeedsAttention ? nil : model.lidUsageStatusText,
+                            isOn: GeneralPage(model: model).lidBinding, identifier: "closed-lid-allow-toggle",
+                            detailIdentifier: "settings-lid-current-status")
                             .disabled(GeneralPage(model: model).lidControlDisabled)
                         if model.v3Settings.allowClosedLid { closedLidDisplayControls }
                     } status: { closedLidStatus }
@@ -128,8 +124,10 @@ struct SafetyPage: View {
     }
 
     @ViewBuilder private var closedLidStatus: some View {
-        Note(model.lidUsageStatusText, color: lidStatusNeedsAttention ? .tetherWarning : .tetherSecondary)
-            .accessibilityIdentifier("settings-lid-current-status")
+        if !model.showsLidOptions || !closedLidDisplayExpansion.wrappedValue || lidStatusNeedsAttention {
+            Note(model.lidUsageStatusText, color: lidStatusNeedsAttention ? .tetherWarning : .tetherSecondary)
+                .accessibilityIdentifier("settings-lid-current-status")
+        }
         if model.showsLidOptions && !model.helperSetupConfirmed
             && (model.v3Settings.allowClosedLid || closedLidDisplayExpansion.wrappedValue) {
             Note(L("Set up the helper below to use the Mac with the lid closed.", "덮개를 닫고 사용하려면 아래에서 도우미를 준비하세요."),
