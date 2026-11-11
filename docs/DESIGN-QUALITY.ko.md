@@ -1,6 +1,6 @@
 # UI 품질 측정
 
-2026-10-13 · 개발용 검사 · macOS native Scene
+2026-11-11 · 개발용 검사 · macOS native Scene
 
 이 검사는 잘림·겹침·조작 접근성처럼 재현 가능한 결함을 찾는다. 앱 사용자에게 점수나 진단 파일을 자동 생성하지 않는다. 색 취향·전체 미적 완성도·사용성·Apple 또는 WCAG 인증을 점수로 판정하지 않는다.
 
@@ -15,8 +15,8 @@ Apple HIG의 적응형 배치, 읽을 수 있는 글자, native 조작 원칙과
 | 읽기 | 20 | 핵심 문구의 실제 표시 10, 측정 가능한 렌더링 대비 10 |
 | 입력 | 20 | 같은 GUI 후보의 native 키보드 경로 10, 마우스 경로 10 |
 
-- 승인된 compact 메뉴 폭은 300±1pt, 프레임 반올림 오차는 0.5pt까지 허용한다. 평가기의 `MENU_WIDTH_POINTS`·`MENU_WIDTH_TOLERANCE_POINTS`와 보고서의 `menuWidthPoints`·`menuWidthTolerancePoints`가 이 제품 기준을 기록한다.
-- 이전 360pt 디자인의 저장된 점수·캡처는 당시 기준의 기록이다. 새 300pt 기준으로 이전 결과를 다시 합격 처리하거나 현재 설치본의 근거로 사용하지 않는다.
+- 현행 메뉴 폭은 380±1pt로 [스타일 가이드](../DESIGN.md)의 380pt와 `WorkSessionMetrics.panelWidth`를 따른다. 프레임 반올림 오차는 0.5pt까지 허용한다. 평가기의 `MENU_WIDTH_POINTS`·`MENU_WIDTH_TOLERANCE_POINTS`와 보고서의 `menuWidthPoints`·`menuWidthTolerancePoints`가 이 제품 기준을 기록한다.
+- 이전 300·304·360pt 기준의 저장된 점수·캡처는 당시 기준의 기록이다. 현행 380pt 기준으로 이전 결과를 다시 합격 처리하거나 현재 설치본의 근거로 사용하지 않는다. 새 기준의 UI 확인에는 같은 후보에서 새로 수집한 캡처가 필요하다.
 - 주요 시작·중지 버튼은 24pt를 제품 목표로 삼는다. `--recommend-minimum-target`은 나머지 식별 가능한 앱 조작의 22pt 권고도 검사한다. macOS 기본 창 버튼을 이 높이로 강제하지 않는다.
 - macOS 좌표 `pt`, PNG 픽셀, 웹 `CSS px`는 다르다. WCAG의 24×24 CSS px 기준을 native 컨트롤의 24pt 의무 규칙으로 사용하지 않는다.
 - 작은 일반 글자의 전경·배경을 확정할 수 있을 때 대비 4.5:1을 목표로 한다. 비활성 조작·장식·큰 글자는 별도로 해석한다. Glass와 vibrancy의 실제 색을 확정하지 못하면 미측정이다.
