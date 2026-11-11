@@ -2,6 +2,8 @@
 
 Apple Silicon Mac의 작업을 유지하는 메뉴바 앱입니다. MacBook에서는 덮개 유지도 선택할 수 있습니다. [English](README.md)
 
+**2026-11-11 유지보수 종료.** 진행 중이던 앱 수정까지만 최종 릴리스로 배포합니다. 이후 신규 기능·버그 수정·보안 패치·OS 호환 지원을 제공하지 않으며 추가 업데이트를 보장하지 않습니다. 저장소는 최종 릴리스와 함께 읽기 전용으로 보관합니다. [종료 범위와 배포·검증의 한계](docs/MAINTENANCE-STATUS.ko.md)
+
 Apple Silicon과 macOS 26 이상이 필요합니다. 변경 내역과 옵션·기본값은 [변경 기록](CHANGELOG.md)과 [기능명세서](docs/PRODUCT-SPEC.ko.md)에서 확인할 수 있습니다.
 
 ## 하는 일

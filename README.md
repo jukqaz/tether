@@ -2,6 +2,8 @@
 
 A menu-bar app for keeping Apple Silicon Macs working, with optional closed-lid support on MacBooks. [한국어 안내](README.ko.md)
 
+**Maintenance ends on 2026-11-11.** The final release completes only the app changes already in progress. No further feature development, bug fixes, security patches or OS compatibility support will be provided, and future updates are not guaranteed. The repository and final release are preserved as read-only records. [유지보수 종료 안내](docs/MAINTENANCE-STATUS.ko.md)
+
 Requires an Apple Silicon Mac running macOS 26 or later. See [release notes](CHANGELOG.md) for changes and the [feature specification](docs/PRODUCT-SPEC.ko.md) for options and defaults.
 
 ## Features
@@ -24,7 +26,9 @@ Display-idle prevention does not promise unlocked display-off operation, defeat 
 
 General keep-awake works without the administrator helper. To use a MacBook with the lid closed, open the lid and prepare the helper in **Settings → Power & Lid**. Automatic start and closed-lid permission are separate choices.
 
-Tether checks one signed feed for stable updates. Beta releases are retained as release history; the next stable candidate is **2026.11.1, build 60**.
+Tether's existing stable-update check uses one signed feed. The final release is the last planned update; later updates and continued feed availability are not guaranteed. Beta releases remain as release history.
+
+The final release is ad-hoc signed, without Developer ID signing or Apple notarization. Physical power acceptance remains incomplete, including closed-lid, unplug/reconnect and actual Sleep/Wake behavior. The separate SwiftUI layout proposal is not included in the app.
 
 [Published releases](https://github.com/jukqaz/tether/releases) · [Installation](docs/INSTALL-AND-TEST.ko.md) · [Validation checklist](docs/VALIDATION-CHECKLIST.ko.md) · [Release procedure](docs/RELEASING.ko.md)
 
@@ -45,4 +49,4 @@ CLI session commands use a running app of the same version. Examples include `co
 
 General → Advanced Integrations → Command-line Control provides copyable commands and URLs from the running app's bundled CLI. Notifications are edited inline in General; importing settings still requires review and saves inactive preset copies. Quitting ends Tether keep-awake and restores its power and display changes while retaining saved preferences.
 
-Previous records remain in [the changelog](docs/CHANGELOG.ko.md); they are not acceptance evidence for this candidate.
+Previous records remain in [the changelog](docs/CHANGELOG.ko.md); they are not acceptance evidence for the final release.

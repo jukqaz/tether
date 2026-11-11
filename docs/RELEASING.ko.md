@@ -5,15 +5,15 @@
 
 ## 이번 후보의 게시 전 조건
 
-최신 자동 검사 범위는 [검증 체크리스트](VALIDATION-CHECKLIST.ko.md), 실물 조작은 [인수 체크리스트](MANUAL-ACCEPTANCE.ko.md)를 따른다. 새로운 helper 실행 파일을 포함하므로 GUI만 교체하지 않는다. 관리자 승인·production 설치·실제 닫힌 분리 Sleep/Wake·macOS26 실행·인증된 원격 입력은 모의/격리 검사로 완료 처리하지 않는다. 현재 미커밋 변경은 이전 작업을 포함하므로 배포를 위해 일괄 커밋하거나 삭제하지 않는다.
+최신 자동 검사 범위는 [검증 체크리스트](VALIDATION-CHECKLIST.ko.md), 실물 조작은 [인수 체크리스트](MANUAL-ACCEPTANCE.ko.md)를 따른다. 새로운 helper 실행 파일을 포함하므로 GUI만 교체하지 않는다. 관리자 승인·production 설치·실제 닫힌 분리 Sleep/Wake·macOS26 실행·인증된 원격 입력은 모의/격리 검사로 완료 처리하지 않는다. 이번 명시적 배포 승인 범위에서 검토한 마지막 앱 변경만 커밋한다. 무관한 변경과 독립 시안은 포함하지 않으며 기존 사용자 변경을 삭제하지 않는다.
 
 사설 ad-hoc 배포 목적을 유지하며 Developer ID나 공증을 새로운 필수 요구로 만들지 않는다. 로컬 build와 서명 확인이 GitHub 게시·온라인 업데이트 완료를 뜻하지 않는다.
 
 ## 버전과 정식 업데이트
 
-표시 버전은 `연도.월.배포순번`이다. `2026.11.1`은 2026년 11월의 첫 정식 배포이며 날짜의 일을 뜻하지 않는다. 다음 정식은 `2026.11.2`, 월이 바뀌면 `2026.12.1`로 올린다.
+표시 버전은 `연도.월.배포순번`이다. `2026.11.1`은 2026년 11월의 첫 정식 배포이며 날짜의 일을 뜻하지 않는다. `2026.11.2`는 같은 달의 두 번째 배포순번이다.
 
-다음 정식 후보는 **2026.11.1 · 빌드 60**, 태그는 `v2026.11.1`, ZIP은 `Tether-2026.11.1-arm64.zip`이다. `Info.plist`와 `TetherPaths.swift`의 표시 버전·빌드를 일치시킨다. 내부 빌드는 이전의 모든 정식·베타보다 높아야 하며 월이 바뀌어도 초기화하지 않는다. 새 설치 파일의 `TetherReleaseChannel`은 `stable`로 고정하고 `TetherBetaIteration` 키는 제거한다.
+최종 정식 릴리스는 **2026.11.2 · 빌드 61**, 태그는 `v2026.11.2`, ZIP은 `Tether-2026.11.2-arm64.zip`이다. `Info.plist`와 `TetherPaths.swift`의 표시 버전·빌드를 일치시킨다. 내부 빌드는 이전의 모든 정식·베타보다 높아야 하며 월이 바뀌어도 초기화하지 않는다. 새 설치 파일의 `TetherReleaseChannel`은 `stable`로 고정하고 `TetherBetaIteration` 키는 제거한다.
 
 기존 공개 베타 **2026.11.1 Beta 1 · 빌드 59**의 태그·자산·Prerelease 속성은 보존한다. 새 정식은 높은 빌드와 별도 설치 파일로 생성한다. 이미 게시한 파일·빌드를 재사용하지 않으며, 같은 표시 버전의 정식을 다시 발행하는 것도 거부한다.
 
@@ -42,7 +42,7 @@ python3 scripts/test-uninstall.py
 
 Swift/앱 버전은 `TetherPaths.swift`와 `Info.plist`에서 함께 올립니다. Sparkle 2.10.0의 공식 도구와 앱 공개키에 대응하는 개인키를 사용합니다. 키는 저장소 밖의 안전한 장소에서 관리하고 값 자체를 명령줄·로그에 넣지 않습니다.
 
-`scripts/build.sh`는 수정 중인 로컬 후보를 만들 수 있다. 서명 배포용 `scripts/release.sh`는 staged·수정·untracked 소스가 있으면 개인키 읽기나 생성물 생성 전에 중단한다. 최종 검증도 `--require-clean`을 적용한다. 배포를 위해 자동 커밋하거나 사용자의 변경을 지우지 않으며, 검토 후 커밋된 깨끗한 checkout에서 실행한다.
+`scripts/build.sh`는 수정 중인 로컬 후보를 만들 수 있다. 서명 배포용 `scripts/release.sh`는 staged·수정·untracked 소스가 있으면 개인키 읽기나 생성물 생성 전에 중단한다. 최종 검증도 `--require-clean`을 적용한다. 이번 승인 범위에서 검토한 마지막 앱 변경만 커밋한 뒤 깨끗한 checkout에서 실행하며 사용자의 변경을 지우지 않는다.
 
 ```sh
 TETHER_PREVIOUS_APPCAST=/path/to/current-signed-appcast.xml \
@@ -60,9 +60,9 @@ sh scripts/release.sh
 변경을 커밋한 뒤 최종 패키징을 하고, 같은 환경변수를 설정한 상태에서 아래 검사가 통과해야 게시할 수 있습니다.
 
 ```sh
-# 빌드 60 후보를 검토·커밋한 뒤의 예시. 버전이 바뀌면 생성된 파일명과 태그를 사용한다.
-python3 scripts/verify-release.py dist/Tether-2026.11.1-arm64.zip \
-  --tag v2026.11.1 --require-clean
+# 최종 빌드 61을 검토·커밋한 뒤의 예시.
+python3 scripts/verify-release.py dist/Tether-2026.11.2-arm64.zip \
+  --tag v2026.11.2 --require-clean
 ```
 
 실제 Sparkle 다운로드→교체 검증은 공식 `sparkle-cli`로 `scripts/test-sparkle-update.py`를 실행합니다. 이 검사는 폐기할 임시 Ed25519 키를 자체 생성하므로 실제 배포 개인키를 요구하지 않습니다. 현재 피드 보안 설정을 그대로 적용하고, 30일간 서명 실패가 이어져도 변조 피드를 거부하는지 확인합니다. 비교용 과거 정책 fixture에서만 만료 설정을 생략합니다. 앱처럼 보이는 합성 fixture만 교체합니다. 실제 관리자 도우미 갱신과 UI 재실행은 별도 대상 Mac 시험입니다.
@@ -74,8 +74,8 @@ SPARKLE_TEST_CLI=/path/to/Sparkle-2.10.0/bin/sparkle-cli \
 SPARKLE_TOOLS_DIR=/path/to/Sparkle-2.10.0 \
 python3 scripts/test-packaged-update.py \
   --previous /path/to/Tether-2026.11.1-beta.1-arm64.zip \
-  --candidate dist/Tether-2026.11.1-arm64.zip \
-  --previous-build 59 --candidate-build 60 \
+  --candidate dist/Tether-2026.11.2-arm64.zip \
+  --previous-build 59 --candidate-build 61 \
   --output .build/verification/packaged-update-YYYYMMDD-HHMMSS
 ```
 
