@@ -183,7 +183,10 @@ def create_utility_app(path, identifier, executable):
     checked_test_id(identifier)
     binary = path / "Contents/MacOS" / executable.name
     binary.parent.mkdir(parents=True)
-    shutil.copy2(executable, binary)
+    # System utilities can carry restricted file flags. Only the disposable
+    # runner bytes and executable permission are needed here.
+    shutil.copyfile(executable, binary)
+    binary.chmod(0o755)
     write_info(path, {
         "CFBundleIdentifier": identifier,
         "CFBundleExecutable": executable.name,
