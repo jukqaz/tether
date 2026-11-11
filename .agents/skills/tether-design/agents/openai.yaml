@@ -1,4 +1,4 @@
 interface:
   display_name: "Tether 디자인 통합 검수"
   short_description: "Tether 메뉴와 설정의 디자인·사용성·네이티브 구현을 통합 검수합니다"
-  default_prompt: "$tether-design 스킬로 Tether의 현재 화면을 검수하고 승인된 디자인 안에서 개선해 주세요."
+  default_prompt: "$tether-design 스킬로 Apple HIG·화면 근거 검수·Impeccable의 시각적 기준·macOS SwiftUI 검수를 필요한 범위로 조합해 Tether를 개선해 주세요."
