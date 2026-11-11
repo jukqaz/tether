@@ -427,8 +427,11 @@ final class UserSessionControllerTests: XCTestCase {
                     XCTAssertEqual(subject.status.enabled, true)
                     if power == .battery {
                         XCTAssertEqual(subject.status.manualBatteryRemaining, 7200, accuracy: 1)
-                        XCTAssertEqual(subject.status.batteryRemaining, 7197, accuracy: 1,
-                            "A fresh ordinary Wake uses the explicitly selected power range and the original first battery cap")
+                        let firstBatteryDeadline = try XCTUnwrap(original.automaticBatteryDeadline)
+                        XCTAssertEqual(fresh.automaticBatteryDeadline, firstBatteryDeadline,
+                            "A fresh ordinary Wake must retain the first battery cap")
+                        XCTAssertEqual(subject.status.batteryRemaining, firstBatteryDeadline - (base + 3),
+                            accuracy: 0.000_001)
                         XCTAssertTrue(subject.status.automaticActive)
                         XCTAssertTrue(subject.status.holding)
                     }
