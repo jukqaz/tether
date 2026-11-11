@@ -36,7 +36,12 @@ extension AppModel {
         guard workSessionHolding, problem == nil, workProtectionReason == nil else { return nil }
         var reasons: [String] = []
         if automaticWorkReasonActive {
-            reasons.append(L("Automatic · power adapter connected", "자동 · 전원 어댑터 연결"))
+            if v4Settings.usesAdvancedAutomaticConditions {
+                let captured = userSession?.runtimeMarkers.automaticActivation?.condition.title ?? v4RuleSummary
+                reasons.append(L("Automatic · \(captured)", "자동 · \(captured)"))
+            } else {
+                reasons.append(L("Automatic · power adapter connected", "자동 · 전원 어댑터 연결"))
+            }
         }
         if manualSessionActive {
             reasons.append(includesManualCountdown

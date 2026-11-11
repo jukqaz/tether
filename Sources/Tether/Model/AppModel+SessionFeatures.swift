@@ -4,6 +4,7 @@ import TetherCore
 @MainActor
 extension AppModel {
     func configureSessionFeaturesIfNeeded() {
+        configureLifecycleOptionsIfNeeded()
         if usageStatisticsStore == nil {
             usageStatisticsStore = UsageStatisticsStore(defaults: userCommandsArePreview || developmentService ? nil : defaults)
         }
@@ -17,6 +18,7 @@ extension AppModel {
     }
 
     func updateSessionFeatures(_ state: UserSessionStatus) {
+        updateLifecycleOptions(state)
         guard !updatingSessionFeatures else { return }
         updatingSessionFeatures = true
         defer { updatingSessionFeatures = false }
@@ -60,6 +62,7 @@ extension AppModel {
     }
 
     func finishSessionFeatures() {
+        lifecycleOptions?.cancel()
         guard hasCoordinatorAuthority else { return }
         closedLidDisplayDriver?.update(mode: v3Settings.closedLidDisplayMode, eligible: false)
         if let driver = closedLidDisplayDriver { publishClosedLidDisplayState(driver.state) }

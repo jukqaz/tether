@@ -40,7 +40,7 @@ final class NotificationSettingsMonitor: ObservableObject {
 
     init(simulated: Bool = false, query: @escaping () async -> AppNotificationSettings = { await .current() },
          authorize: @escaping () async throws -> Void = {
-             _ = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert])
+             _ = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
          }) {
         self.simulated = simulated; self.query = query; self.authorize = authorize
         if simulated { value = AppNotificationSettings(access: .notRequested, alerts: false) }

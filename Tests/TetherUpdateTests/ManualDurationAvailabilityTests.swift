@@ -186,6 +186,60 @@ final class ManualDurationAvailabilityTests: XCTestCase {
         }
     }
 
+    func testCustomStartAndAbsoluteEndUseTheCommonPolicyAndRememberTheAcceptedFiniteDuration() async throws {
+        try await MainActor.run {
+            let (model, controller, backend) = fixture(power: .ac)
+            defer { _ = controller.end() }
+            let saved = controller.settings.lastManualDurationSeconds
+            let before = backend.creates
+            XCTAssertNotNil(model.manualStartSelectionDuration(.minutes(47)))
+            XCTAssertEqual(backend.creates, before, "Reading a draft must not start work")
+            XCTAssertEqual(controller.settings.lastManualDurationSeconds, saved)
+            XCTAssertTrue(model.startManualSelection(.minutes(47)))
+            let id = controller.manualRequestID
+            XCTAssertTrue(model.manualSessionActive)
+            XCTAssertEqual(controller.settings.lastManualDurationSeconds, 47 * 60, "Accepted finite starts keep the existing remember-last-duration behavior")
+            XCTAssertFalse(model.startManualSelection(.minutes(60)), "A new draft must not replace current work")
+            XCTAssertEqual(controller.manualRequestID, id)
+            model.endManualSession()
+            let now = Date()
+            XCTAssertTrue(model.startManualSelection(.until(now.addingTimeInterval(1234.5)), now: now))
+            XCTAssertEqual(model.manualSessionUntil!.timeIntervalSince(now), 1234.5, accuracy: 0.25)
+        }
+    }
+
+    func testCustomStartRechecksAChangedPowerLimitAndExplicitAllStop() async throws {
+        try await MainActor.run {
+            let (model, controller, backend) = fixture(power: .ac)
+            defer { _ = controller.end() }
+            model.setBatteryTimeLimit(.thirtyMinutes)
+            XCTAssertNotNil(model.manualStartSelectionDuration(.minutes(60)))
+            controller.update(power: .battery, thermal: 0, fullWake: true, controllingUser: true,
+                now: ContinuousTime.now, batteryPercent: 80)
+            let creates = backend.creates
+            XCTAssertFalse(model.startManualSelection(.minutes(60)))
+            XCTAssertFalse(model.manualSessionActive)
+            XCTAssertEqual(backend.creates, creates)
+            model.setEnabled(false)
+            XCTAssertFalse(model.startManualSelection(.minutes(15)))
+            XCTAssertFalse(model.manualSessionActive)
+        }
+    }
+
+    func testInjectedPreviewDoesNotInheritTheHostPhysicalLidState() async {
+        await MainActor.run {
+            let (model, controller, _) = fixture(power: .ac)
+            defer { _ = controller.end() }
+            XCTAssertEqual(model.snapshot.power, .ac)
+            XCTAssertNil(model.snapshot.observedLidClosed,
+                "An injected controller must not read this Mac's physical lid before binding")
+            XCTAssertNil(model.snapshot.observedSleepDisabled)
+            controller.setKeepDisplayAwake(true)
+            XCTAssertTrue(controller.start(duration: 600))
+            XCTAssertEqual(controller.status.displayHolding, true)
+        }
+    }
+
     @MainActor
     private func fixture(power: PowerSource) -> (AppModel, UserSessionController, ManualDurationAssertion) {
         let defaults = ManualDurationDefaults(), backend = ManualDurationAssertion()

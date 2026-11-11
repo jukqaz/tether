@@ -6,6 +6,11 @@ final class P0PolicyTests: XCTestCase {
     private func observe(_ policy: inout IdleSessionPolicy, _ now: Double,
                          power: PowerSource = .ac, thermal: Int? = 0, battery: Int? = 80,
                          lowMode: Bool? = false, owner: Bool = true) {
+        if policy.settings.v4.usesAdvancedAutomaticConditions,
+           policy.settings.automaticPowerCondition?.includesBattery == true {
+            policy.setV4AutomaticGate(.init(isSatisfied: true, validUntil: now + 15,
+                                           reason: "explicit-advanced-fixture"), now: now)
+        }
         policy.evaluate(power: power, thermal: thermal, fullWake: true, controllingUser: owner,
             now: now, batteryPercent: battery, lowPowerWarning: false, lowPowerMode: lowMode)
     }
@@ -148,6 +153,7 @@ final class P0PolicyTests: XCTestCase {
     func testUnknownThermalOnACDoesNotEnforceOrShortenTheCapturedBatteryCap() {
         var settings = IdleSessionSettings(); settings.automaticEnabled = true
         settings.automaticPowerCondition = .any; settings.disconnectPolicy = .continueEligible
+        settings.v4.automaticMode = .advanced
         var policy = ready(settings, power: .battery)
         let id = policy.automaticRequestID, cap = policy.automaticBatteryDeadline
         XCTAssertEqual(cap, 7300)
@@ -202,6 +208,7 @@ final class P0PolicyTests: XCTestCase {
     func testOrdinaryWakeUsesNewAutomaticIDAndOriginalBatteryCap() {
         var settings = IdleSessionSettings(); settings.automaticEnabled = true
         settings.automaticPowerCondition = .any; settings.disconnectPolicy = .continueEligible
+        settings.v4.automaticMode = .advanced
         var policy = ready(settings, power: .battery)
         let first = policy.automaticRequestID, deadline = policy.automaticBatteryDeadline
         XCTAssertNotNil(first); XCTAssertEqual(deadline, 7300)
@@ -212,18 +219,21 @@ final class P0PolicyTests: XCTestCase {
         policy.consumeSystemSleep(observedAt: 7301); observe(&policy, 7302, power: .battery)
         XCTAssertFalse(policy.automaticActive)
     }
-    func testBatteryDisconnectStartRequiresBothExplicitSelections() {
+    func testBatteryDisconnectStartFlagCannotCreateNewAutomaticWork() {
         for explicitStart in [false, true] {
             var settings = IdleSessionSettings(); settings.automaticEnabled = true
             settings.automaticPowerCondition = .battery; settings.disconnectPolicy = .continueEligible
+            settings.v4.automaticMode = .advanced
             settings.startAutomaticOnBatteryDisconnect = explicitStart
             var policy = ready(settings); observe(&policy, 101, power: .battery)
-            XCTAssertEqual(policy.automaticActive, explicitStart)
+            XCTAssertFalse(policy.automaticActive)
+            XCTAssertEqual(policy.settings.startAutomaticOnBatteryDisconnect, explicitStart)
         }
     }
     func testWakeReceiptCannotConsumeNewExecutionUsingTheOldActivationAnchor() throws {
         var settings = IdleSessionSettings(); settings.automaticEnabled = true
         settings.automaticPowerCondition = .any; settings.disconnectPolicy = .continueEligible
+        settings.v4.automaticMode = .advanced
         var policy = ready(settings, power: .battery)
         let oldID = try XCTUnwrap(policy.decision.batteryPermitID)
         XCTAssertTrue(policy.recordBatteryPermitIssued(id: oldID, now: 100))
@@ -272,6 +282,7 @@ final class P0PolicyTests: XCTestCase {
     func testOptionalAutomaticRecoveryPreservesActivationBudgetAndNeverRevivesManual() {
         var settings = IdleSessionSettings(); settings.automaticEnabled = true
         settings.automaticPowerCondition = .any; settings.disconnectPolicy = .continueEligible
+        settings.v4.automaticMode = .advanced
         settings.automaticallyResumeAfterProtection = true
         var policy = ready(settings, power: .battery)
         XCTAssertTrue(policy.start(duration: 600, now: 100)); let cap = policy.automaticBatteryDeadline

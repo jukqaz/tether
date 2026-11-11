@@ -6,6 +6,7 @@ public struct V4ExpiryNoticeToken: Codable, Equatable, Sendable {
     public var scope: V4Scope
     public var deadline: Double
     public var mayExtend15: Bool
+    public var warningMinutes: Int? = nil
 }
 public struct V4ExpiryNoticeUpdate: Equatable, Sendable {
     public var submit: V4ExpiryNoticeToken?
@@ -29,7 +30,7 @@ public struct V4ExpiryNoticeEngine: Sendable {
     public init() {}
 
     public mutating func update(manual: V4ManualSnapshot?, context: V4ExecutionContext, now: Double,
-                                enabled: Bool, notificationsAuthorized: Bool) -> V4ExpiryNoticeUpdate {
+                                enabled: Bool, notificationsAuthorized: Bool, warningMinutes: Int = 5) -> V4ExpiryNoticeUpdate {
         var invalidated: [V4ExpiryNoticeToken] = []
         func valid(_ manual: V4ManualSnapshot) -> Bool {
             manual.ownerID == context.scope.ownerID && manual.isActive(at: now) && context.permitsWork(at: now)
@@ -39,7 +40,8 @@ public struct V4ExpiryNoticeEngine: Sendable {
             if let delivered, !invalidated.contains(delivered) { invalidated.append(delivered) }
             candidate = nil; delivered = nil
         }
-        guard let manual, valid(manual), let deadline = manual.deadline, deadline.isFinite else {
+        guard V4Settings.expiryNoticeMinuteChoices.contains(warningMinutes),
+              let manual, valid(manual), let deadline = manual.deadline, deadline.isFinite else {
             invalidateCurrent()
             return .init(submit: nil, invalidate: invalidated, nextEvaluation: nil)
         }
@@ -47,8 +49,8 @@ public struct V4ExpiryNoticeEngine: Sendable {
             invalidateCurrent(); trackedRequestID = manual.requestID; attempted = false
         }
         let token = V4ExpiryNoticeToken(requestID: manual.requestID, revisionID: manual.revisionID,
-            scope: context.scope, deadline: deadline, mayExtend15: fullExtensionAllowed(manual, minutes: 15))
-        if candidate.map({ $0.revisionID != token.revisionID || $0.deadline != token.deadline || $0.scope != token.scope }) == true
+            scope: context.scope, deadline: deadline, mayExtend15: fullExtensionAllowed(manual, minutes: 15), warningMinutes: warningMinutes)
+        if candidate.map({ $0.revisionID != token.revisionID || $0.deadline != token.deadline || $0.scope != token.scope || $0.warningMinutes != token.warningMinutes }) == true
             || delivered.map({ $0.revisionID != token.revisionID || $0.deadline != token.deadline || $0.scope != token.scope }) == true {
             invalidateCurrent()
         }
@@ -56,10 +58,11 @@ public struct V4ExpiryNoticeEngine: Sendable {
             invalidateCurrent(); return .init(submit: nil, invalidate: invalidated, nextEvaluation: nil)
         }
         guard !attempted else { return .init(submit: nil, invalidate: invalidated, nextEvaluation: nil) }
-        let due = deadline - 300
+        let lead = Double(warningMinutes * 60)
+        let due = deadline - lead
         if candidate == nil {
             // First observation after the threshold is never a catch-up notification.
-            guard now < due, deadline - manual.startedAt > 300 else {
+            guard now < due, deadline - manual.startedAt > lead else {
                 return .init(submit: nil, invalidate: invalidated, nextEvaluation: nil)
             }
             candidate = token

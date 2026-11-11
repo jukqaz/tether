@@ -37,7 +37,7 @@ final class AppModel: ObservableObject {
 
     // MARK: State from the helper
 
-    @Published private(set) var snapshot = SystemProbe.snapshot()
+    @Published private(set) var snapshot = Snapshot(power: .unknown, lidClosed: nil, sleepDisabled: nil, fullWake: nil)
     @Published private(set) var status: Status?
     @Published private(set) var protection: ProtectionStatus?
     var developmentService: Bool { TetherPaths.serviceSocket != TetherPaths.productionSocket }
@@ -131,6 +131,7 @@ final class AppModel: ObservableObject {
     var usageStatisticsStore: UsageStatisticsStore?
     var closedLidDisplayDriver: ClosedLidDisplayDriver?
     var updatingSessionFeatures = false
+    @Published var lifecycleOptions: LifecycleOptionsRuntime?
 
     /// Ticks every second while a battery hold counts down, for the menu bar and the panel.
     let clock = HoldClock()
@@ -286,6 +287,15 @@ final class AppModel: ObservableObject {
         self.previewHelperFiles = preview ? previewHelperFiles : nil
         self.capabilitiesProbe = preview ? previewCapabilitiesProbe : { SystemProbe.capabilities }
         self.defaults = preview ? (previewDefaults ?? .standard) : .standard
+        // Injected fixtures must not inherit the host's physical lid/display
+        // state before their controller is bound. Explicit observations still
+        // drive closed-lid previews through the same rendering path.
+        if preview, previewSession != nil || previewLegacyObservation != nil {
+            snapshot = previewLegacyObservation?() ?? Snapshot(power: previewSession?.status.power ?? .unknown,
+                lidClosed: nil, sleepDisabled: nil, fullWake: nil)
+        } else {
+            snapshot = SystemProbe.snapshot()
+        }
         let live = !preview && TetherPaths.serviceSocket == TetherPaths.productionSocket
         coordinatorLeaseRequired = live || (preview && (previewCoordinatorPath != nil || previewCommandPath != nil))
         var startupFailure: String?
@@ -1391,21 +1401,25 @@ final class AppModel: ObservableObject {
     }
     func startManualSession(minutes: Int?) {
         guard acceptingUserCommands else { return }
-        if let userSession {
-            guard !v4ManualApprovalPending, canAcquireManualFeatures,
-                  userSession.start(duration: minutes.map { Double($0) * 60 }) else {
-                errorText = userSession.status.error ?? L("This manual session cannot start with the current power or protection state.", "현재 전원·보호 상태에서는 수동 세션을 시작할 수 없습니다.")
-                return
-            }
-            acceptedUserWorkIntent()
-            if manualFeaturesNeedHelper, let requestID = userSession.manualRequestID {
-                v4ManualApprovalPending = true
-                Task { _ = await verifyManualStart(requestID: requestID) }
-            }
-            return
-        }
+        if userSession != nil { _ = startManualDuration(minutes.map { Double($0) * 60 }); return }
         var request = ServiceRequest(.startManualSession); request.minutes = minutes
         send(request)
+    }
+    /// Every advanced Start uses the same executor approval as the compact presets.
+    @discardableResult
+    func startManualDuration(_ duration: TimeInterval?) -> Bool {
+        guard acceptingUserCommands, !commandPending, let userSession, !manualSessionActive,
+              !v4ManualApprovalPending, canAcquireManualFeatures,
+              userSession.start(duration: duration) else {
+            errorText = userSession?.status.error ?? L("This manual session cannot start with the current power or protection state.", "현재 전원·보호 상태에서는 수동 세션을 시작할 수 없습니다.")
+            return false
+        }
+        acceptedUserWorkIntent()
+        if manualFeaturesNeedHelper, let requestID = userSession.manualRequestID {
+            v4ManualApprovalPending = true
+            Task { _ = await verifyManualStart(requestID: requestID) }
+        }
+        return true
     }
     @discardableResult
     func extendCommonManualSession(minutes: Int) -> Bool {
@@ -1570,6 +1584,9 @@ final class AppModel: ObservableObject {
             guard userSession.end() else {
                 terminating = false; errorText = userSession.status.error; return false
             }
+            // Only in-process HTTPS actions are enabled. Cancelling networking
+            // must not veto core shutdown after the work request has ended.
+            _ = await lifecycleOptions?.shutdown()
             finishSessionFeatures()
             if !renderOnly { screenGuard.releaseAll() }
             userCommandService?.stop()

@@ -299,7 +299,7 @@ struct SettingsToggle: View {
 
     private var nativeToggle: some View {
         Toggle(title, isOn: $isOn).labelsHidden().toggleStyle(.switch)
-            .tint(.tetherAccent)
+            .tint(.tetherAction)
             .accessibilityLabel(title)
             .accessibilityHint(hint ?? detail ?? "")
     }

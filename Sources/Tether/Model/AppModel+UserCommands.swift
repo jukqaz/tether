@@ -162,6 +162,9 @@ extension AppModel {
             else if enabled && controller.status.automaticActive { acceptedUserWorkIntent() }
         case .condition(let condition):
             if condition != .ac, let error = validateBatteryAction() { commandError = error }
+            else if condition != .ac && !controller.settings.v4.usesAdvancedAutomaticConditions {
+                commandError = "advancedAutomationRequired"
+            }
             else {
                 controller.setPowerCondition(condition)
                 if controller.status.powerCondition != condition { commandError = "safetyBlocked" }

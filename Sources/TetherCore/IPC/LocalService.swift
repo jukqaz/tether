@@ -97,6 +97,7 @@ public struct ServiceFailure: LocalizedError {
         case "coordinatorRequired": L("This session is managed by the Tether app. Use its session controls.", "이 세션은 Tether 앱에서 관리합니다. 앱의 세션 조작을 사용해 주세요.")
         case "invalidWorkLease": L("The lid request is stale or cannot be verified. General work is reported separately.", "덮개 요청이 오래됐거나 확인할 수 없습니다. 일반 작업 유지 상태는 별도로 표시합니다.")
         case "unavailable": L("The helper service is unavailable. Install the matching helper.", "도우미에 연결할 수 없습니다. 이 버전의 도우미를 설치해 주세요.")
+        case "advancedAutomationRequired": L("Basic automatic starts use power only. Select advanced automation before changing its power range.", "기본 자동 시작은 전원 연결 중에만 동작합니다. 전원 범위를 바꾸려면 고급 자동화를 먼저 선택하세요.")
         case "safetyBlocked": L("Safety protection is holding this Mac back. Resume after charging or cooling.", "배터리·발열 보호로 중지됐습니다. 충전하거나 냉각한 뒤 재개해 주세요.")
         case "powerConflict": L("Another power setting is active. Resolve it before resuming.", "다른 절전 방지 설정이 활성화돼 있습니다. 충돌을 해결한 뒤 재개해 주세요.")
         case "powerUnconfirmed": L("Power return is not confirmed yet. Keep power connected, then retry.", "안정적인 전원 복귀를 아직 확인하지 못했습니다. 연결을 유지한 뒤 다시 시도해 주세요.")

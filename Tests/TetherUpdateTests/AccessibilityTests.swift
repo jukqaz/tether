@@ -34,22 +34,37 @@ final class AccessibilityTests: XCTestCase {
     /// Rendering injections verify the shipping modifier consumes its input. They do not
     /// replace the separate keyboard or actual macOS preference checks.
     @MainActor
-    func testShippingCardRendersDifferentContrastAndOpaqueSurfaces() throws {
+    func testReadingCardStrengthensContrastWithoutAddingABorderForReducedTransparency() throws {
         let standard = try renderCard(contrast: .standard, reduceTransparency: false)
         let increased = try renderCard(contrast: .increased, reduceTransparency: false)
         let opaque = try renderCard(contrast: .standard, reduceTransparency: true)
         XCTAssertNotEqual(standard, increased, "The increased-contrast input must affect actual drawing")
-        XCTAssertNotEqual(standard, opaque, "The reduced-transparency input must affect actual drawing")
+        XCTAssertEqual(standard, opaque, "Reading cards are already opaque; reducing transparency must not add a high-contrast border")
     }
 
     @MainActor
-    private func renderCard(contrast: ColorSchemeContrast, reduceTransparency: Bool) throws -> Data {
+    func testShippingControlSurfaceDrawsAnOpaqueFallbackWhenTransparencyIsReduced() throws {
+        let standard = try renderCard(contrast: .standard, reduceTransparency: false, controlSurface: true)
+        let opaque = try renderCard(contrast: .standard, reduceTransparency: true, controlSurface: true)
+        XCTAssertNotEqual(standard, opaque, "Interactive glass must still honor reduced transparency")
+    }
+
+    @MainActor
+    private func renderCard(contrast: ColorSchemeContrast, reduceTransparency: Bool, controlSurface: Bool = false) throws -> Data {
         _ = NSApplication.shared
         let size = CGSize(width: 360, height: 150)
-        let view = SettingsCard(title: "Protection", symbol: "shield") {
-            WorkSessionNote(title: "Stopped for protection", detail: "Resume after cooling.")
+        let surface: AnyView
+        if controlSurface {
+            surface = AnyView(HStack {
+                Text("Keep awake")
+                Button("Start") {}
+            }.padding(12).surface(radius: 12))
+        } else {
+            surface = AnyView(SettingsCard(title: "Protection", symbol: "shield") {
+                WorkSessionNote(title: "Stopped for protection", detail: "Resume after cooling.")
+            })
         }
-        .padding(16).frame(width: size.width, height: size.height)
+        let view = surface.padding(16).frame(width: size.width, height: size.height)
         .environment(\.tetherContrastOverride, contrast)
         .environment(\.tetherReduceTransparencyOverride, reduceTransparency)
         .preferredColorScheme(.dark)

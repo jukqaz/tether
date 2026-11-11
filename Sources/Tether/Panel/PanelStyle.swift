@@ -66,7 +66,7 @@ private struct WorkSessionControlSurface: ViewModifier {
                 .background(Color.tetherControlSurface, in: .rect(cornerRadius: radius))
                 .overlay {
                     RoundedRectangle(cornerRadius: radius)
-                        .strokeBorder(Color.tetherControlBorder, lineWidth: preferences.borderWidth)
+                        .strokeBorder(preferences.borderColor, lineWidth: preferences.borderWidth)
                         .accessibilityHidden(true)
                 }
         } else if #available(macOS 26.0, *), DesignKey.glassOn {
@@ -108,7 +108,7 @@ private struct WorkSessionMenuSurface: ViewModifier {
             content.background(Color(nsColor: .windowBackgroundColor), in: .rect(cornerRadius: 14))
                 .overlay {
                     RoundedRectangle(cornerRadius: 14)
-                        .strokeBorder(preferences.usesOpaqueControls ? Color.tetherControlBorder : Color.tetherDivider,
+                        .strokeBorder(preferences.borderColor,
                                       lineWidth: preferences.borderWidth)
                         .accessibilityHidden(true)
                 }
@@ -139,7 +139,7 @@ private struct WorkSessionCardSurface: ViewModifier {
             .background(RoundedRectangle(cornerRadius: 12).fill(Color.tetherControlSurface))
             .overlay {
                 RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(preferences.usesOpaqueControls ? Color.tetherControlBorder : Color.tetherDivider,
+                    .strokeBorder(preferences.borderColor,
                                   lineWidth: preferences.borderWidth)
                     .accessibilityHidden(true)
             }
@@ -158,17 +158,18 @@ private struct WorkSessionActionStyle: ViewModifier {
             reduceTransparency: transparencyOverride ?? reduceTransparency)
         if !preferences.usesOpaqueControls, #available(macOS 26.0, *), DesignKey.glassOn {
             if prominent {
-                content.buttonStyle(.glassProminent).tint(.accentColor)
+                content.buttonStyle(.glassProminent).tint(.tetherAction)
                     .font(TetherTypography.body.weight(.medium))
             } else {
-                content.buttonStyle(.glass)
+                content.buttonStyle(.glass).tint(Color(nsColor: .controlColor))
                     .font(TetherTypography.body)
             }
         } else if prominent {
-            content.buttonStyle(.borderedProminent).tint(.accentColor)
+            content.buttonStyle(.borderedProminent).tint(.tetherAction)
                 .font(TetherTypography.body.weight(.medium))
         } else {
-            content.buttonStyle(.bordered).font(TetherTypography.body)
+            content.buttonStyle(.bordered).tint(Color(nsColor: .controlColor))
+                .font(TetherTypography.body)
         }
     }
 }

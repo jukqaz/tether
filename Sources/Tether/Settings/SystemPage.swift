@@ -7,7 +7,10 @@ struct SystemPage: View {
     @State private var diagnosticsExpanded = false
     @State private var updateOptionsExpanded = false
     @State private var helperExpanded = false
-    @State private var alertsExpanded = false
+    @State private var showNotifications = false
+    @State private var showSettingsTransfer = false
+    @State private var showAdditionalOptions = false
+    @State private var showSystemOverlap = false
     @State private var showMenuPreview = false
     @State private var usageStatisticsExpanded = false
     @State private var otherAppRequestsExpanded = false
@@ -23,7 +26,7 @@ struct SystemPage: View {
                 updateAttentionSection
             }
             activeRecordingStatus
-            SettingsContentGroup(L("Startup and display", "시작과 표시")) {
+            SettingsContentGroup(L("General", "일반")) {
                 SettingsToggle(title: L("Launch at login", "로그인 시 시작"), isOn: Binding(
                     get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
                     .disabled(model.userCommandsArePreview || model.developmentService)
@@ -52,26 +55,33 @@ struct SystemPage: View {
                 }
             }
 
-            SettingsDisclosure(title: L("Notifications", "알림"),
-                summary: notificationSummary, isExpanded: alertsExpansion) {
-                VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
-                    NotificationSettingsView(model: model, monitor: model.notificationSettings)
-                }
-            }.accessibilityIdentifier("settings-protection-alerts-details")
-
-            SettingsContentGroup(L("Quitting and updates", "앱 종료와 업데이트")) {
-                SettingRow(title: L("When Tether quits", "Tether를 종료하면")) {
-                    Text(L("End all Tether work", "잠자기 방지 모두 끝내기"))
-                        .foregroundStyle(Color.tetherSecondary)
-                }
-                Note(L("Tether restores its changes before quitting. Ended timers never restart.",
-                       "자체 변경을 되돌린 뒤 종료합니다. 끝난 타이머를 다시 실행하지 않습니다."))
-            }
-
             SettingsDisclosure(title: L("Updates", "업데이트"),
                 summary: updateSummary, isExpanded: updateExpansion) {
                 updateDetails
             }.accessibilityIdentifier("settings-updates-details")
+
+            SettingsContentGroup(L("More app settings", "추가 앱 설정")) {
+                SettingRow(title: L("Notifications", "알림"), detail: notificationSummary) {
+                    Button(L("Details…", "세부 설정…")) { showNotifications = true }
+                        .buttonStyle(.link).accessibilityLabel(L("Notification settings", "알림 세부 설정"))
+                        .accessibilityIdentifier("settings-open-notifications")
+                }
+                SettingRow(title: L("Move settings", "설정 이동"),
+                    detail: L("Reviewed imports stay inactive", "가져온 설정은 검토 후 비활성 사본으로 저장")) {
+                    Button(L("Import / export…", "가져오기·내보내기…")) { showSettingsTransfer = true }
+                        .buttonStyle(.link).accessibilityLabel(L("Import and export settings", "설정 가져오기·내보내기"))
+                        .accessibilityIdentifier("settings-open-transfer")
+                }
+                SettingRow(title: L("Additional options", "추가 옵션"),
+                    detail: L("Find timer, display and automation settings", "시간·화면·자동화 설정 찾기")) {
+                    Button(L("Browse…", "모두 보기…")) { showAdditionalOptions = true }
+                        .buttonStyle(.link).accessibilityLabel(L("Browse additional options", "추가 옵션 모두 보기"))
+                        .accessibilityIdentifier("settings-open-additional-options")
+                }
+            }
+
+            Note(L("Quitting ends Tether work and restores its changes. Ended timers do not restart.",
+                   "앱을 종료하면 유지를 끝내고 자체 변경을 되돌립니다. 끝난 타이머는 다시 시작하지 않습니다."))
 
             SettingsDisclosure(title: L("Usage statistics", "사용 통계"),
                 summary: L("Last 7 days", "최근 7일"), isExpanded: usageStatisticsExpansion) {
@@ -99,10 +109,8 @@ struct SystemPage: View {
                         DiagnosticControls(model: model, showActiveRecordingStatus: false)
                             .frame(maxWidth: .infinity, alignment: .leading)
                         Divider()
-                        DisclosureGroup(L("Features shared with macOS", "macOS와 겹치는 기능")) {
-                            SystemFeatureOverlapView(model: model, monitor: model.systemSettings)
-                                .padding(.top, 4)
-                        }
+                        Button(L("Features shared with macOS…", "macOS와 겹치는 기능…")) { showSystemOverlap = true }
+                            .buttonStyle(.link).accessibilityIdentifier("settings-open-system-overlap")
                     }
             }.accessibilityIdentifier("settings-records-diagnostics-details")
 
@@ -119,6 +127,29 @@ struct SystemPage: View {
                 .padding(.top, 2)
         }
         .toggleStyle(.switch)
+        .sheet(isPresented: $showNotifications) {
+            V4FeatureSheet(title: L("Notifications", "알림")) {
+                Text(L("App-wide choices", "앱 전체에 적용"))
+                    .font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
+                NotificationSettingsView(model: model, monitor: model.notificationSettings)
+            } actions: {
+                Button(L("Back", "뒤로")) { showNotifications = false }
+                    .actionButton().keyboardShortcut(.cancelAction)
+                    .accessibilityIdentifier("settings-notifications-back")
+                Spacer()
+            }.accessibilityIdentifier("settings-notifications-sheet")
+        }
+        .sheet(isPresented: $showSettingsTransfer) { SettingsTransferView(model: model) }
+        .sheet(isPresented: $showAdditionalOptions) { OptionCatalogView(model: model) }
+        .sheet(isPresented: $showSystemOverlap) {
+            V4FeatureSheet(title: L("Features shared with macOS", "macOS와 겹치는 기능")) {
+                SystemFeatureOverlapView(model: model, monitor: model.systemSettings)
+            } actions: {
+                Button(L("Back", "뒤로")) { showSystemOverlap = false }
+                    .actionButton().keyboardShortcut(.cancelAction)
+                Spacer()
+            }.accessibilityIdentifier("settings-system-overlap-sheet")
+        }
         .onAppear { revealRequestedOtherAppDetails() }
         .onChange(of: model.otherAppDetailsRequested) { _, requested in
             if requested { revealRequestedOtherAppDetails() }
@@ -140,7 +171,6 @@ struct SystemPage: View {
     private var diagnosticsExpansion: Binding<Bool> { disclosures?.diagnostics ?? $diagnosticsExpanded }
     private var updateExpansion: Binding<Bool> { disclosures?.updates ?? $updateOptionsExpanded }
     private var helperExpansion: Binding<Bool> { disclosures?.helper ?? $helperExpanded }
-    private var alertsExpansion: Binding<Bool> { disclosures?.protectionAlerts ?? $alertsExpanded }
     private var notificationSummary: String {
         [model.notifySessionEnd ? L("Timer end on", "타이머 종료 켬") : L("Timer end off", "타이머 종료 꺼짐"),
          model.notifyExpiryWarning ? L("Warning on", "미리 알림 켬") : L("Warning off", "미리 알림 꺼짐")].joined(separator: " · ")

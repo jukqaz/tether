@@ -557,6 +557,14 @@ final class CommonSessionRoutingTests: XCTestCase {
         defer { _ = controller.end(); defaults.removePersistentDomain(forName: name) }
         await wait { service.gate.current != nil }
         model.setPowerCondition(.any); model.setAutomaticMinutes(30)
+        var advanced = controller.v4Settings
+        let condition = V4Condition(id: UUID(), kind: .timeWindow,
+            timeWindow: .init(startMinute: 0, endMinute: 0))
+        let preset = V4Preset(id: UUID(), name: "Explicit advanced clock", groups: [
+            V4RuleGroup(id: UUID(), conditions: [condition])
+        ])
+        advanced.automaticMode = .advanced; advanced.presets = [preset]; advanced.activePresetID = preset.id
+        XCTAssertTrue(controller.setV4Settings(advanced))
         model.setAutomaticEnabled(true); model.startManualSession(minutes: 10)
         await wait { model.clamshellActive && !model.lidCommandPending }
         let deadline = model.manualSessionUntil; let reservation = model.batteryHoldUntil

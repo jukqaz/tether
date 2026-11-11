@@ -52,13 +52,20 @@ final class AutomaticPauseTests: XCTestCase {
     }
     private func fixture(settings: IdleSessionSettings = .init(), power: PowerSource = .ac,
                          defaults previous: AutomaticPauseDefaults? = nil, clock: AutomaticPauseClock = .init(),
-                         boot: String = "automatic-pause", advancedSatisfied: Bool? = nil) throws -> Fixture {
+                         boot: String = "automatic-pause", advancedSatisfied: Bool? = nil,
+                         advancedClockRule: Bool = false) throws -> Fixture {
         let defaults = previous ?? AutomaticPauseDefaults()
         if previous == nil {
             var saved = settings; saved.automaticEnabled = true; saved.legacyRootConfigurationPending = false
-            if advancedSatisfied != nil {
+            if advancedSatisfied != nil || advancedClockRule {
+                // A full-day clock condition grants explicit advanced authority
+                // without native observations or a cache tied to the real clock.
+                let condition = advancedClockRule
+                    ? V4Condition(id: UUID(), kind: .timeWindow,
+                        timeWindow: .init(startMinute: 0, endMinute: 0))
+                    : V4Condition(id: UUID(), kind: .appRunning, target: "fixture.editor")
                 let preset = V4Preset(id: UUID(), name: "Selected conditions", groups: [
-                    V4RuleGroup(id: UUID(), conditions: [V4Condition(id: UUID(), kind: .appRunning, target: "fixture.editor")])
+                    V4RuleGroup(id: UUID(), conditions: [condition])
                 ])
                 saved.v4.automaticMode = .advanced; saved.v4.presets = [preset]; saved.v4.activePresetID = preset.id
             }
@@ -147,7 +154,7 @@ final class AutomaticPauseTests: XCTestCase {
         for duration: Double? in [1800, nil] {
             var settings = IdleSessionSettings(); settings.automaticPowerCondition = .battery
             settings.batteryTimeLimit = .fourHours; settings.disconnectPolicy = .continueEligible
-            let f = try fixture(settings: settings, power: .battery); defer { _ = f.controller.end() }
+            let f = try fixture(settings: settings, power: .battery, advancedClockRule: true); defer { _ = f.controller.end() }
             let activation = try XCTUnwrap(f.controller.runtimeMarkers.automaticActivation)
             let deadline = try XCTUnwrap(activation.batteryDeadline)
             let oldExecution = try XCTUnwrap(f.controller.sessionDecision.automaticRequestID)
@@ -169,7 +176,7 @@ final class AutomaticPauseTests: XCTestCase {
 
     func testEndAllUnplugDuringPauseRemainsConsumedAfterPauseExpires() throws {
         var settings = IdleSessionSettings(); settings.automaticPowerCondition = .any; settings.disconnectPolicy = .endAll
-        let f = try fixture(settings: settings); defer { _ = f.controller.end() }
+        let f = try fixture(settings: settings, advancedClockRule: true); defer { _ = f.controller.end() }
         XCTAssertTrue(f.controller.start(duration: 600, now: f.clock.now))
         XCTAssertTrue(f.model.pauseAutomatic(for: 1800))
         observe(f, after: 1, power: .battery)

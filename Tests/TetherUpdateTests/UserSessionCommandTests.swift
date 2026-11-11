@@ -1330,6 +1330,18 @@ final class UserSessionCommandTests: XCTestCase {
         XCTAssertEqual(automatic.code, 0, automatic.error); XCTAssertTrue(f.controller.status.automaticActive)
         let end = try await cli(["manual", "off", "--json"], fixture: f, executable: executable)
         XCTAssertEqual(end.code, 0, end.error); XCTAssertFalse(f.controller.status.manualActive); XCTAssertTrue(f.controller.status.holding)
+        let storedCondition = f.controller.settings.automaticPowerCondition
+        let rejected = try await cli(["condition", "battery", "--json"], fixture: f, executable: executable)
+        XCTAssertEqual(rejected.code, 1)
+        XCTAssertTrue(rejected.error.contains("고급") || rejected.error.contains("advanced"))
+        XCTAssertEqual(f.controller.settings.automaticPowerCondition, storedCondition,
+            "Rejecting a basic-mode command must not secretly edit its stored range")
+        var advanced = f.controller.settings.v4; advanced.automaticMode = .advanced
+        let preset = V4Preset(id: UUID(), name: "Explicit advanced CLI fixture",
+            groups: [.init(id: UUID(), conditions: [.init(id: UUID(), kind: .timeWindow,
+                timeWindow: .init(startMinute: 0, endMinute: 0))])])
+        advanced.presets = [preset]; advanced.activePresetID = preset.id
+        XCTAssertTrue(f.controller.setV4Settings(advanced))
         for selected in ["battery", "any"] {
             let condition = try await cli(["condition", selected, "--json"], fixture: f, executable: executable)
             XCTAssertEqual(condition.code, 0, condition.error)

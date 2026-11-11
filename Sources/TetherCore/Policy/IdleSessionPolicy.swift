@@ -40,6 +40,10 @@ public struct IdleSessionSettings: Codable, Equatable, Sendable {
     public var lastManualDurationSeconds: Double? = 30 * 60
     /// Old battery/both choices are retained for decoding, never battery authority.
     public var condition: PowerCondition { automaticPowerCondition ?? .ac }
+    /// The basic mode is AC-only without rewriting a saved advanced power choice.
+    public var effectiveAutomaticCondition: PowerCondition {
+        v4.usesAdvancedAutomaticConditions ? condition : .ac
+    }
     public var automaticMinutes: Int { min(120, max(1, automaticHoldMinutes ?? 60)) }
     public init() {}
     private enum CodingKeys: String, CodingKey {
@@ -234,7 +238,19 @@ public struct IdleSessionPolicy: Equatable, Sendable {
     public var manualBatteryTimeLimit: WorkSessionBatteryLimit { manual.batteryLimit }
     public var automaticBatteryTimeLimit: WorkSessionBatteryLimit { markers.automaticActivation?.batteryLimit ?? settings.batteryTimeLimit }
     public var manualPowerCondition: PowerCondition { manual.powerCondition }
-    public var automaticPowerCondition: PowerCondition { markers.automaticActivation?.condition ?? settings.condition }
+    public var effectiveAutomaticCondition: PowerCondition { settings.effectiveAutomaticCondition }
+    public var automaticPowerCondition: PowerCondition {
+        settings.v4.usesAdvancedAutomaticConditions
+            ? (markers.automaticActivation?.condition ?? effectiveAutomaticCondition) : .ac
+    }
+    /// The gate for an existing advanced activation uses its captured range.
+    /// Editing the next default cannot disable that activation's providers.
+    public var automaticEvaluationCondition: PowerCondition {
+        guard settings.v4.usesAdvancedAutomaticConditions,
+              let activation = markers.automaticActivation,
+              !activation.conditionEnded, !activation.batteryExpired else { return effectiveAutomaticCondition }
+        return activation.condition
+    }
     public var manualExtensionID: UUID? { manual.extensionID }
     public var manualKeepDisplayAwake: Bool { manual.active && manualDisplayChoice }
     public var manualAllowClosedLid: Bool { manual.active && manualLidChoice }
@@ -255,7 +271,7 @@ public struct IdleSessionPolicy: Equatable, Sendable {
     /// Live request identity survives an unavailable snapshot; it grants no work.
     public var currentBatteryPermitID: UUID? {
         if manual.allowsBattery { return manual.requestID }
-        guard settings.automaticEnabled, settings.condition.includesBattery,
+        guard settings.automaticEnabled, automaticPowerCondition.includesBattery,
               markers.automaticActivation?.batteryExpired != true else { return nil }
         return automaticExecutionID
     }
@@ -347,7 +363,11 @@ public struct IdleSessionPolicy: Equatable, Sendable {
     @discardableResult
     public mutating func setV4Settings(_ value: V4Settings) -> Bool {
         guard settings.isSupported else { return false }
-        settings.v4 = value; automaticGate = nil; resolveLegacyConfiguration(); return true
+        settings.v4 = value; automaticGate = nil
+        // A settings edit is not a newly observed condition edge, including one
+        // left pending by the previously selected advanced mode.
+        gateWasSatisfied = nil; pendingConditionActivation = false
+        resolveLegacyConfiguration(); return true
     }
     @discardableResult
     public mutating func applyUserChoices(automatic: Bool, allowClosedLid: Bool) -> Bool {
@@ -584,7 +604,7 @@ public struct IdleSessionPolicy: Equatable, Sendable {
             issued.manualID = manual.requestID; issued.manualIssuedAt = now
         }
         if let activation = markers.automaticActivation, !activation.conditionEnded, !activation.batteryExpired,
-           settings.automaticEnabled, activation.condition.includesBattery,
+           settings.automaticEnabled, automaticPowerCondition.includesBattery,
            issued.automaticID != activation.id {
             issued.automaticID = activation.id; issued.automaticIssuedAt = now
         }
@@ -633,7 +653,7 @@ public struct IdleSessionPolicy: Equatable, Sendable {
         }
         if transition.reasons.contains(.automatic), let end = transition.batteryDeadline,
            let activation = markers.automaticActivation, !activation.batteryExpired,
-           settings.automaticEnabled, settings.condition.includesBattery, let seconds = automaticDuration {
+           settings.automaticEnabled, automaticPowerCondition.includesBattery, let seconds = automaticDuration {
             let cap = min(end, observed + seconds)
             batteryDeadline = min(batteryDeadline ?? cap, cap); automaticStartedAt = min(automaticStartedAt ?? observed, observed)
             mutateMarkers { $0.automaticActivation?.batteryConsumed = true }
@@ -665,13 +685,14 @@ public struct IdleSessionPolicy: Equatable, Sendable {
                 manual.end(.powerDisconnected); endAutomaticForDisconnect()
             case .endAutomatic: endAutomaticForDisconnect()
             case .continueEligible:
-                let existingEligible = markers.automaticActivation.map { $0.condition.includesBattery } == true
-                if !existingEligible {
-                    endAutomaticForDisconnect()
-                    if settings.startAutomaticOnBatteryDisconnect && settings.condition.includesBattery {
-                        beginAutomaticActivation()
-                    }
-                }
+                // Only work that was actually running before this incident may
+                // continue. A saved marker, delayed rule edge or retired start
+                // preference cannot turn unplugging into a new battery start.
+                let existingEligible = automaticPowerCondition.includesBattery
+                    && previousDecision.reasons.contains(.automatic)
+                    && previousDecision.expiry.map({ now < $0 }) == true
+                    && markers.automaticActivation.map({ !$0.conditionEnded && !$0.batteryExpired }) == true
+                if !existingEligible { endAutomaticForDisconnect() }
             }
         }
         manual.evaluate(power: power, now: now, disconnectPolicy: settings.disconnectPolicy)
@@ -687,8 +708,7 @@ public struct IdleSessionPolicy: Equatable, Sendable {
             stopForProtection("thermal"); return
         }
         let batteryWork = power == .battery && (manual.active
-            || previousDecision.reasons.contains(.automatic)
-            || (settings.automaticEnabled && settings.condition.includesBattery))
+            || (settings.automaticEnabled && automaticPowerCondition.includesBattery))
         if batteryWork, lowPowerWarning == true || batteryPercent.map({ (0...100).contains($0) && $0 <= SafetyPolicy.floor(settings.limits) }) == true {
             stopForProtection("battery"); return
         }
@@ -705,7 +725,7 @@ public struct IdleSessionPolicy: Equatable, Sendable {
             return
         }
         lastValidExecutionObservation = now
-        if connected || conditionActivation {
+        if connected || (conditionActivation && !disconnected) {
             let explicitSleepEvent = markers.pauseReason == .userSleep
             if markers.pauseReason == .userSleep {
                 mutateMarkers { $0.pauseReason = nil }; userSleepRequestedAt = nil; userSleepObserved = false
@@ -734,7 +754,7 @@ public struct IdleSessionPolicy: Equatable, Sendable {
         guard settings.enabled, markers.permitsAcquisition, fullWake == true, power != .unknown else { return }
         let advancedAllowed = !settings.v4.usesAdvancedAutomaticConditions
             || (automaticGate?.isSatisfied == true && automaticGate?.validUntil.map({ now < $0 }) == true)
-        let capturedCondition = markers.automaticActivation?.condition ?? settings.condition
+        let capturedCondition = automaticPowerCondition
         let automaticEligible = settings.automaticEnabled && capturedCondition.permits(power) && advancedAllowed
             && !automaticPauseActive
             && !disconnectBlocksAutomatic && markers.automaticRestartBlocked != true
@@ -780,8 +800,8 @@ public struct IdleSessionPolicy: Equatable, Sendable {
         expiry = min(now + Self.observationTTL, now + Self.healthTTL, final ?? .infinity)
         if automaticActive, settings.v4.usesAdvancedAutomaticConditions,
            let validUntil = automaticGate?.validUntil { expiry = min(expiry!, validUntil) }
-        // A saved battery-only trigger grants no battery scope to AC manual work.
-        // An active both-power trigger still approves its first battery transition.
+        // Saved basic-mode battery choices grant no automatic battery scope.
+        // A directly approved manual or advanced both-power request remains separate.
         let manualBatteryAllowed = manual.allowsBattery
         let automaticBatteryAllowed = automaticActive && capturedCondition.includesBattery
             && (power == .battery || settings.disconnectPolicy == .continueEligible)
@@ -813,13 +833,14 @@ public struct IdleSessionPolicy: Equatable, Sendable {
     }
     private mutating func observeAutomaticBoundary(power: PowerSource) {
         guard var activation = markers.automaticActivation else { return }
-        if !eligible(activation.condition, power) {
+        let capturedCondition = automaticPowerCondition
+        if !eligible(capturedCondition, power) {
             activation.conditionEnded = true
             mutateMarkers { $0.automaticActivation = activation }
-        } else if activation.conditionEnded, eligible(settings.condition, power) {
+        } else if activation.conditionEnded, eligible(effectiveAutomaticCondition, power) {
             // A confirmed false-to-true boundary starts a new activation, but
             // never overrides Stop all, protection or an unplug stop on battery.
-            if power == .ac || (settings.disconnectPolicy == .continueEligible && settings.startAutomaticOnBatteryDisconnect) {
+            if power == .ac {
                 if markers.pauseReason == .userSleep { mutateMarkers { $0.pauseReason = nil } }
                 beginAutomaticActivation()
             }
@@ -846,14 +867,15 @@ public struct IdleSessionPolicy: Equatable, Sendable {
     }
     private func matchesAutomaticPermit(_ issued: IssuedBatteryPermit, observedAt: Double) -> Bool {
         guard let activation = markers.automaticActivation else { return false }
-        return settings.automaticEnabled && activation.condition.includesBattery
+        return settings.automaticEnabled && automaticPowerCondition.includesBattery
             && !activation.conditionEnded && !activation.batteryExpired && issued.automaticID == activation.id
             && issued.automaticIssuedAt.map({ observedAt >= $0 }) == true
     }
     private mutating func pruneIssuedBatteryPermits() {
         let manualID = manual.allowsBattery ? manual.requestID : nil
         let activation = markers.automaticActivation
-        let automaticID = activation?.conditionEnded != true && activation?.batteryExpired != true ? activation?.id : nil
+        let automaticID = automaticPowerCondition.includesBattery
+            && activation?.conditionEnded != true && activation?.batteryExpired != true ? activation?.id : nil
         for (id, var issued) in issuedBatteryPermits {
             if issued.manualID != manualID { issued.manualID = nil; issued.manualIssuedAt = nil }
             if issued.automaticID != automaticID { issued.automaticID = nil; issued.automaticIssuedAt = nil }
@@ -882,7 +904,7 @@ public struct IdleSessionPolicy: Equatable, Sendable {
         mutateMarkers { $0.protectionReason = $0.protectionReason ?? reason }
     }
     private mutating func beginAutomaticActivation() {
-        let condition = settings.condition, limit = settings.batteryTimeLimit
+        let condition = effectiveAutomaticCondition, limit = settings.batteryTimeLimit
         mutateMarkers {
             $0.automaticActivation = AutomaticActivationMarker(condition: condition, batteryLimit: limit)
             $0.automaticRestartBlocked = nil
@@ -915,7 +937,8 @@ public struct IdleSessionPolicy: Equatable, Sendable {
         var retained = previous
         retained.reasons = previous.reasons.filter {
             $0 == .manual ? manual.active : (settings.automaticEnabled && !automaticPauseActive
-                && !disconnectBlocksAutomatic && markers.automaticRestartBlocked != true)
+                && !disconnectBlocksAutomatic && markers.automaticRestartBlocked != true
+                && automaticPowerCondition.permits(latestPower == .unknown ? lastKnownPower : latestPower))
         }
         let hasAutomatic = retained.reasons.contains(.automatic)
         let hasManual = retained.reasons.contains(.manual)

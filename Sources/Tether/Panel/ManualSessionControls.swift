@@ -11,6 +11,7 @@ struct ManualSessionControls: View {
     var nextSessionExpansion: Binding<Bool>? = nil
     var presentation: Presentation = .combined
     var prominentStart = true
+    @State private var showOtherTime = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -52,19 +53,27 @@ struct ManualSessionControls: View {
                     .foregroundStyle(Color.tetherSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else if !model.manualSessionActive, presentation != .current {
-                HStack(spacing: 8) {
-                    ManualDurationPicker(model: model)
-                    Button(L("Start", "직접 시작")) {
-                        if model.selectedManualMinutes == 0 { model.startUntimedSession() }
-                        else { model.startManualSession(minutes: model.selectedManualMinutes) }
-                    }.actionButton(prominent: prominentStart)
-                        .controlSize(.regular)
-                        .fixedSize(horizontal: true, vertical: false)
-                        .layoutPriority(1)
-                        .accessibilityLabel(L("Start manual session", "타이머 직접 시작"))
-                        .accessibilityIdentifier("panel-start-manual")
-                        .accessibilityHint(L("Choosing a duration alone does not start work", "시간 선택만으로 시작되지 않습니다"))
-                        .disabled(!model.canStartManualSession)
+                // Keep the optional time editor attached to its duration row,
+                // rather than spending another full section gap in the menu.
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(spacing: 8) {
+                        ManualDurationPicker(model: model)
+                        Button(L("Start", "직접 시작")) {
+                            if model.selectedManualMinutes == 0 { model.startUntimedSession() }
+                            else { model.startManualSession(minutes: model.selectedManualMinutes) }
+                        }.actionButton(prominent: prominentStart)
+                            .controlSize(.regular)
+                            .fixedSize(horizontal: true, vertical: false)
+                            .layoutPriority(1)
+                            .accessibilityLabel(L("Start manual session", "타이머 직접 시작"))
+                            .accessibilityIdentifier("panel-start-manual")
+                            .accessibilityHint(L("Choosing a duration alone does not start work", "시간 선택만으로 시작되지 않습니다"))
+                            .disabled(!model.canStartManualSession)
+                    }
+                    Button(L("Other duration or end time…", "다른 시간·끝날 시각…")) { showOtherTime = true }
+                        .font(TetherTypography.secondary)
+                        .buttonStyle(.link).disabled(!model.canStartManualSession)
+                        .accessibilityIdentifier("panel-other-manual-time")
                 }
                 if !model.canStartManualSession && model.problem == nil {
                     Note(model.manualStartBlockedDetail)
@@ -72,6 +81,7 @@ struct ManualSessionControls: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .sheet(isPresented: $showOtherTime) { ManualStartOptionsView(model: model) }
     }
 
     var hasConfirmedUnlimitedDuration: Bool {

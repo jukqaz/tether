@@ -40,10 +40,19 @@ private final class P0AssertionBackend: IdleAssertionBackend {
 
 @MainActor
 final class P0IntegrationTests: XCTestCase {
-    private func fixture(power: PowerSource = .ac, settings: IdleSessionSettings = .init()) throws
+    private func fixture(power: PowerSource = .ac, settings: IdleSessionSettings = .init(),
+                         advancedClockRule: Bool = false) throws
         -> (P0MemoryDefaults, P0AssertionBackend, UserSessionController, Double) {
         let defaults = P0MemoryDefaults(), backend = P0AssertionBackend()
         var saved = settings; saved.legacyRootConfigurationPending = false
+        if advancedClockRule {
+            let condition = V4Condition(id: UUID(), kind: .timeWindow,
+                timeWindow: .init(startMinute: 0, endMinute: 0))
+            let preset = V4Preset(id: UUID(), name: "Explicit advanced clock", groups: [
+                V4RuleGroup(id: UUID(), conditions: [condition])
+            ])
+            saved.v4.automaticMode = .advanced; saved.v4.presets = [preset]; saved.v4.activePresetID = preset.id
+        }
         defaults.set(try JSONEncoder().encode(saved), forKey: UserSessionController.preferenceKey)
         let controller = UserSessionController(defaults: defaults, backend: backend,
             displayBackend: P0AssertionBackend(), guiProbe: nil, environmentProbe: nil, boot: "p0-integration")
@@ -140,7 +149,7 @@ final class P0IntegrationTests: XCTestCase {
     func testExplicitBatteryAutomaticUsesTheSelectedRuleGateAndCannotBypassUnplugEnd() throws {
         var settings = IdleSessionSettings()
         settings.automaticEnabled = true; settings.automaticPowerCondition = .any
-        let (_, _, controller, now) = try fixture(settings: settings); defer { _ = controller.end() }
+        let (_, _, controller, now) = try fixture(settings: settings, advancedClockRule: true); defer { _ = controller.end() }
         XCTAssertTrue(controller.status.automaticActive)
         observe(controller, .battery, now + 1)
         XCTAssertFalse(controller.status.automaticActive); XCTAssertFalse(controller.status.holding)
@@ -149,7 +158,7 @@ final class P0IntegrationTests: XCTestCase {
         XCTAssertFalse(controller.status.automaticActive, "Wake must not evade the already consumed unplug boundary")
 
         settings.automaticPowerCondition = .battery
-        let (_, _, direct, next) = try fixture(power: .battery, settings: settings)
+        let (_, _, direct, next) = try fixture(power: .battery, settings: settings, advancedClockRule: true)
         defer { _ = direct.end() }
         XCTAssertEqual(direct.v4RuleEvaluation?.gate.isSatisfied, true)
         XCTAssertTrue(direct.status.automaticActive)
@@ -164,7 +173,7 @@ final class P0IntegrationTests: XCTestCase {
         var settings = IdleSessionSettings()
         settings.automaticEnabled = true; settings.automaticPowerCondition = .battery
         settings.batteryTimeLimit = .thirtyMinutes
-        let (_, _, controller, now) = try fixture(power: .battery, settings: settings)
+        let (_, _, controller, now) = try fixture(power: .battery, settings: settings, advancedClockRule: true)
         defer { _ = controller.end() }
         let first = try XCTUnwrap(controller.workLease(now: now)?.automaticBatteryDeadline)
         controller.observeSystemSleep(observedAt: now + 60)
@@ -290,7 +299,7 @@ final class P0IntegrationTests: XCTestCase {
         var settings = IdleSessionSettings()
         settings.automaticEnabled = true; settings.automaticPowerCondition = .any
         settings.disconnectPolicy = .continueEligible; settings.batteryTimeLimit = .thirtyMinutes
-        let (_, _, controller, now) = try fixture(power: .battery, settings: settings)
+        let (_, _, controller, now) = try fixture(power: .battery, settings: settings, advancedClockRule: true)
         defer { _ = controller.end() }
         XCTAssertTrue(controller.status.automaticActive)
         XCTAssertTrue(controller.setBatteryTimeLimit(.fourHours))

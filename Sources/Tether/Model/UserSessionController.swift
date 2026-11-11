@@ -249,7 +249,7 @@ final class UserSessionController {
         var value = UserSessionStatus(power: latestPower, thermal: latestThermal ?? -1,
             batteryPercent: latestBatteryPercent, limits: policy.settings.limits, enabled: policy.settings.enabled,
             automaticEnabled: policy.settings.automaticEnabled, automaticActive: policy.automaticActive,
-            powerCondition: policy.settings.condition, automaticMinutes: policy.settings.automaticMinutes,
+            powerCondition: policy.settings.effectiveAutomaticCondition, automaticMinutes: policy.settings.automaticMinutes,
             batteryHoldUntil: policy.automaticActive ? batteryWallDeadline : nil,
             pendingBatteryMinutes: policy.pendingBatteryMinutes,
             manualActive: policy.manualActive,
@@ -1167,7 +1167,7 @@ extension UserSessionController {
             validUntil: (policy.lastEvaluation ?? -30) + 15, automaticEnabled: settings.automaticEnabled, paused: !settings.enabled,
             protectionActive: settings.blockReason != nil, ownerValid: currentUser && fullWake == true,
             isMacBook: isMacBook, lidClosed: lidClosed, allowDisplay: settings.keepDisplayAwake,
-            allowClosedLid: settings.allowClosedLid, automaticPowerCondition: settings.condition)
+            allowClosedLid: settings.allowClosedLid, automaticPowerCondition: policy.automaticEvaluationCondition)
     }
     var v4RehearsalObservations: [V4Observation] {
         v4Observations + V4RuleEngine.requiredConditions(settings: settings.v4, automaticEnabled: settings.automaticEnabled)
@@ -1193,7 +1193,7 @@ extension UserSessionController {
         v4ConditionSource.configure(settings: policy.settings.v4,
             enabled: policy.settings.automaticEnabled && currentUser && fullWake == true
                 && policy.settings.enabled && policy.settings.blockReason == nil
-                && (policy.settings.condition == .any || policy.settings.condition.rawValue == latestPower.rawValue),
+                && (policy.automaticEvaluationCondition == .any || policy.automaticEvaluationCondition.rawValue == latestPower.rawValue),
             scope: v4Scope, observing: observing)
         let capabilities = v4Capabilities
         var context = v4Context(now: now); context.validUntil = now + 15 // This call follows fresh common observations.
