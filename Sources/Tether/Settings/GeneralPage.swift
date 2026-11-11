@@ -1,50 +1,127 @@
 import SwiftUI
 import TetherCore
 
+/// Edits future manual defaults only; current work stays in the menu.
 struct GeneralPage: View {
+    @ObservedObject var model: AppModel
+    var disclosures: Binding<SettingsDisclosureState>? = nil
+    @State private var manualBatteryExpanded = false
+    @State private var manualLimitsDetailsExpanded = false
+
+    var body: some View {
+        SettingsForm {
+            SettingsContentGroup(model.showsLidOptions ? L("Display & Lid", "화면·덮개") : L("Display", "화면")) {
+                ManualDefaultsOptionsView(model: model, embedded: true, applicationDetails: disclosures?.manualApplication)
+            }
+            if model.hasInternalBattery {
+                SettingsDisclosure(title: L("Power & Time Limits", "전원·시간 한도"),
+                    summary: manualLimitsSummary, isExpanded: manualBatteryExpansion) {
+                    Note(L("Saves immediately. Applies to future work.",
+                           "즉시 저장되고 이후 유지부터 적용됩니다."))
+                        .accessibilityIdentifier("settings-manual-limits-save-summary")
+                    SettingRow(title: L("Manual power source", "수동 유지 전원"),
+                        detail: L("Applies to new manual work", "다음 수동 유지부터 적용")) {
+                        CompactPopUp(title: L("Manual work power range", "수동 유지 전원 범위"),
+                            selection: Binding(get: { model.v3Settings.manualPowerCondition }, set: { model.setManualPowerCondition($0) }),
+                            choices: PowerCondition.allCases.map { PopupChoice($0, $0.title) },
+                            identifier: "settings-manual-power-condition")
+                            .disabled(settingsControlsDisabled)
+                    }
+                    SettingRow(title: L("Battery time limit", "배터리 시간 한도"),
+                        detail: L("New manual work and the next advanced automatic run",
+                                  "새 수동 유지와 고급 자동의 다음 조건 구간에 적용")) {
+                        CompactPopUp(title: L("Battery time limit", "배터리 시간 한도"),
+                            selection: Binding(get: { model.v3Settings.batteryTimeLimit }, set: { model.setBatteryTimeLimit($0) }),
+                            choices: WorkSessionBatteryLimit.allCases.map { PopupChoice($0, model.batteryLimitTitle($0)) },
+                            identifier: "settings-battery-manual-limit")
+                            .disabled(settingsControlsDisabled)
+                    }
+                    SettingsDisclosure(title: L("Saving & Battery Time", "저장 범위와 배터리 시간"),
+                        isExpanded: manualLimitsDetailsExpansion, groupsSection: false) {
+                        Note(L("Apply and Discard above only affect manual defaults. Reconnecting power does not refill the current work's battery time.",
+                               "위의 적용·변경 취소는 수동 기본값에만 적용됩니다. 전원을 다시 연결해도 현재 유지의 배터리 시간은 늘지 않습니다."))
+                            .accessibilityIdentifier("settings-manual-limits-save-scope")
+                    }.accessibilityIdentifier("settings-manual-limits-application-details")
+                }.accessibilityIdentifier("settings-manual-battery-details")
+            }
+        }
+        .alert(L("Current manual keep-awake", "현재 수동 유지"), isPresented: $model.reviewingManualDeadline) {
+            Button(L("Close", "닫기"), role: .cancel) {}
+        } message: {
+            Text(currentManualDetail)
+        }
+    }
+
+    var currentManualDetail: String {
+        if model.manualSessionActive, let until = model.manualSessionUntil {
+            return L("Ends at \(Texts.time(until)). Extend or end it from the menu.", "\(Texts.time(until)) 종료됩니다. 메뉴에서 연장하거나 종료할 수 있습니다.")
+        }
+        if model.hasConfirmedUntimedManualSession {
+            return L("Until ended. The original power, battery and protection limits still apply.", "종료할 때까지 유지합니다. 시작할 때의 전원·배터리·보호 한도는 계속 적용됩니다.")
+        }
+        if model.manualSessionActive {
+            return L("Checking end time. The original limits still apply; an unavailable end time does not mean unlimited keep-awake.", "종료 시간 확인 중입니다. 기존 한도는 계속 적용되며, 종료 시간이 미확인이라고 무기한 유지를 뜻하지는 않습니다.")
+        }
+        return L("Manual keep-awake has ended.", "수동 유지를 종료했습니다.")
+    }
+
+    var lidAvailability: LidOptionAvailability { LidOptionAvailability(model: model) }
+    var lidControlDisabled: Bool { lidAvailability.isDisabled }
+    var lidBinding: Binding<Bool> {
+        Binding(get: { model.v3Settings.allowClosedLid }, set: { value in
+            guard lidAvailability.permits(value) else { return }
+            model.setAllowClosedLid(value)
+        })
+    }
+    private var settingsControlsDisabled: Bool { !model.acceptingUserCommands || model.commandPending }
+    private var manualBatteryExpansion: Binding<Bool> { disclosures?.manualBattery ?? $manualBatteryExpanded }
+    private var manualLimitsDetailsExpansion: Binding<Bool> { disclosures?.manualLimitsApplication ?? $manualLimitsDetailsExpanded }
+    private var manualLimitsSummary: String {
+        "\(model.v3Settings.manualPowerCondition.title) · \(model.batteryLimitTitle(model.v3Settings.batteryTimeLimit))"
+    }
+}
+
+/// Content only: protection stays within the page's one scroll viewport.
+struct ProtectionSettingsContent: View {
     @ObservedObject var model: AppModel
 
     var body: some View {
-        Page {
-            Section {
-                Toggle(L("Open at login", "로그인하면 자동으로 열기"),
-                       isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
-            } footer: {
-                Note(L("Keeping the screen unlocked, dimming with the lid closed and turning the screen off need this app running. The power rules themselves are kept by the helper even when the app is closed.",
-                       "화면이 잠기지 않게 붙잡는 일, 덮개를 닫았을 때 어둡게 하기, 화면 끄기는 이 앱이 켜져 있어야 해요. 전원 규칙 자체는 앱이 꺼져 있어도 도우미가 지켜요."))
+        VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
+            SettingRow(title: L("Thermal protection", "열 보호")) {
+                Text(L("Critical is always on", "위험 단계는 항상 켬")).foregroundStyle(Color.tetherSecondary)
             }
+            SettingsToggle(title: L("Also stop at serious thermal pressure", "심각한 열 상태에서도 중지"),
+                isOn: Binding(get: { model.v3Settings.stopOnSeriousThermal }, set: { model.setStopOnSeriousThermal($0) }))
+                .disabled(model.commandPending || !model.acceptingUserCommands)
+            SettingRow(title: L("Current thermal state", "현재 열 상태")) {
+                Text(model.observedThermalSummary).foregroundStyle(thermalColor)
+            }
+            if model.hasInternalBattery {
+                SettingRow(title: L("Stop below battery level", "배터리가 이보다 낮으면 끝내기"), showsAccessibleTitle: false) {
+                    CompactPopUp(title: L("Stop below", "잔량 하한"), selection: Binding(
+                        get: { model.batteryFloor }, set: { value in
+                            var limits = model.limits; limits.batteryFloor = value; model.setLimits(limits)
+                        }), choices: Array(Set(SafetyPolicy.floorChoices + [model.batteryFloor])).sorted().map {
+                            PopupChoice($0, "\($0)%")
+                        }, identifier: "settings-battery-protection-floor-control")
+                        .disabled(model.commandPending || !model.acceptingUserCommands)
+                }.accessibilityIdentifier("settings-battery-protection-floor")
+            }
+            SettingsToggle(title: L("Stop in Low Power Mode", "저전력 모드가 되면 멈추기"),
+                isOn: Binding(get: { model.v4Settings.stopOnLowPowerMode }, set: { model.setV4StopOnLowPowerMode($0) }))
+                .disabled(model.commandPending || !model.acceptingUserCommands)
+                .accessibilityIdentifier("settings-low-power-stop")
+            Note(L("Thermal state comes from macOS, not a Celsius reading. Critical always stops work; turning off notifications never disables protection.",
+                   "열 상태는 macOS 기준이며 섭씨 온도가 아닙니다. 위험 단계는 항상 중지하고, 알림을 꺼도 보호는 계속됩니다."))
+        }
+    }
 
-            Section {
-                Picker(L("Language", "언어"), selection: $model.language) {
-                    Text(L("Same as macOS", "macOS와 같게")).tag(LanguageChoice.system)
-                    Text("English").tag(LanguageChoice.english)
-                    Text("한국어").tag(LanguageChoice.korean)
-                }
-            } footer: {
-                Note(L("The tether command in Terminal uses the same language.", "터미널의 tether 명령도 같은 언어를 써요."))
-            }
-
-            Section {
-                Picker(L("Panel", "패널"), selection: $model.panelCompact) {
-                    Text(L("Full", "자세히")).tag(false)
-                    Text(L("Compact", "컴팩트")).tag(true)
-                }
-                .pickerStyle(.segmented)
-            } header: {
-                Text(L("Appearance", "모양"))
-            } footer: {
-                Note(L("Compact shows the state and one row of controls; the button at the bottom of the panel switches too. Liquid Glass follows System Settings › Accessibility › Display › Reduce transparency.",
-                       "컴팩트는 상태와 조작 한 줄만 보여 줘요. 패널 아래 버튼으로도 바꿀 수 있어요. 리퀴드 글래스는 시스템 설정 › 손쉬운 사용 › 디스플레이 › 투명도 줄이기를 따라요."))
-            }
-
-            Section {
-                Toggle(L("Show the hold countdown and heat temperature", "배터리 유지 남은 시간과 발열 온도 표시"), isOn: $model.menuBarDetails)
-            } header: {
-                Text(L("Menu Bar", "메뉴바"))
-            } footer: {
-                Note(L("During a battery hold, a ring around the icon empties and the time left counts down to the second. With the lid closed and running hot, the battery temperature appears next to the icon.",
-                       "배터리 유지 중에는 아이콘을 둘러싼 링이 줄어들고 남은 시간이 초 단위로 줄어요. 덮개를 닫고 뜨거울 때는 배터리 온도를 아이콘 옆에 보여 줘요."))
-            }
+    private var thermalColor: Color {
+        switch model.userSessionStatus?.thermal ?? model.status?.thermal {
+        case 1, 2: .tetherWarning
+        case 3: .tetherError
+        case 0: .tetherPrimary
+        default: .tetherSecondary
         }
     }
 }

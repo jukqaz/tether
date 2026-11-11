@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -11,9 +12,73 @@ permissions:
 jobs:
   build:
     runs-on: macos-26
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-      - name: Test
+      - name: Build the independent recovery executor
+        run: swift build --product TetherRecoveryCLI
+      - name: Swift regressions and bounded native idle assertions
+        env:
+          TETHER_RUN_LIVE_ASSERTION_TESTS: "1"
         run: swift test
+      - name: Writer lifetime and helper recovery guards
+        run: |
+          swift build --product TetherWriterFixture
+          python3 scripts/test-power-writers.py
+          python3 scripts/test-writer-gate.py
+          python3 scripts/test-gui-writer.py
+          python3 scripts/test-writer-guards.py
+          python3 scripts/test-recovery-lock.py
+          python3 scripts/test-recovery-executor.py
+      - name: Calendar version and update channel feed checks
+        run: python3 scripts/test-update-feed.py
+      - name: Signed release source preflight
+        run: python3 scripts/test-release-preflight.py
+      - name: Minimum macOS and arm64 packaging regression checks
+        run: python3 scripts/test-platform.py
+      - name: Helper service integration
+        run: python3 scripts/test-service.py
+      - name: Common work and native clamshell handoff
+        run: |
+          python3 scripts/test-work-session.py
+          python3 scripts/test-remote-display.py
+          python3 scripts/test-display-observation.py
+          python3 scripts/test-native-handoff.py
+          python3 scripts/test-power-observation.py
+      - name: Common-session handoff and runtime capability changes
+        run: |
+          python3 scripts/test-session-handoff.py
+          python3 scripts/test-capability-routing.py
+      - name: Manual sessions and cross-feature coordination
+        run: |
+          python3 scripts/test-manual-sessions.py
+          python3 scripts/test-coordination.py
+      - name: GUI login ownership and fast-user-switch policy
+        run: python3 scripts/test-gui-session.py
+      - name: Final feature scope and legacy energy-mode recovery
+        run: python3 scripts/test-final-scope.py
+      - name: Native coexistence and conflict transition stress
+        run: python3 scripts/test-conflicts.py
+      - name: Display recovery and OS sleep-log reconciliation
+        run: python3 scripts/test-power-fixes.py
+      - name: App lifecycle and orphan recovery failures
+        run: python3 scripts/test-lifecycle.py
+      - name: Upgrade and rollback integration
+        run: python3 scripts/test-upgrade.py
+      - name: Uninstall and ownership recovery integration
+        run: python3 scripts/test-uninstall.py
       - name: Build the app bundle
         run: scripts/build.sh
+      - name: Packaged helper and CLI common-session regressions
+        env:
+          TETHER_TEST_HELPER: ${{ github.workspace }}/build/Tether.app/Contents/Resources/tether-helper
+          TETHER_TEST_CLI_EXECUTABLE: ${{ github.workspace }}/build/Tether.app/Contents/Helpers/tether
+        run: swift test --filter 'WorkbenchSessionTests|UserSessionCommandTests.testActualCLI'
+      - name: Packaged v3 disconnect and protection execution
+        env:
+          TETHER_TEST_HELPER: ${{ github.workspace }}/build/Tether.app/Contents/Resources/tether-helper
+        run: python3 scripts/test-redesign-helper.py
+      - name: Native finite idle lease after a stopped test driver
+        run: |
+          BIN=$(swift build --show-bin-path)
+          python3 scripts/test-idle-lease.py --fixture "$BIN/TetherWriterFixture" --output .build/verification/ci-native-idle

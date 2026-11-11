@@ -11,9 +11,13 @@ func printStatus(_ s: State, json: Bool) {
         printJSON(s)
         return
     }
-    guard SystemProbe.isSupportedMac else {
+    guard SystemProbe.capabilities.generalIdleAvailable else {
         print(L("This Mac has no built-in battery or lid: Tether leaves its sleep settings alone.",
                 "이 Mac에는 내장 배터리나 덮개가 없어 Tether가 잠자기 설정을 건드리지 않습니다."))
+        return
+    }
+    if SystemProbe.capabilities.helperInstallTarget == .desktop {
+        print(UserSessionFailure("appUnavailable").localizedDescription)
         return
     }
     guard s.installed else {
@@ -28,6 +32,9 @@ func printStatus(_ s: State, json: Bool) {
     let state = !s.control.enabled ? L("off", "꺼짐")
         : (s.clamshell ? L("on · clamshell on", "켜짐 · 클램쉘 켜짐") : L("on · clamshell off", "켜짐 · 클램쉘 꺼짐"))
     print("Tether: \(state)")
+    if let protection = status.protection {
+        if let reason = protection.blockReason { print("\(L("Safety stop", "보호 중지")): \(reason)") }
+    }
     let power = s.snapshot.power == .ac ? L("connected", "연결됨")
         : (s.snapshot.power == .battery ? L("battery", "배터리") : L("checking", "확인 중"))
     print(L("Power: ", "전원: ") + power + (status.batteryPercent.map { " · \($0)%" } ?? ""))
@@ -39,14 +46,15 @@ func printStatus(_ s: State, json: Bool) {
         print(L("Battery hold: until \(time(until)) (\(Texts.duration(until - now.timeIntervalSince1970)) left)",
                 "배터리 유지: \(time(until))까지 (\(Texts.duration(until - now.timeIntervalSince1970)) 남음)"))
     }
+    if let recovery = status.currentDisplayRecovery(now: now) { print(recovery.summary) }
     if status.heatGuard == true {
-        print(L("Heat guard: Low Power Mode on (lid closed, on power)", "발열 보호: 저전력 모드 켜짐 (덮개 닫힘, 전원 연결)"))
+        print(L("Legacy energy mode recovery pending", "구버전 전원 모드 복원 대기 중"))
     }
     if let usage = s.usage {
         let today = usage.stats.today(now: now)
         var line = L("Today: awake with the lid closed \(Texts.total(today.lidClosedSeconds))",
                      "오늘: 덮개 닫고 깨어 있음 \(Texts.total(today.lidClosedSeconds))")
-        if today.forcedSleeps > 0 { line += L(" · slept \(today.forcedSleeps)×", " · 잠재움 \(today.forcedSleeps)회") }
+        if today.sleepRequestAttempts > 0 { line += " · " + Texts.sleepRequestAttempts(today.sleepRequestAttempts) }
         if today.heatGuards > 0 { line += L(" · heat guard \(today.heatGuards)×", " · 발열 보호 \(today.heatGuards)회") }
         print(line)
         if let last = usage.sleeps.recent.last, let drain = last.drainPerHour {
@@ -64,6 +72,8 @@ func printStatus(_ s: State, json: Bool) {
 }
 
 struct Report: Encodable {
+    let schemaVersion = 2
+    let commonSessionAvailable = false
     struct Blocker: Encodable {
         var process: String
         var kind: String
@@ -89,13 +99,17 @@ struct Report: Encodable {
     var limits: Limits
     var lastSession: LidSession?
     var lastSleep: SleepRecord?
+    var protection: ProtectionStatus?
+    var displayRecovery: DisplayRecoveryStatus?
     var sleepBlockers: [Blocker]
 
     /// Today's totals, without the temperature histograms kept in usage.json.
     struct Today: Encodable {
         var day: String
         var lidClosedMinutes: Int
+        /// Retained JSON field for older consumers; this counts request attempts.
         var forcedSleeps: Int
+        var sleepRequestAttempts: Int
         var batteryHolds: Int
         var heatGuards: Int
         var lidClosedPeakTemperature: Double?
@@ -105,6 +119,7 @@ struct Report: Encodable {
             day = d.day
             lidClosedMinutes = Int(d.lidClosedSeconds / 60)
             forcedSleeps = d.forcedSleeps
+            sleepRequestAttempts = d.sleepRequestAttempts
             batteryHolds = d.batteryHolds
             heatGuards = d.heatGuards
             lidClosedPeakTemperature = d.closedTemps?.max
@@ -115,33 +130,29 @@ struct Report: Encodable {
     /// The battery-hold limits in force, auto-adjust included.
     struct Limits: Encodable {
         var batteryFloor: Int
-        var lidClosedMaxTemperature: Double
-        var lidOpenMaxTemperature: Double
         var maxHoldHours: Double
-        var autoAdjust: Bool
 
-        init(_ user: UserLimits?, auto: Bool) {
+        init(_ user: UserLimits?) {
             batteryFloor = SafetyPolicy.floor(user)
-            lidClosedMaxTemperature = SafetyPolicy.limits(lidClosed: true, user: user).hardTemperature
-            lidOpenMaxTemperature = SafetyPolicy.limits(lidClosed: false, user: user).hardTemperature
             maxHoldHours = SafetyPolicy.maxHold(user) / 3600
-            autoAdjust = auto
         }
     }
 }
 
 func printJSON(_ s: State) {
     let report = Report(
-        supportedMac: SystemProbe.isSupportedMac, helperInstalled: s.installed, helperResponding: s.responding,
+        supportedMac: SystemProbe.capabilities.generalIdleAvailable, helperInstalled: s.installed, helperResponding: s.responding,
         helperVersion: s.status?.version, enabled: s.control.enabled, clamshell: s.clamshell, power: s.snapshot.power,
         lidClosed: s.snapshot.lidClosed, batteryPercent: s.status?.batteryPercent ?? SystemProbe.batteryPercent(),
         batteryTemperature: s.status?.batteryTemperature, thermal: s.status?.thermal,
         batteryHoldUntil: s.status?.batteryHoldUntil.map { Date(timeIntervalSince1970: $0) },
         heatGuard: s.status?.heatGuard ?? false, lastEvent: s.status?.lastEvent,
         lastEventAt: s.status?.lastEventAt.map { Date(timeIntervalSince1970: $0) },
-        today: s.usage.map { Report.Today($0.stats.today(now: Date())) }, limits: Report.Limits(s.limits, auto: s.control.autoLimits == true),
+        today: s.usage.map { Report.Today($0.stats.today(now: Date())) }, limits: Report.Limits(s.limits),
         lastSession: s.usage?.recentSessions.last,
         lastSleep: s.usage?.sleeps.recent.last,
+        protection: s.status?.protection,
+        displayRecovery: s.status?.displayRecovery,
         sleepBlockers: blockers().map { Report.Blocker(process: $0.process, kind: $0.kind.rawValue, reason: $0.reason) })
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

@@ -2,10 +2,25 @@ import AppKit
 import SwiftUI
 import TetherCore
 
-/// The first-run window: what Tether does, and the one-time helper install.
+/// General work needs no helper. Selected notebook lid support requires preparation.
 @MainActor
 enum WelcomeWindow {
     private static var window: NSWindow?
+    private static var windowDelegate: SetupDelegate?
+
+    @MainActor
+    private final class SetupDelegate: NSObject, NSWindowDelegate {
+        weak var model: AppModel?
+        init(model: AppModel) { self.model = model }
+        func windowShouldClose(_ sender: NSWindow) -> Bool {
+            guard let model else { return false }
+            // Window dismissal never applies draft choices or bypasses required setup.
+            return !model.needsOnboarding
+        }
+        func windowWillClose(_ notification: Notification) {
+            WelcomeWindow.window = nil; WelcomeWindow.windowDelegate = nil
+        }
+    }
 
     static func show(model: AppModel) {
         if let window {
@@ -14,13 +29,17 @@ enum WelcomeWindow {
             return
         }
         let host = NSHostingView(rootView: WelcomeView(model: model) { close(model: model) }
-            .background(SettingsWindowBridge()))
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 680),
+            .background(SettingsWindowBridge(minimumSize: CGSize(width: 560, height: 448), allowsResizing: false)))
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 448),
                               styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: false)
         window.titlebarAppearsTransparent = true
         window.title = L("Welcome to Tether", "Tether 시작하기")
+        window.identifier = NSUserInterfaceItemIdentifier("tether-welcome-window")
         window.contentView = host
         window.isReleasedWhenClosed = false
+        let delegate = SetupDelegate(model: model)
+        window.delegate = delegate
+        windowDelegate = delegate
         window.center()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate()
@@ -28,7 +47,7 @@ enum WelcomeWindow {
     }
 
     private static func close(model: AppModel) {
-        model.finishOnboarding()
+        guard !model.needsOnboarding else { return }
         window?.close()
         window = nil
     }
@@ -37,110 +56,171 @@ enum WelcomeWindow {
 struct WelcomeView: View {
     @ObservedObject var model: AppModel
     let done: () -> Void
+    @State private var automaticDraft: Bool
+    @State private var closedLidDraft: Bool
+    @State private var applyError: String?
 
-    var body: some View {
-        VStack(spacing: 18) {
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable()
-                .frame(width: 96, height: 96)
-                .padding(.top, 28)
-            VStack(spacing: 4) {
-                Text("Tether")
-                    .font(.system(.largeTitle, design: .rounded).weight(.bold))
-                Text(L("Clamshell mode that follows your power cord", "전원에 따라 움직이는 클램쉘 모드"))
-                    .foregroundStyle(.secondary)
-            }
-
-            if model.supportedMac {
-                VStack(alignment: .leading, spacing: 12) {
-                    point("powerplug.fill", .tetherMint,
-                          L("On power, close the lid and keep working", "전원 연결: 덮개를 닫아도 계속 일해요"),
-                          L("No sleep and no lock; the screen under the lid goes dark.", "잠들지도 잠기지도 않고, 덮개 아래 화면은 어둡게 꺼 둬요."))
-                    point("battery.75percent", .blue,
-                          L("Unplugged, it sleeps like normal", "전원을 뽑으면 평소처럼 잠들어요"),
-                          L("A Mac already closed goes to sleep right away, even in a bag.", "이미 덮개가 닫혀 있으면 가방 안에서도 바로 잠들어요."))
-                    point("shield.lefthalf.filled", .orange,
-                          L("Safe when it has to stay awake", "깨어 있어야 할 때도 안전하게"),
-                          L("Battery holds end when hot or low. A closed Mac running hot on power is cooled, and put to sleep if it keeps overheating.",
-                            "배터리 유지는 뜨겁거나 배터리가 적으면 끝나요. 전원 연결 중 덮개를 닫은 채 뜨거우면 식히고, 계속 과열되면 잠재워요."))
-                }
-                .padding(.horizontal, 36)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(L("When the lid closes", "덮개를 닫으면"))
-                        .font(.callout.weight(.semibold))
-                    Picker("", selection: $model.lidCloseLocks) {
-                        Text(L("Stay unlocked — remote sessions and agents keep going", "잠그지 않음 — 원격 접속과 에이전트가 그대로 이어져요")).tag(false)
-                        Text(L("Lock the screen — safer when you walk away", "화면 잠그기 — 자리를 비울 때 더 안전해요")).tag(true)
-                    }
-                    .pickerStyle(.radioGroup)
-                    .labelsHidden()
-                    Text(L("Unlocked, the screen still turns off after \(model.idleBlankMinutes) idle minutes, without locking. Change either in Settings.",
-                           "잠그지 않아도 입력이 \(model.idleBlankMinutes)분 없으면 화면은 꺼져요(잠기지는 않아요). 둘 다 설정에서 바꿀 수 있어요."))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.horizontal, 36)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                VStack(spacing: 8) {
-                    if model.isTranslocated {
-                        Label(L("Move Tether.app to Applications and open it again before installing.",
-                                "설치하기 전에 Tether.app을 응용 프로그램 폴더로 옮기고 다시 열어 주세요."),
-                              systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
-                            .padding(.horizontal, 36)
-                    } else if model.helperInstalled {
-                        Label(L("Helper installed", "도우미 설치됨"), systemImage: "checkmark.circle.fill")
-                            .foregroundStyle(Color.tetherMint)
-                    } else {
-                        Button(L("Install Helper…", "도우미 설치…")) { model.installHelper() }
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.large)
-                    }
-                    Text(L("It asks for your administrator password once and only switches the sleep setting (pmset). Settings › System shows everything it changes.",
-                           "관리자 암호를 한 번 묻고, 잠자기 설정(pmset)만 바꿔요. 바꾸는 것은 설정 › 시스템에서 모두 볼 수 있어요."))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, 40)
-                }
-                Toggle(L("Open at login", "로그인하면 자동으로 열기"),
-                       isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
-                    .toggleStyle(.checkbox)
-            } else {
-                Text(L("This Mac has no built-in battery or lid, so Tether has nothing to do here and leaves its sleep settings alone.",
-                       "이 Mac에는 내장 배터리나 덮개가 없어서 Tether가 할 일이 없어요. 잠자기 설정은 건드리지 않아요."))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-            }
-
-            Spacer(minLength: 0)
-            HStack {
-                if !model.supportedMac {
-                    Button(L("Quit Tether", "Tether 종료")) { NSApp.terminate(nil) }
-                }
-                Spacer()
-                Button(model.helperInstalled || !model.supportedMac ? L("Done", "완료") : L("Later", "나중에"), action: done)
-                    .keyboardShortcut(.defaultAction)
-            }
-            .padding(20)
-        }
-        .frame(width: 480, height: 680)
+    init(model: AppModel, done: @escaping () -> Void) {
+        self.model = model
+        self.done = done
+        // Existing choices are shown exactly as saved, never replaced by new defaults.
+        _automaticDraft = State(initialValue: model.v3Settings.automaticEnabled)
+        _closedLidDraft = State(initialValue: model.v3Settings.allowClosedLid)
     }
 
-    private func point(_ symbol: String, _ color: Color, _ title: String, _ detail: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            SidebarIcon(symbol: symbol, color: color)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.callout.weight(.semibold))
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+    var body: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(spacing: 12) {
+                        Image(nsImage: NSApp.applicationIconImage)
+                            .resizable().frame(width: 44, height: 44)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(setupAlreadyCompleted
+                                ? L("Check setup", "준비 상태 확인")
+                                : L("Choose how Tether starts", "처음 사용할 동작"))
+                                .font(TetherTypography.page)
+                            Note(setupAlreadyCompleted
+                                ? L("Review your saved choices.", "저장된 선택을 확인하세요.")
+                                : L("You can change these choices later in Settings.", "선택은 나중에 설정에서 바꿀 수 있습니다."))
+                        }
+                        Spacer(minLength: 0)
+                        if model.userCommandsArePreview { PreviewIndicator() }
+                    }
+                    if model.supportedMac {
+                        SettingsToggle(title: model.v4Settings.automaticMode == .advanced
+                            ? L("Allow automatic start", "자동 시작 허용")
+                            : L("Start automatically on power", "전원을 연결하면 자동 유지"),
+                            isOn: $automaticDraft)
+                            .disabled(!choicesAvailable)
+                            .accessibilityIdentifier("welcome-automatic-toggle")
+                        if showsClosedLidChoice {
+                            SettingsToggle(title: L("Allow closed-lid use", "덮개 닫고 사용 허용"),
+                                detail: model.capabilities.lidControlAvailable
+                                    ? L("Requires a helper on MacBooks.", "MacBook에서는 도우미가 필요합니다.")
+                                    : L("This Mac’s lid support hasn’t been confirmed.", "이 Mac의 덮개 기능 지원 여부를 확인하지 못했습니다."),
+                                isOn: $closedLidDraft)
+                                .disabled(!closedLidChoiceAvailable)
+                                .accessibilityIdentifier("welcome-closed-lid-toggle")
+                        }
+                        if closedLidDraft && model.capabilities.lidControlAvailable { helperPreparation }
+                        choiceResults
+                    } else {
+                        PolicyNote(L("Tether requires Apple Silicon and macOS 26 or later.", "Tether는 Apple Silicon과 macOS 26 이상이 필요합니다."))
+                    }
+                    if let applyError { Note(applyError, color: .tetherError) }
+                }.padding(.horizontal, 28).padding(.vertical, 22)
+            }.scrollEdgeEffectHidden(true, for: .top)
+            Divider()
+            HStack(spacing: 12) {
+                Label(L("Locking follows macOS settings.", "잠금은 macOS 설정을 따릅니다."), systemImage: "lock")
+                    .font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
                     .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                Button(setupAlreadyCompleted ? L("Finish preparation check", "준비 확인 완료") : L("Save and Finish", "저장하고 완료")) {
+                    if model.finishOnboarding(automaticEnabled: automaticDraft,
+                                              allowClosedLid: closedLidDraft) {
+                        done()
+                    } else {
+                        applyError = L("Could not apply the choices. Review setup and try again.", "선택을 적용하지 못했습니다. 준비 상태를 확인한 뒤 다시 시도하세요.")
+                    }
+                }.actionButton(prominent: true).keyboardShortcut(.defaultAction)
+                    .disabled(!canConfirmChoices || model.commandPending || model.helperInstallInFlight)
+                    .accessibilityIdentifier("welcome-confirm-choices")
+            }.padding(.horizontal, 28).padding(.vertical, 12).background(Color.tetherBackground)
+        }.frame(width: 560, height: 448)
+            .font(TetherTypography.body).foregroundStyle(Color.tetherPrimary)
+            .background(Color.tetherBackground)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("welcome-content")
+    }
+
+    private var setupAlreadyCompleted: Bool { model.defaults.bool(forKey: "onboarded") }
+    private var canConfirmChoices: Bool {
+        model.canFinishOnboarding(allowClosedLid: closedLidDraft)
+    }
+    private var choicesAvailable: Bool {
+        !setupAlreadyCompleted && model.supportedMac
+            && !model.helperInstallInFlight && !model.commandPending
+    }
+    private var showsClosedLidChoice: Bool { model.showsLidOptions || closedLidDraft }
+    private var closedLidChoiceAvailable: Bool {
+        if !setupAlreadyCompleted {
+            return choicesAvailable && (model.capabilities.lidControlAvailable || closedLidDraft)
+        }
+        // An existing lid user may explicitly opt out without enabling any new
+        // permission. Automatic choices stay read-only during preparation.
+        return model.supportedMac && model.v3Settings.allowClosedLid
+            && !model.helperInstallInFlight && !model.commandPending
+    }
+    private var choiceResults: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(setupAlreadyCompleted ? L("After you finish", "완료 후 동작") : L("After saving", "저장 후 동작"))
+                .font(TetherTypography.secondary.weight(.medium))
+            choiceResult(L("Automatic", "자동 유지"), automaticResult)
+                .accessibilityIdentifier("welcome-automatic-result")
+            if showsClosedLidChoice {
+                choiceResult(L("Lid closed", "덮개 닫힘"), closedLidResult)
+                    .accessibilityIdentifier("welcome-closed-lid-result")
             }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("welcome-choice-result")
+    }
+
+    private func choiceResult(_ title: String, _ detail: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(title).font(TetherTypography.secondary.weight(.medium))
+                .frame(width: 80, alignment: .leading)
+            Note(detail)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var automaticResult: String {
+        if setupAlreadyCompleted {
+            return L("Your automatic settings stay as saved.", "저장한 자동 설정을 유지합니다.")
+        }
+        guard automaticDraft else {
+            return L("Keep-awake won’t start automatically.", "자동으로 유지를 시작하지 않습니다.")
+        }
+        return model.v4Settings.automaticMode == .advanced
+            ? L("Starts when the saved conditions and protection checks allow.", "저장한 조건과 보호 기준을 충족하면 시작합니다.")
+            : L("Starts on power when this Mac is awake and protection allows.", "깨어 있는 Mac에서 전원이 연결되고 보호 중이 아니면 시작합니다.")
+    }
+
+    private var closedLidResult: String {
+        guard closedLidDraft else {
+            return L("Lid behavior follows macOS.", "덮개 닫힘은 macOS에 맡깁니다.")
+        }
+        guard model.capabilities.lidControlAvailable else {
+            return L("Turn off closed-lid use to finish without it.", "이 기능 없이 완료하려면 덮개 사용 허용을 끄세요.")
+        }
+        guard model.helperSetupConfirmed else {
+            return L("Prepare the helper before saving this choice.", "이 선택을 저장하려면 먼저 도우미를 준비하세요.")
+        }
+        return L("Allows closed-lid use during eligible keep-awake sessions.", "조건을 충족하는 유지에서 덮개를 닫고 사용할 수 있습니다.")
+    }
+    private var helperPreparation: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Text(L("Required for closed-lid work", "덮개 유지에 필요한 도우미"))
+                Spacer(minLength: 8)
+                if model.helperSetupConfirmed {
+                    Text(L("Ready", "준비됨")).foregroundStyle(Color.tetherSecondary)
+                } else {
+                    Button(model.helperInstallInFlight ? L("Waiting…", "인증 대기…") : L("Prepare…", "준비…")) { model.installHelper() }
+                        .actionButton(prominent: true)
+                        .disabled(model.helperInstallInFlight || model.userCommandsArePreview || model.developmentService || model.isTranslocated)
+                }
+            }.frame(minHeight: 30)
+            if !model.helperSetupConfirmed {
+                Note(L("Requires macOS administrator approval. Setup alone does not start keep-awake.",
+                       "macOS 관리자 인증이 필요합니다. 준비만으로 유지를 시작하지 않습니다."))
+            }
+            if model.isTranslocated { Note(L("Move Tether to Applications and reopen it.", "Tether를 응용 프로그램으로 옮기고 다시 여세요.")) }
+            if let error = model.errorText { Note(error, color: .tetherError) }
         }
     }
 }

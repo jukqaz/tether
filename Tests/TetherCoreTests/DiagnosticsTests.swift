@@ -2,6 +2,95 @@ import XCTest
 @testable import TetherCore
 
 final class DiagnosticsTests: XCTestCase {
+    func testCommonReportIncludesManualAndBatteryReservationIndependentOfHelper() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let reply = diagnosticCommonReply(now: now)
+        let report = Diagnostics.commonSessionReport(reply, now: now)
+        XCTAssertTrue(report.contains("| user enabled | yes |"))
+        XCTAssertTrue(report.contains("| automatic setting / active reason | no / no |"))
+        XCTAssertTrue(report.contains("| manual active | yes |"))
+        XCTAssertTrue(report.contains("| battery reservation minutes | 3 |"))
+        XCTAssertTrue(report.contains("| lid support (app observation) | notRequired |"))
+        XCTAssertTrue(report.contains("remote frames/input"))
+        XCTAssertFalse(report.contains("Install"))
+    }
+
+    func testUnavailableCommonReportDoesNotInventOffOrActiveWork() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        var stale = diagnosticCommonReply(now: now); stale.observedAt -= 100
+        for reply in [nil, stale] {
+            let report = Diagnostics.commonSessionReport(reply, now: now)
+            XCTAssertTrue(report.contains("Current common state unavailable"))
+            XCTAssertFalse(report.contains("| user enabled |"))
+            XCTAssertFalse(report.contains("| own idle request active"))
+        }
+    }
+
+    func testBatteryAllowanceRequiresFreshCommonReplyAndAnInternalBattery() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let portable = MacCapabilities(supportedPlatform: true, internalBattery: true, lid: true)
+        let legacy = UserLimits(batteryFloor: 65, maxHoldHours: 1)
+        var fresh = diagnosticCommonReply(now: now)
+        fresh.status?.limits = UserLimits(batteryFloor: 35, maxHoldHours: 2)
+        let current = Diagnostics.batteryLimitSummary(userSession: fresh, userSessionRequested: true,
+            capabilities: portable, legacyLimits: legacy, now: now)
+        XCTAssertTrue(current.contains("Battery floor 35%, longest hold 2.0 h"))
+        XCTAssertFalse(current.contains("65%"))
+
+        fresh.status?.limits = nil
+        let defaults = Diagnostics.batteryLimitSummary(userSession: fresh, userSessionRequested: true,
+            capabilities: portable, legacyLimits: legacy, now: now)
+        XCTAssertTrue(defaults.contains("Battery floor \(SafetyPolicy.floor(nil))%, longest hold \(SafetyPolicy.maxHold(nil) / 3600) h"))
+        XCTAssertFalse(defaults.contains("65%"))
+
+        var stale = fresh; stale.observedAt -= 100
+        var incompatible = fresh; incompatible.build -= 1
+        var failed = fresh; failed.ok = false
+        let unavailableReplies: [UserSessionReply?] = [nil, stale, incompatible, failed]
+        for reply in unavailableReplies {
+            let summary = Diagnostics.batteryLimitSummary(userSession: reply, userSessionRequested: true,
+                capabilities: portable, legacyLimits: legacy, now: now)
+            XCTAssertTrue(summary.contains("unavailable"))
+            XCTAssertFalse(summary.contains("Battery floor"), "Missing evidence must not invent applied allowances")
+            XCTAssertFalse(summary.contains("65%"))
+        }
+
+        let desktop = Diagnostics.batteryLimitSummary(userSession: nil, userSessionRequested: true,
+            capabilities: MacCapabilities(supportedPlatform: true, internalBattery: false, lid: false),
+            legacyLimits: legacy, now: now)
+        XCTAssertTrue(desktop.contains("not applicable")); XCTAssertFalse(desktop.contains("Battery floor"))
+        let unknown = Diagnostics.batteryLimitSummary(userSession: fresh, userSessionRequested: true,
+            capabilities: MacCapabilities(supportedPlatform: true, internalBattery: nil, lid: nil),
+            legacyLimits: legacy, now: now)
+        XCTAssertTrue(unknown.contains("unverified")); XCTAssertFalse(unknown.contains("Battery floor"))
+        let legacySummary = Diagnostics.batteryLimitSummary(userSession: nil, userSessionRequested: false,
+            capabilities: portable, legacyLimits: legacy, now: now)
+        XCTAssertTrue(legacySummary.contains("Battery floor 65%, longest hold 1.0 h"))
+    }
+
+    func testOSObservationRowsDistinguishUnknownFromOpenOffAndDesktop() {
+        let portable = MacCapabilities(supportedPlatform: true, internalBattery: true, lid: true)
+        var unknown = Snapshot(power: .unknown, lidClosed: nil, sleepDisabled: nil, fullWake: nil, externalDisplay: true)
+        unknown.displayTopology = .unknown
+        let rows = Dictionary(uniqueKeysWithValues: Diagnostics.osObservationRows(unknown, capabilities: portable, simulated: false))
+        XCTAssertEqual(rows["lid"], "unknown")
+        XCTAssertEqual(rows["SleepDisabled (clamshell)"], "unknown")
+        XCTAssertEqual(rows["full wake"], "unknown")
+        XCTAssertEqual(rows["additional display observed"], "unknown")
+        let simulated = Dictionary(uniqueKeysWithValues: Diagnostics.osObservationRows(unknown, capabilities: portable, simulated: true))
+        XCTAssertEqual(simulated["full wake"], "unknown (not captured in dry-run status)")
+        let desktop = Dictionary(uniqueKeysWithValues: Diagnostics.osObservationRows(unknown,
+            capabilities: MacCapabilities(supportedPlatform: true, internalBattery: false, lid: false), simulated: false))
+        XCTAssertEqual(desktop["lid"], "not applicable (desktop)")
+
+        let observed = Snapshot(power: .ac, lidClosed: true, sleepDisabled: false, fullWake: true, externalDisplay: false)
+        let current = Dictionary(uniqueKeysWithValues: Diagnostics.osObservationRows(observed, capabilities: portable, simulated: false))
+        XCTAssertEqual(current["lid"], "closed")
+        XCTAssertEqual(current["SleepDisabled (clamshell)"], "no")
+        XCTAssertEqual(current["full wake"], "yes")
+        XCTAssertEqual(current["additional display observed"], "no")
+    }
+
     func testRedactMasksTheUserAndTheMac() {
         let text = "/Users/jane/Applications/Tether.app by Jane Doe on janes-mbp.local (jane)"
         let masked = Diagnostics.redact(text, home: "/Users/jane", user: "jane", fullName: "Jane Doe", host: "janes-mbp.local")
@@ -41,7 +130,8 @@ final class DiagnosticsTests: XCTestCase {
         }
         XCTAssertTrue(Diagnostics.isInterestingPowerLine(line("Sleep", "Entering Sleep state due to 'Clamshell Sleep'")))
         XCTAssertTrue(Diagnostics.isInterestingPowerLine(line("DarkWake", "DarkWake from Normal Sleep")))
-        XCTAssertTrue(Diagnostics.isInterestingPowerLine(line("Assertions", "PID 53650(Tether) Created PreventUserIdleDisplaySleep")))
+        XCTAssertFalse(Diagnostics.isInterestingPowerLine(line("Assertions", "PID 53650(Tether) Created PreventUserIdleDisplaySleep")))
+        XCTAssertFalse(Diagnostics.isInterestingPowerLine(line("Assertions", "PID 80(ExampleLLM) Created PreventUserIdleSystemSleep named: prompt about Tether secret")))
         XCTAssertTrue(Diagnostics.isInterestingPowerLine(line("Notification", "Display is turned off")))
         XCTAssertFalse(Diagnostics.isInterestingPowerLine(line("Assertions", "PID 53650(Tether) Summary PreventUserIdleDisplaySleep")))
         XCTAssertFalse(Diagnostics.isInterestingPowerLine(line("Assertions", "PID 182(runningboardd) Created PreventUserIdleSystemSleep")))

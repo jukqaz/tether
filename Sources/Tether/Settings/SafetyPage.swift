@@ -1,198 +1,254 @@
 import SwiftUI
 import TetherCore
 
+/// Edits app-wide permissions and event policies; automatic conditions have one editor.
 struct SafetyPage: View {
     @ObservedObject var model: AppModel
+    var disclosures: Binding<SettingsDisclosureState>? = nil
+    @State private var showAutomaticConditions = false
+    @State private var unplugExpanded = true
+    @State private var closedLidDisplayExpanded = false
+    @State private var scopeDetailsExpanded = false
 
     var body: some View {
-        let summary = model.summary
-        let advice = model.recommendations
-        Page {
-            Section {
-                LabeledContent(L("Battery, lid closed", "덮개 닫힘 배터리 온도")) { Text(temperatureSummary(summary.closed)) }
-                LabeledContent(L("Battery, lid open", "덮개 열림 배터리 온도")) { Text(temperatureSummary(summary.open)) }
-                LabeledContent(L("Used during battery holds", "배터리 유지 중 사용량")) {
-                    Text(summary.drainPerHour.map { L(String(format: "%.0f%% an hour", $0), String(format: "시간당 %.0f%%", $0)) }
-                         ?? L("no data yet", "아직 기록 없음"))
+        SettingsForm {
+            if let problem = model.problem, case .translocated = problem {
+                ProblemBanner(problem: problem, model: model, compact: false, embeddedInForm: true)
+                    .accessibilityIdentifier("settings-translocation-context")
+            }
+            SettingsContentGroup(L("Automatic keep-awake", "자동 유지"),
+                summary: L("Saves immediately", "즉시 저장"), summaryIdentifier: "settings-power-save-scope") {
+                SettingsToggle(title: L("Allow automatic start", "자동 시작 허용"),
+                    detail: automaticConditionSummary,
+                    isOn: Binding(get: { model.automaticEnabled }, set: { model.setAutomaticEnabled($0) }),
+                    identifier: "automatic-ac-toggle", detailIdentifier: "settings-automatic-mode-summary")
+                    .disabled(settingsControlsDisabled)
+                HStack(alignment: .center, spacing: 12) {
+                    Text(automaticStatusSummary)
+                        .font(TetherTypography.settingsBody).foregroundStyle(.primary)
+                        .lineLimit(nil).fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .help(model.automaticStartStateDetail)
+                        .accessibilityIdentifier("settings-automatic-start-state")
+                    CompactPushButton(L("Conditions…", "조건 설정…"),
+                        identifier: "settings-automatic-rules") { showAutomaticConditions = true }
+                        .disabled(settingsControlsDisabled)
                 }
-                LabeledContent(L("Used while asleep", "잠자는 동안 사용량")) {
-                    Text(model.sleepLog.averageDrain.map {
-                        L(String(format: "%.1f%% an hour · %@", $0, Texts.drainLevel($0)), String(format: "시간당 %.1f%% · %@", $0, Texts.drainLevel($0)))
-                    } ?? L("no data yet", "아직 기록 없음"))
+            }
+
+            SettingsContentGroup(L("Power & lid behavior", "전원·덮개 동작")) {
+                if model.hasInternalBattery {
+                    PowerEventSettingsSection(title: L("When power disconnects", "전원을 분리하면"),
+                        outcome: disconnectEventSummary, outcomeIdentifier: "settings-unplug-policy-summary",
+                        isExpanded: unplugExpansion) {
+                        SettingRow(title: L("Existing work", "진행 중인 유지")) {
+                            CompactPopUp(title: L("Unplug policy", "전원 분리 규칙"), selection: Binding(
+                                get: { model.v3Settings.disconnectPolicy }, set: { model.setDisconnectPolicy($0) }), choices: [
+                                PopupChoice(WorkSessionDisconnectPolicy.endAll, L("End all · Recommended", "모두 끝내기 · 권장")),
+                                PopupChoice(.endAutomatic, L("End automatic only", "자동 유지 끝내기")),
+                                PopupChoice(.continueEligible, L("Continue eligible work", "허용된 유지 계속"))
+                            ], identifier: "settings-unplug-policy-control").disabled(settingsControlsDisabled)
+                        }.accessibilityIdentifier("settings-unplug-policy")
+                        Note(disconnectSummary)
+                        if model.showsLidOptions && model.v3Settings.allowClosedLid {
+                            SettingRow(title: L("When the last hold ends with the lid closed", "덮개가 닫힌 채 마지막 유지가 끝나면"), showsAccessibleTitle: false) {
+                                CompactPopUp(title: L("Unplugged with lid closed", "닫힌 채 전원 분리"), selection: Binding(
+                                    get: { model.v3Settings.disconnectAction }, set: { model.setDisconnectAction($0) }), choices: [
+                                    PopupChoice(WorkSessionEndAction.sleepIfClosed, L("Request sleep · Recommended", "잠자기 요청 · 권장")),
+                                    PopupChoice(.followOS, L("Follow macOS", "macOS에 맡김"))
+                                ], identifier: "closed-lid-disconnect-picker").disabled(settingsControlsDisabled)
+                            }
+                        }
+                    } status: { EmptyView() }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("settings-unplug-details")
                 }
-                LabeledContent(L("Low Power Mode for heat", "발열로 저전력 모드")) {
-                    Text(summary.heatGuards == 0 ? L("never needed", "켜진 적 없음")
-                         : L("\(summary.heatGuards)× · peak heat with the lid closed: \(Texts.thermal(summary.closedMaxThermal))",
-                             "\(summary.heatGuards)회 · 덮개 닫힘 최고 발열 \(Texts.thermal(summary.closedMaxThermal))"))
-                }
-                if !advice.isEmpty, model.recommendationsDiffer {
-                    LabeledContent {
-                        Button(L("Apply", "추천값 적용")) { model.applyRecommendations() }
-                            .buttonStyle(.borderedProminent)
-                            .tint(.orange)
-                    } label: {
-                        Label(adviceSummary(advice, limits: !model.autoLimits), systemImage: "wand.and.stars")
+
+                if model.showsLidOptions {
+                    PowerEventSettingsSection(title: L("When the lid closes", "덮개를 닫으면"),
+                        outcome: closedLidEventSummary, outcomeIdentifier: "settings-closed-lid-saved-summary",
+                        isExpanded: closedLidDisplayExpansion) {
+                        SettingsToggle(title: WorkPermissionText.lidTitle,
+                            detail: L("Used only during valid keep-awake.", "유효한 유지에만 사용합니다."),
+                            isOn: GeneralPage(model: model).lidBinding, identifier: "closed-lid-allow-toggle")
+                            .disabled(GeneralPage(model: model).lidControlDisabled)
+                        if model.v3Settings.allowClosedLid { closedLidDisplayControls }
+                    } status: { closedLidStatus }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("settings-closed-lid-display-details")
+                } else if showsClosedLidStatus {
+                    VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
+                        Text(L("Closed-lid recovery", "덮개·화면 복구"))
+                            .font(TetherTypography.settingsBody.weight(.medium))
+                        closedLidStatus
+                        if let error = model.coordinatedLidError { Note(error, color: .tetherWarning) }
                     }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("settings-closed-lid-recovery")
                 }
-            } header: {
-                Text(L("Measured on This Mac · Last 7 Days", "이 Mac에서 잰 값 · 최근 7일"))
-            } footer: {
-                Note(adviceNote(advice))
-            }
-
-            Section {
-                Toggle(isOn: Binding(get: { model.autoLimits }, set: { model.setAutoLimits($0) })) {
-                    InfoLabel(L("Adjust to this Mac", "이 Mac에 맞춰 자동 조정"), info: SettingsInfo.autoAdjust)
-                    Text(L("Temperatures and the longest hold follow the measurements, never looser than the defaults",
-                           "온도와 최대 시간을 측정값에 맞춰요. 기본값보다 느슨해지지 않아요"))
-                }
-                Picker(selection: limit(\.batteryFloor, SafetyPolicy.floor(model.limits), default: SafetyPolicy.batteryFloor)) {
-                    ForEach(SafetyPolicy.floorChoices, id: \.self) { value in
-                        Text(choice("\(value)%", isDefault: value == SafetyPolicy.batteryFloor, isRecommended: false)).tag(value)
+                displayPermission
+                SettingsDisclosure(title: L("Display sleep & behavior", "화면 꺼짐과 동작 안내"),
+                    isExpanded: scopeDetailsExpansion, groupsSection: false) {
+                    lockPolicyNote
+                    lockScreenSettingsButton
+                    Note(WorkPermissionText.scopeDetail)
+                        .accessibilityIdentifier("settings-global-permission-scope")
+                    if model.showsLidOptions {
+                        Note(closedLidDisplayExplanation)
+                        if let reason = model.closedLidDisplayAvailabilityReason {
+                            Note(reason).accessibilityIdentifier("settings-closed-lid-display-availability")
+                        }
                     }
-                } label: {
-                    InfoLabel(L("End at this much battery", "배터리가 이만큼 남으면 끝내기"), info: SettingsInfo.floor)
-                }
-                if model.autoLimits {
-                    autoRows(advice)
-                } else {
-                    limitPickers(advice)
-                }
-            } header: {
-                InfoLabel(L("Battery Hold", "배터리 유지"), info: SettingsInfo.batteryHold)
-            } footer: {
-                Note((model.autoLimits
-                      ? L("Recommendations are applied by themselves and re-checked as measurements come in. Until there's enough data (about 30 minutes with the lid closed), the current values stay. ",
-                          "추천값을 알아서 적용하고 기록이 쌓일 때마다 다시 맞춰요. 기록이 모이기 전(덮개를 닫고 약 30분)에는 지금 값을 써요. ")
-                      : L("Limits can't be looser than the defaults. ", "기본값보다 느슨하게는 바꿀 수 없어요. "))
-                     + L("With the lid closed it also ends after a minute at 3°C below the limit, or at “serious” heat. If the battery temperature can't be read, it ends at once.",
-                         "덮개가 닫혀 있으면 이 온도보다 3°C 낮은 상태가 1분 이어지거나 발열이 '심각'이 돼도 끝내요. 배터리 온도를 읽지 못하면 바로 끝내요."))
-            }
-
-            Section {
-                Toggle(L("During a battery hold", "배터리 유지 중"),
-                       isOn: Binding(get: { model.holdLowPower }, set: { model.setHoldLowPower($0) }))
-                Picker(selection: Binding(get: { model.heatLowPowerLevel }, set: { model.setHeatLowPowerLevel($0) })) {
-                    Text(choice(L("From “serious” heat", "발열 '심각'부터"), isDefault: true,
-                                isRecommended: advice.heatLevel?.value == 2)).tag(2)
-                    Text(choice(L("From “fair” heat", "발열 '주의'부터"), isDefault: false,
-                                isRecommended: advice.heatLevel?.value == 1)).tag(1)
-                    Text(L("Never", "켜지 않음")).tag(0)
-                } label: {
-                    InfoLabel(L("On power, lid closed and hot", "전원 연결 중 덮개를 닫은 채 뜨거울 때"), info: SettingsInfo.heatLevel)
-                }
-            } header: {
-                Text(L("Low Power Mode", "저전력 모드"))
-            } footer: {
-                Note(L("Tether turns Low Power Mode on only in these cases, for less heat and drain, and puts your setting back afterwards: on power after \(Int(ACThermalPolicy.coolDown / 60)) cool minutes. If you change Low Power Mode yourself meanwhile, it's left as you set it.",
-                       "Tether는 이 두 경우에만 저전력 모드를 켜서 열과 배터리 소모를 줄이고, 끝나면 원래 설정으로 돌려요(전원 연결 중에는 \(Int(ACThermalPolicy.coolDown / 60))분 동안 식은 뒤). 그사이 직접 저전력 모드를 바꾸면 그대로 둬요."))
-            }
-
-            Section {
-                LabeledContent(L("Put to sleep when overheating", "과열되면 잠재우기")) {
-                    Text(L("always on", "항상 켜짐"))
-                }
-            } header: {
-                Text(L("Safety Net · On Power, Lid Closed", "안전장치 · 전원 연결, 덮개 닫힘"))
-            } footer: {
-                Note(L("With no display attached, a closed Mac on power may be in a bag on a power bank. If heat stays “critical” for 2 minutes or the battery reaches \(Int(ACThermalPolicy.hotBattery))°C for a minute, it's put to sleep. With an external display attached it's left running.",
-                       "모니터 없이 전원이 연결된 채 덮개가 닫혀 있으면 보조배터리를 꽂고 가방에 넣은 상태일 수 있어요. 발열 '위험'이 2분 이어지거나 배터리가 \(Int(ACThermalPolicy.hotBattery))°C로 1분 지나면 잠재워요. 외장 모니터가 있으면 그대로 둬요."))
-            }
-
-            Section {
-                HStack {
-                    if model.helperOutdated {
-                        Label(L("Update the helper to apply these", "도우미를 업데이트해야 적용돼요"), systemImage: "exclamationmark.triangle.fill")
-                            .font(.callout)
-                            .foregroundStyle(.orange)
+                    if model.hasInternalBattery, model.showsLidOptions, model.v3Settings.allowClosedLid {
+                        Note(disconnectExplanation)
                     }
-                    Spacer()
-                    Button(L("Restore Defaults", "기본값으로 되돌리기")) { model.resetSafety() }
-                        .disabled(model.safetyIsDefault)
-                }
+                    Note(L("Connecting power may not wake a sleeping Mac. Unavailable conditions never authorize a start. Pausing automatic starts does not change a manual deadline.",
+                           "전원을 연결해도 잠든 Mac이 깨어나지 않을 수 있습니다. 확인되지 않은 조건으로는 시작하지 않으며, 자동 시작을 쉬어도 수동 유지 기한은 바뀌지 않습니다."))
+                }.accessibilityIdentifier("settings-power-scope-details")
+            }
+            if model.showsLidOptions { ClosedLidHelperSettingsContent(model: model, disclosures: disclosures, summaryOnly: true) }
+        }
+        .sheet(isPresented: $showAutomaticConditions) {
+            V4AutomaticRulesView(model: model)
+        }
+    }
+
+    private var displayPermission: some View {
+        VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
+            SettingsToggle(title: WorkPermissionText.displayTitle,
+                detail: model.displayUsageStatusText,
+                isOn: Binding(get: { model.v3Settings.keepDisplayAwake }, set: { model.setKeepDisplayAwake($0) }),
+                identifier: "keep-display-awake-toggle", detailIdentifier: "settings-display-current-status")
+                .disabled(settingsControlsDisabled)
+            if let error = model.userSessionStatus?.displayError { Note(error, color: .tetherWarning) }
+            if model.userSessionStatus?.ownReleasePending == true || model.userSessionStatus?.displayError != nil {
+                refreshPowerStatusButton(identifier: "settings-refresh-display-status")
             }
         }
     }
 
-    /// The limits auto-adjust sets, read-only: the value in force, and whether it follows the data yet.
-    @ViewBuilder
-    private func autoRows(_ advice: Recommendations) -> some View {
-        autoRow(L("Lid closed · end at once at", "덮개 닫힘 · 이 온도면 바로 끝내기"), info: SettingsInfo.closedLidLimit,
-                "\(Int(model.safetyLimits(lidClosed: true).hardTemperature))°C", following: advice.closedLid != nil)
-        autoRow(L("Lid open · end at once at", "덮개 열림 · 이 온도면 바로 끝내기"),
-                "\(Int(model.safetyLimits(lidClosed: false).hardTemperature))°C", following: advice.openLid != nil)
-        autoRow(L("Longest hold", "한 번에 최대"), L("\(model.maxHoldMinutes / 60) h", "\(model.maxHoldMinutes / 60)시간"),
-                following: advice.maxHold != nil)
-    }
-
-    private func autoRow(_ title: String, info: String? = nil, _ value: String, following: Bool) -> some View {
-        LabeledContent {
-            HStack(spacing: 6) {
-                Text(following ? L("Auto", "자동") : L("Collecting data", "기록 모으는 중"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(value)
-            }
-        } label: {
-            if let info { InfoLabel(title, info: info) } else { Text(title) }
+    @ViewBuilder private var closedLidStatus: some View {
+        Note(model.lidUsageStatusText, color: lidStatusNeedsAttention ? .tetherWarning : .tetherSecondary)
+            .accessibilityIdentifier("settings-lid-current-status")
+        if model.showsLidOptions && !model.helperSetupConfirmed {
+            Note(L("Helper setup required · Review the helper below.", "도우미 준비 필요 · 아래 도우미에서 확인하세요."), color: .tetherWarning)
+                .accessibilityIdentifier("settings-lid-preparation-required")
+        }
+        if let status = model.closedLidDisplayStatusText {
+            Note(status, color: model.closedLidDisplayRecoveryPending ? .tetherWarning : .tetherSecondary)
+                .accessibilityIdentifier("settings-closed-lid-display-status")
+        }
+        if model.v3Settings.closedLidDisplayMode == .zeroBrightness, !model.canUseZeroBrightness,
+           let reason = model.closedLidDisplayAvailabilityReason { Note(reason, color: .tetherWarning) }
+        if model.closedLidDisplayRecoveryPending {
+            CompactPushButton(L("Retry brightness restoration", "밝기 복구 다시 시도"),
+                identifier: "settings-retry-brightness-restoration") { model.retryClosedLidDisplayRecovery() }
+                .disabled(!model.hasCoordinatorAuthority || model.commandPending)
+        }
+        if model.snapshot.observedLidClosed == nil || model.lidReleasePending {
+            refreshPowerStatusButton(identifier: "settings-refresh-lid-status")
         }
     }
 
-    @ViewBuilder
-    private func limitPickers(_ advice: Recommendations) -> some View {
-        Picker(selection: limit(\.closedLidMaxTemperature, model.safetyLimits(lidClosed: true).hardTemperature,
-                                default: SafetyPolicy.closedLid.hardTemperature)) {
-            ForEach(SafetyPolicy.closedLidChoices, id: \.self) { value in
-                Text(choice("\(Int(value))°C", isDefault: value == SafetyPolicy.closedLid.hardTemperature,
-                            isRecommended: value == advice.closedLid?.value)).tag(value)
-            }
-        } label: {
-            InfoLabel(L("Lid closed · end at once at", "덮개 닫힘 · 이 온도면 바로 끝내기"), info: SettingsInfo.closedLidLimit)
-        }
-        Picker(L("Lid open · end at once at", "덮개 열림 · 이 온도면 바로 끝내기"),
-               selection: limit(\.openLidMaxTemperature, model.safetyLimits(lidClosed: false).hardTemperature,
-                                default: SafetyPolicy.openLid.hardTemperature)) {
-            ForEach(SafetyPolicy.openLidChoices, id: \.self) { value in
-                Text(choice("\(Int(value))°C", isDefault: value == SafetyPolicy.openLid.hardTemperature,
-                            isRecommended: value == advice.openLid?.value)).tag(value)
-            }
-        }
-        Picker(L("Longest hold", "한 번에 최대"), selection: limit(\.maxHoldHours, SafetyPolicy.maxHold(model.limits) / 3600,
-                                                           default: SafetyPolicy.maxHold / 3600)) {
-            ForEach(SafetyPolicy.maxHoldChoices, id: \.self) { hours in
-                Text(choice(L("\(Int(hours)) h", "\(Int(hours))시간"), isDefault: hours == SafetyPolicy.maxHold / 3600,
-                            isRecommended: hours == advice.maxHold?.value)).tag(hours)
-            }
-        }
+    private func refreshPowerStatusButton(identifier: String) -> some View {
+        Button(L("Check status again", "상태 다시 확인")) { model.refresh() }
+            .buttonStyle(.link).disabled(model.commandPending).accessibilityIdentifier(identifier)
     }
 
-    /// `limits`: include the battery-hold limits, which auto-adjust otherwise applies by itself.
-    private func adviceSummary(_ a: Recommendations, limits: Bool) -> String {
-        var parts: [String] = []
-        if limits, let v = a.closedLid?.value { parts.append(L("lid closed \(Int(v))°C", "덮개 닫힘 \(Int(v))°C")) }
-        if limits, let v = a.openLid?.value { parts.append(L("lid open \(Int(v))°C", "덮개 열림 \(Int(v))°C")) }
-        if limits, let v = a.maxHold?.value { parts.append(L("up to \(Int(v)) h", "최대 \(Int(v))시간")) }
-        if let v = a.heatLevel?.value { parts.append(L("Low Power Mode from “\(Texts.thermal(v))”", "저전력 모드 '\(Texts.thermal(v))'부터")) }
-        return L("Recommended: ", "추천: ") + parts.joined(separator: " · ")
+    private var lidStatusNeedsAttention: Bool {
+        model.snapshot.observedLidClosed == nil || model.lidReleasePending
+            || model.userSessionStatus?.ownReleasePending == true
+            || (model.v3Settings.allowClosedLid && !model.helperSetupConfirmed)
     }
-
-    private func adviceNote(_ a: Recommendations) -> String {
-        let reasons = [a.closedLid?.reason, a.openLid?.reason, a.maxHold?.reason, a.heatLevel?.reason].compactMap { $0 }
-        guard !reasons.isEmpty else {
-            return L("The helper records battery temperature and heat every 30 seconds. After about 30 minutes with the lid closed, recommendations for this Mac appear here.",
-                     "도우미가 30초마다 배터리 온도와 발열을 기록해요. 덮개를 닫고 30분쯤 쓰면 이 Mac에 맞는 추천값을 보여 줘요.")
+    var showsClosedLidStatus: Bool { model.showsLidOptions || model.closedLidDisplayRecoveryPending || model.lidReleasePending }
+    var automaticEventTitle: String {
+        model.v4Settings.usesAdvancedAutomaticConditions
+            ? model.v3Settings.effectiveAutomaticCondition.title : L("Power connected", "전원 연결")
+    }
+    var automaticConditionSummary: String {
+        model.v4Settings.usesAdvancedAutomaticConditions
+            ? L("Advanced · ", "고급 · ") + model.v4RuleSummary + " · " + automaticEventTitle : automaticEventTitle
+    }
+    private var automaticStatusSummary: String {
+        if model.userSessionStatus?.ownReleasePending == true || model.lidReleasePending {
+            return L("Confirming release", "해제 확인 중")
         }
-        return reasons.joined(separator: " · ")
-            + L(". Recommendations sit 4°C above the usual peak: ordinary use never trips them, a bag soon does.",
-                ". 추천은 평소 최고 온도보다 4°C 위로 잡아서, 평소에는 멈추지 않고 가방 안처럼 뜨거워지면 일찍 멈추게 해요.")
+        if model.workProtectionReason != nil { return L("Stopped for protection", "보호로 중지됨") }
+        if model.workPaused { return L("All work stopped", "모두 중지됨") }
+        if model.automaticPauseActive { return L("Automatic paused", "자동만 일시 중지됨") }
+        if model.automaticWorkReasonActive, model.workSessionHolding {
+            return L("Automatic keep-awake active", "자동 유지 중")
+        }
+        if !model.automaticEnabled {
+            return model.manualSessionActive && model.workSessionHolding
+                ? L("Automatic off · manual work continues", "자동 꺼짐 · 수동 유지 계속")
+                : L("Automatic start off", "자동 시작 꺼짐")
+        }
+        return L("Waiting for conditions", "조건 대기 중")
     }
-
-    /// A picker binding for one user limit: shows the value in force, stores nil for the default.
-    private func limit<V: Equatable>(_ key: WritableKeyPath<UserLimits, V?>, _ current: V, default standard: V) -> Binding<V> {
-        Binding(get: { current }, set: { value in
-            var limits = model.limits
-            limits[keyPath: key] = value == standard ? nil : value
-            model.setLimits(limits)
-        })
+    private var disconnectEventSummary: String {
+        switch model.v3Settings.disconnectPolicy {
+        case .endAll: L("End all current work", "현재 유지 모두 종료")
+        case .endAutomatic: L("End automatic · eligible manual work continues", "자동 종료 · 허용된 수동 유지 계속")
+        case .continueEligible: L("Continue battery-eligible work only", "배터리 허용 유지 계속")
+        }
     }
+    private var closedLidEventSummary: String {
+        if model.v3Settings.allowClosedLid { return L("Closed-lid use allowed", "닫고 사용 허용") + " · " + closedLidDisplayTitle }
+        return L("Closed-lid use off · Saved: ", "닫고 사용 꺼짐 · 저장: ") + closedLidDisplayTitle
+    }
+    private var lockPolicyNote: some View {
+        Note(L("Display sleep and zero brightness do not unlock your Mac. Locking and password requirements follow macOS.",
+               "화면 꺼짐과 밝기 0은 잠금 해제가 아닙니다. 잠금·암호 요구는 macOS 설정을 따릅니다."))
+            .accessibilityIdentifier("settings-lock-policy-note")
+    }
+    private var lockScreenSettingsButton: some View {
+        Button(L("Lock Screen settings…", "macOS 잠금 화면 설정…")) { model.open(.lockScreen) }
+            .buttonStyle(.link).disabled(model.userCommandsArePreview || model.developmentService)
+    }
+    private var closedLidDisplayControls: some View {
+        SettingRow(title: L("Built-in display when closed", "덮개를 닫으면 내장 화면을")) {
+            CompactPopUp(title: L("Built-in display with the lid closed", "덮개를 닫으면 내장 화면을"), selection: Binding(
+                get: { model.v3Settings.closedLidDisplayMode }, set: { model.setClosedLidDisplayMode($0) }), choices: [
+                PopupChoice(ClosedLidDisplayMode.off, L("Turn display off", "화면 끄기")),
+                PopupChoice(.zeroBrightness, L("Set brightness to zero", "밝기 0으로 낮추기"), enabled: model.canUseZeroBrightness),
+                PopupChoice(.unchanged, L("Do not change", "변경하지 않기"))
+            ], identifier: "settings-closed-lid-display-mode").disabled(settingsControlsDisabled)
+        }
+    }
+    private var closedLidDisplayTitle: String {
+        switch model.v3Settings.closedLidDisplayMode {
+        case .off: L("Turn display off", "화면 끄기")
+        case .zeroBrightness: L("Brightness zero", "밝기 0")
+        case .unchanged: L("Do not change", "변경하지 않기")
+        }
+    }
+    private var closedLidDisplayExplanation: String {
+        switch model.v3Settings.closedLidDisplayMode {
+        case .off: L("Requests built-in display sleep; panel power is not measured.", "내장 화면 절전을 요청합니다. 패널 전력 측정값은 아닙니다.")
+        case .zeroBrightness: L("Lowers brightness only. Display sleep, unlocking and remote connectivity are not confirmed.", "밝기만 낮춥니다. 화면 꺼짐·잠금 해제·원격 연결 성공을 뜻하지 않습니다.")
+        case .unchanged: L("Tether leaves built-in display settings unchanged. macOS and other apps still apply.", "내장 화면 설정을 바꾸지 않습니다. macOS와 다른 앱의 설정은 계속 적용됩니다.")
+        }
+    }
+    private var closedLidDisplayExpansion: Binding<Bool> { disclosures?.closedLidDisplay ?? $closedLidDisplayExpanded }
+    var unplugExpansion: Binding<Bool> { disclosures?.powerDisconnect ?? $unplugExpanded }
+    private var scopeDetailsExpansion: Binding<Bool> { disclosures?.powerScope ?? $scopeDetailsExpanded }
+    private var disconnectSummary: String {
+        switch model.v3Settings.disconnectPolicy {
+        case .endAll: L("Start new manual work separately to use the battery.", "배터리에서 사용하려면 새 수동 유지를 시작하세요.")
+        case .endAutomatic: L("Only battery-eligible manual work continues within its original deadline and limit.", "배터리 사용이 허용된 수동 유지만 원래 기한·한도 안에서 계속합니다.")
+        case .continueEligible: L("Only already eligible work continues. Deadlines and battery limits are not reset.", "이미 배터리 사용이 허용된 유지에만 적용됩니다. 기한과 한도는 초기화하지 않습니다.")
+        }
+    }
+    var disconnectExplanation: String {
+        switch model.v3Settings.disconnectAction {
+        case .sleepIfClosed:
+            L("After the last eligible work ends, Tether releases its support, then requests sleep. macOS or other apps may delay sleep.",
+              "마지막 유지가 끝나면 자체 지원을 해제한 뒤 잠자기를 요청합니다. macOS·다른 앱의 요청으로 잠자기가 지연될 수 있습니다.")
+        case .followOS:
+            L("After the last eligible work ends, Tether releases its support and lets macOS decide when to sleep. Other requests may keep the Mac awake.",
+              "마지막 유지가 끝나면 자체 지원을 해제하고 잠자기는 macOS에 맡깁니다. 다른 요청으로 Mac이 계속 깨어 있을 수 있습니다.")
+        }
+    }
+    private var settingsControlsDisabled: Bool { !model.acceptingUserCommands || model.commandPending }
 }

@@ -11,7 +11,8 @@ func appVersion() -> String? {
 
 /// `tether doctor`: the quick checks, one line each; exits 1 when one failed.
 func doctor() -> Never {
-    let checks = HealthChecks.run()
+    let common = try? userSessionClient().snapshot()
+    let checks = HealthChecks.run(userSession: common, userSessionRequested: true)
     for check in checks {
         let mark = switch check.result {
         case .ok: "✓"
@@ -26,38 +27,50 @@ func doctor() -> Never {
 func diagnose(_ rest: [String]) -> Never {
     var output: String?
     var record = false
+    var recordingMinutes = 15
+    var includeProcessNames = false
     var hours = 24.0
     var i = 0
     while i < rest.count {
         switch rest[i] {
         case "--record": record = true
+        case "--include-app-names": includeProcessNames = true
+        case "--record-minutes" where i + 1 < rest.count:
+            i += 1
+            guard let value = Int(rest[i]), (1...240).contains(value) else { fail("--record-minutes must be 1...240", code: 2) }
+            recordingMinutes = value; record = true
         case "--out" where i + 1 < rest.count:
             i += 1
             output = rest[i]
         case "--hours" where i + 1 < rest.count:
             i += 1
-            hours = Double(rest[i]) ?? hours
+            guard let value = Double(rest[i]), value.isFinite, value > 0, value <= 72 else { fail("--hours must be greater than 0 and at most 72", code: 2) }
+            hours = value
         default:
-            fail(L("Usage: tether diagnose [--record] [--out <file>] [--hours <n>]", "사용법: tether diagnose [--record] [--out <파일>] [--hours <n>]"), code: 2)
+            fail(L("Usage: tether diagnose [--record] [--record-minutes 1...240] [--out <file>] [--hours 1...72] [--include-app-names]", "사용법: tether diagnose [--record] [--record-minutes 1...240] [--out <파일>] [--hours 1...72] [--include-app-names]"), code: 2)
         }
         i += 1
     }
     var since: Date?
     if record {
-        let before = ControlStore.read().debugLog
         let started = Date()
-        let logging = ControlStore.update { $0.debugLog = true }
-        note(logging
-            ? L("Recording with detailed logging. Reproduce the problem now, then press Return.",
-                "자세히 기록하는 중입니다. 지금 문제를 재현한 뒤 Return 키를 누르세요.")
-            : L("Recording (detailed logging needs the helper, which isn't installed). Reproduce the problem, then press Return.",
-                "기록 중입니다 (도우미가 없어 자세한 기록은 불가). 문제를 재현한 뒤 Return 키를 누르세요."))
+        let recording = try? userSessionClient().perform(.status, recording: .start(minutes: recordingMinutes))
+        note(recording != nil
+            ? L("Detailed logging for up to \(recordingMinutes) minutes. Reproduce the problem, then press Return to export.",
+                "최대 \(recordingMinutes)분간 자세히 기록합니다. 문제를 재현한 뒤 Return 키를 눌러 내보내세요.")
+            : L("Couldn't start detailed recording. Open the matching Tether app and check its command connection. Press Return to export available logs.",
+                "상세 기록을 켜지 못했습니다. 같은 버전의 Tether 앱과 명령 연결을 확인하세요. Return 키를 누르면 보관된 기록을 내보냅니다."))
         _ = readLine()
-        if logging { ControlStore.update { $0.debugLog = before } }
+        if let recording {
+            do { _ = try userSessionClient().perform(.status, recording: .finish(recordingID: recording.id)) }
+            catch { note(L("Couldn't confirm detailed recording ended: ", "상세 기록 종료를 확인하지 못했습니다: ") + error.localizedDescription) }
+        }
         since = started.addingTimeInterval(-60)
     }
     note(L("Collecting (a few seconds)…", "모으는 중입니다 (몇 초 걸려요)…"))
-    let report = Diagnostics.report(appVersion: appVersion(), since: since, hours: hours)
+    let common = try? userSessionClient().snapshot()
+    let report = Diagnostics.report(appVersion: appVersion(), since: since, hours: hours, includeProcessNames: includeProcessNames,
+        userSession: common, userSessionRequested: true)
     guard let output else {
         print(report)
         exit(0)

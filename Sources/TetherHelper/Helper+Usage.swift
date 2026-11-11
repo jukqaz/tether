@@ -14,13 +14,14 @@ extension Helper {
                                            requestedByTether: SystemProbe.sleepRequestedByPID == Int(getpid()),
                                            wakeType: SystemProbe.rootDomainString("Wake Type"),
                                            wakeReason: SystemProbe.rootDomainString("Wake Reason")) {
-            log(String(format: "slept %.0f min, charge %@%% -> %@%%%@, %d dark wakes; asleep by %@, woke by %@ (%@)",
+            log(String(format: "slept %.0f min, charge %@%% -> %@%%%@, dark wakes %@; asleep by %@, woke by %@ (%@)",
                        (slept.duration ?? 0) / 60, slept.percentBefore.map(String.init) ?? "?",
                        slept.percentAfter.map(String.init) ?? "?",
-                       slept.drainPerHour.map { String(format: " (%.1f%%/h)", $0) } ?? "", slept.darkWakes,
+                       slept.drainPerHour.map { String(format: " (%.1f%%/h)", $0) } ?? "", slept.darkWakeSummary,
                        slept.byTether ? "Tether" : (slept.sleepReason ?? "?"), slept.wakeType ?? "?",
                        slept.wakeReason ?? "?"))
             recorded = true
+            reconcileSleepLog()
         }
         usage.stats.tick(now: now, sample: UsageSample(lidClosed: s.lidClosed, clamshellOn: clamshellOn,
                                                        holdingOnBattery: holdingOnBattery, temperature: r.temperature,
@@ -39,11 +40,73 @@ extension Helper {
         if recorded || now.timeIntervalSince(usageSavedAt) >= 300 {
             JSONFile.write(usage, to: usagePath, permissions: 0o644)
             usageSavedAt = now
-            summary = UsageSummary(usage, now: now)
         }
     }
 
-    func saveState() {
-        JSONFile.write(state, to: statePath, permissions: 0o600)
+    /// Run at startup/full wake, never synchronously inside a power notification or policy loop.
+    /// Two bounded reads allow powerd to finish writing the wake event; no continuous polling.
+    func reconcileSleepLog(attempt: Int = 0) {
+        guard !systemSleepTransition, currentSnapshot().fullWake,
+              usage.sleeps.recent.contains(where: { $0.darkWakeCountVerified != true }) else { return }
+        guard !sleepLogReadInFlight else { sleepLogReadQueued = true; return }
+        let simulated = dryRun
+        let fixtureLog = simulated ? fake["powerEventLog"] as? String : nil
+        if simulated && fixtureLog == nil { return }
+        sleepLogReadInFlight = true
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let output: String?
+            let readStatus: Int32
+            if simulated { output = fixtureLog; readStatus = 0 }
+            else {
+                let result = Shell.run("/usr/bin/pmset", ["-g", "log"], timeout: 8,
+                                       maxOutputBytes: 4 * 1_048_576, keepTail: true)
+                readStatus = result.status
+                output = result.status == 0 ? result.output : nil
+            }
+            let events = output.map(SystemSleepEvents.init)
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.sleepLogReadInFlight = false
+                if readStatus != 0 {
+                    self.log("sleep log reconciliation unavailable: pmset status=\(readStatus); notification counts remain unverified")
+                }
+                var sleeps = self.usage.sleeps
+                let changed = events.map { sleeps.reconcileDarkWakes(with: $0) } ?? 0
+                if changed > 0 {
+                    var next = self.usage; next.sleeps = sleeps
+                    if JSONFile.write(next, to: self.usagePath, permissions: 0o644) {
+                        let corrected = sleeps.recent.filter { row in
+                            row.darkWakeCountVerified == true && self.usage.sleeps.recent.contains {
+                                $0.sleptAt == row.sleptAt && $0.wokeAt == row.wokeAt && $0.darkWakeCountVerified != true
+                            }
+                        }
+                        self.usage = next
+                        self.log("sleep log reconciled: \(changed) record(s), dark wake counts verified against macOS events")
+                        for row in corrected {
+                            self.log("sleep log interval \(row.sleptAt)...\(row.wokeAt ?? row.sleptAt): darkWakes=\(row.darkWakes) source=pmset")
+                        }
+                        DarwinNotification.post(TetherPaths.statusChanged)
+                    } else { self.log("sleep log reconciliation could not be saved; prior records retained") }
+                }
+                let queued = self.sleepLogReadQueued
+                self.sleepLogReadQueued = false
+                if queued { self.reconcileSleepLog() }
+                else if attempt == 0, self.usage.sleeps.recent.contains(where: { $0.darkWakeCountVerified != true }) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in self?.reconcileSleepLog(attempt: 1) }
+                }
+            }
+        }
+    }
+
+    @discardableResult
+    func saveState() -> Bool {
+        guard !stateJournalUnreadable else {
+            lastApplyError = "stateUnreadable"
+            return false
+        }
+        guard JSONFile.write(state, to: statePath, permissions: 0o600, durable: true) else {
+            lastApplyError = "writeFailed"; protection.block("stateWriteFailed"); return false
+        }
+        return true
     }
 }

@@ -10,7 +10,7 @@
 		<string>/Library/PrivilegedHelperTools/local.tether.watchdog</string>
 	</array>
 	<key>StartInterval</key>
-	<integer>60</integer>
+	<integer>30</integer>
 	<key>StandardErrorPath</key>
 	<string>/Library/Logs/Tether/helper.log</string>
 </dict>

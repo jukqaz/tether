@@ -1,92 +1,202 @@
 import SwiftUI
 import TetherCore
 
-/// The settings window, laid out like System Settings: a sidebar of coloured icons, a grouped
-/// form on the right. Measurements sit next to the settings they inform; the full record is in
-/// "History".
+/// Native navigation owns selection; opaque surfaces keep the reading area stable.
+/// Page and disclosure selections remain presentation state of this window.
 struct SettingsView: View {
     @ObservedObject var model: AppModel
-    /// Offscreen screenshots can't draw the system's sidebar selection (it comes out as a black
-    /// bar hiding the title), so they mark the current page themselves.
     var screenshot = false
+    @State private var disclosures: SettingsDisclosureState
+
+    init(model: AppModel, screenshot: Bool = false, expandedDetails: Bool = false) {
+        self.model = model
+        self.screenshot = screenshot
+        _disclosures = State(initialValue: SettingsDisclosureState(expanded: expandedDetails))
+    }
 
     var body: some View {
-        let page = model.settingsPage
-        let selection = Binding<SettingsPage?>(get: { model.settingsPage }, set: { if let new = $0 { model.settingsPage = new } })
-        NavigationSplitView {
-            List(SettingsPage.allCases, selection: screenshot ? .constant(nil) : selection) { item in
-                Label {
-                    Text(item.title)
-                } icon: {
-                    SidebarIcon(symbol: item.symbol, color: item.color)
-                }
-                .tag(item)
-                .listRowBackground(screenshot && item == page
-                                   ? RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.09)).padding(.horizontal, 10)
-                                   : nil)
+        SettingsNavigation(model: model, disclosures: $disclosures)
+            .tint(.tetherAccent)
+            // The window bridge owns the content minimum. A second minimum on
+            // NavigationSplitView adds native toolbar/footer heights to it.
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background { if !screenshot { SettingsWindowBridge() } }
+            .sheet(isPresented: $model.showActivityReview, onDismiss: {
+                if !model.showActivityReview { model.activityReviewPresentationOrigin = .unknown }
+            }) {
+                ActivityReviewView(model: model, sample: model.userCommandsArePreview || model.developmentService,
+                    presentationOrigin: model.activityReviewPresentationOrigin)
             }
-            .navigationSplitViewColumnWidth(min: 200, ideal: 214, max: 260)
+            .environment(\.tetherSettingsStyle, true)
+    }
+}
+
+struct SettingsNavigation: View {
+    @ObservedObject var model: AppModel
+    @Binding var disclosures: SettingsDisclosureState
+    @State private var columns: NavigationSplitViewVisibility = .all
+    @State private var selection: SettingsPage?
+
+    init(model: AppModel, disclosures: Binding<SettingsDisclosureState>) {
+        self.model = model
+        _disclosures = disclosures
+        _selection = State(initialValue: model.settingsPage)
+    }
+
+    var body: some View {
+        NavigationSplitView(columnVisibility: $columns) {
+            List(SettingsPage.allCases, selection: $selection) { page in
+                Label {
+                    Text(page.shortTitle)
+                        .font(TetherTypography.settingsBody)
+                        .fixedSize(horizontal: false, vertical: true)
+                } icon: {
+                    Image(systemName: page.symbol)
+                        .font(.system(size: 18))
+                        .foregroundStyle(.secondary)
+                }
+                .tag(page)
+                .accessibilityLabel(page.title)
+                .accessibilityIdentifier("settings-tab-\(page.rawValue)")
+            }
+            .listStyle(.sidebar)
+            .scrollContentBackground(.hidden)
+            .environment(\.defaultMinListRowHeight, 44)
             .toolbar(removing: .sidebarToggle)
+            .navigationSplitViewColumnWidth(min: 176, ideal: 190, max: 220)
+            .background(Color(nsColor: .windowBackgroundColor))
+            .accessibilityIdentifier("settings-sidebar")
         } detail: {
-            page.page(model: model)
-                .navigationTitle(page.title)
+            model.settingsPage.page(model: model, disclosures: $disclosures)
+                .accessibilityIdentifier("settings-page-\(model.settingsPage.rawValue)")
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(model.settingsPage.title).font(TetherTypography.page)
+                            .foregroundStyle(Color.tetherPrimary)
+                            .accessibilityAddTraits(.isHeader)
+                            .accessibilityIdentifier("settings-page-heading")
+                        Text(model.settingsPage.subtitle).font(TetherTypography.settingsSecondary)
+                            .foregroundStyle(Color.tetherSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: SettingsMetrics.contentWidth, alignment: .leading)
+                    .padding(.horizontal, SettingsMetrics.gutter)
+                    .padding(.top, 22).padding(.bottom, 18)
+                    .frame(maxWidth: .infinity)
+                    .background(Color(nsColor: .windowBackgroundColor))
+                }
+                // A stable reading surface belongs to the detail pane only;
+                // the native sidebar and titlebar retain their own materials.
+                .background(Color(nsColor: .windowBackgroundColor))
+                .navigationTitle(L("Tether Settings", "Tether 환경설정"))
+                // An opaque toolbar prevents scrolled text ghosting behind the title.
+                .toolbarBackground(Color(nsColor: .windowBackgroundColor), for: .windowToolbar)
+                .toolbarBackground(.visible, for: .windowToolbar)
         }
-        .frame(width: 800, height: 620)
-        .background(SettingsWindowBridge())
+        .navigationSplitViewStyle(.balanced)
+        .toolbar(removing: .sidebarToggle)
+        .toolbar {
+            if model.userCommandsArePreview {
+                ToolbarItem(placement: .primaryAction) { PreviewIndicator() }
+                    .sharedBackgroundVisibility(.hidden)
+            }
+            ToolbarItem(placement: .navigation) {
+                Button {
+                    columns = columns == .detailOnly ? .all : .detailOnly
+                } label: { Image(systemName: "sidebar.left") }
+                .buttonStyle(.plain).controlSize(.small)
+                .help(L("Show sidebar", "사이드바 보기"))
+                .accessibilityIdentifier("settings-toggle-sidebar")
+            }.sharedBackgroundVisibility(.hidden)
+        }
+        .accessibilityLabel(L("Settings pages", "설정 페이지"))
+        // Native List can reconcile selection during its view update. Keep that
+        // write local, then publish route changes outside the binding setter.
+        .onChange(of: selection) { _, page in
+            guard let page else {
+                selection = model.settingsPage
+                return
+            }
+            guard page != model.settingsPage else { return }
+            model.settingsPage = page
+        }
+        .onChange(of: model.settingsPage) { _, page in
+            guard selection != page else { return }
+            selection = page
+        }
+    }
+}
+
+/// Presentation state belongs to the settings window, not power preferences.
+/// Standalone page renderers can continue using their local State fallback.
+struct SettingsDisclosureState {
+    var powerDisconnect = true
+    var manualBattery = false
+    var manualApplication = false
+    var manualLimitsApplication = false
+    var powerScope = false
+    var protectionBasis = false
+    var appBehavior = false
+    var notifications = false
+    var appAdvanced = false
+    var workRules = false
+    var protectionAlerts = false
+    var protectionRules = false
+    var diagnostics = false
+    var updates = false
+    var helper = false
+    var automaticConnections = false
+    var closedLidDisplay = false
+    var usageStatistics = false
+    var otherAppRequests = false
+    init(expanded: Bool = false) {
+        manualBattery = expanded; workRules = expanded; protectionAlerts = expanded; protectionRules = expanded
+        manualApplication = expanded; manualLimitsApplication = expanded; powerScope = expanded
+        protectionBasis = expanded; appBehavior = expanded
+        notifications = expanded; appAdvanced = expanded
+        diagnostics = expanded; updates = expanded; helper = expanded
+        automaticConnections = expanded; closedLidDisplay = expanded
+        usageStatistics = expanded; otherAppRequests = expanded
     }
 }
 
 enum SettingsPage: String, CaseIterable, Identifiable {
-    case general, lid, safety, history, notifications, automation, system
-
+    // Retain raw identities used by saved routes and external callers.
+    case safety, general, protection, system
     var id: Self { self }
-
     var title: String {
         switch self {
-        case .general: L("General", "일반")
-        case .lid: L("Lid & Screen", "덮개와 화면")
-        case .safety: L("Safety", "배터리와 발열")
-        case .history: L("History", "기록")
-        case .notifications: L("Notifications", "알림")
-        case .automation: L("Automation", "자동화")
-        case .system: L("System", "시스템")
+        case .safety: L("Power & Lid", "전원·덮개")
+        case .general: L("Manual", "수동 유지")
+        case .protection: L("Protection & Diagnostics", "보호·진단")
+        case .system: L("General", "일반")
         }
     }
-
+    var shortTitle: String { self == .protection ? L("Protection", "보호·진단") : title }
+    var subtitle: String {
+        switch self {
+        case .safety: L("Power connection, disconnection and closed-lid work.", "전원 연결·분리와 덮개 동작을 정합니다.")
+        case .general: L("Defaults for the next manual start.", "다음에 직접 시작할 작업의 기본값입니다.")
+        case .protection: L("Device protection, activity and diagnostics.", "기기 보호와 사용 기록·진단을 확인합니다.")
+        case .system: L("Startup, language, notifications and updates.", "시작·언어·알림·업데이트를 관리합니다.")
+        }
+    }
     var symbol: String {
         switch self {
-        case .general: "gearshape.fill"
-        case .lid: "laptopcomputer"
-        case .safety: "thermometer.medium"
-        case .history: "chart.xyaxis.line"
-        case .notifications: "bell.badge.fill"
-        case .automation: "terminal.fill"
-        case .system: "wrench.and.screwdriver.fill"
+        case .safety: "powerplug"
+        case .general: "timer"
+        case .protection: "shield.lefthalf.filled"
+        case .system: "gearshape"
         }
     }
-
-    var color: Color {
-        switch self {
-        case .general: .gray
-        case .lid: .blue
-        case .safety: .orange
-        case .history: .tetherMint
-        case .notifications: .red
-        case .automation: .purple
-        case .system: Color(white: 0.45)
-        }
-    }
-
+    var color: Color { .tetherSecondary }
     @MainActor @ViewBuilder
-    func page(model: AppModel) -> some View {
+    func page(model: AppModel, disclosures: Binding<SettingsDisclosureState>? = nil) -> some View {
         switch self {
-        case .general: GeneralPage(model: model)
-        case .lid: LidPage(model: model)
-        case .safety: SafetyPage(model: model)
-        case .history: HistoryPage(model: model)
-        case .notifications: NotificationsPage(model: model)
-        case .automation: AutomationPage(model: model)
-        case .system: SystemPage(model: model)
+        case .safety: SafetyPage(model: model, disclosures: disclosures)
+        case .general: GeneralPage(model: model, disclosures: disclosures)
+        case .protection: ProtectionPage(model: model, disclosures: disclosures)
+        case .system: SystemPage(model: model, disclosures: disclosures)
         }
     }
 }
@@ -96,11 +206,26 @@ enum SettingsPage: String, CaseIterable, Identifiable {
 /// link, say), with no ⌘-Tab entry to get back. While the window is open Tether is a regular
 /// app instead: Dock icon, ⌘-Tab, window stays put. Closing it returns Tether to the menu bar.
 struct SettingsWindowBridge: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView { WindowWatcher() }
+    var minimumSize = WorkSessionMetrics.settingsMinimum
+    var allowsResizing = true
+
+    func makeNSView(context: Context) -> NSView {
+        WindowWatcher(minimumSize: minimumSize, allowsResizing: allowsResizing)
+    }
     func updateNSView(_ nsView: NSView, context: Context) {}
 
     final class WindowWatcher: NSView {
         private var observers: [NSObjectProtocol] = []
+        private weak var initialFocusWindow: NSWindow?
+        private let minimumSize: CGSize
+        private let allowsResizing: Bool
+
+        init(minimumSize: CGSize, allowsResizing: Bool) {
+            self.minimumSize = minimumSize
+            self.allowsResizing = allowsResizing
+            super.init(frame: .zero)
+        }
+        required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
@@ -108,17 +233,73 @@ struct SettingsWindowBridge: NSViewRepresentable {
             observers = []
             guard let window else { return }
             window.hidesOnDeactivate = false
+            window.contentMinSize = minimumSize
+            let resize = allowsResizing
+            let contentMinimum = minimumSize
             let center = NotificationCenter.default
             // SwiftUI may reuse the window after it closes, so opening again is seen as "became key".
             observers.append(center.addObserver(forName: NSWindow.didBecomeKeyNotification, object: window,
-                                                queue: .main) { _ in
-                MainActor.assumeIsolated { Self.showInDock(true) }
+                                                queue: .main) { [weak window] _ in
+                MainActor.assumeIsolated {
+                    // Keep only the window affordances that Settings may reset.
+                    // SwiftUI retains ownership of its native tabs and toolbar.
+                    DispatchQueue.main.async { [weak window] in
+                        guard let window else { return }
+                        Self.configureChrome(window, allowsResizing: resize, minimumSize: contentMinimum)
+                    }
+                    Self.showInDock(true)
+                }
             })
             observers.append(center.addObserver(forName: NSWindow.willCloseNotification, object: window,
                                                 queue: .main) { _ in
                 MainActor.assumeIsolated { Self.showInDock(false) }
             })
+            if resize {
+                // The Settings host can restore its fixed style after the first
+                // key-window callback. Reconcile resizing without replacing the
+                // toolbar, titlebar or system material.
+                observers.append(center.addObserver(forName: NSWindow.didUpdateNotification, object: window,
+                                                    queue: .main) { [weak window] _ in
+                    DispatchQueue.main.async { [weak window] in
+                        guard let window, window.isVisible else { return }
+                        Self.configureChrome(window, allowsResizing: true, minimumSize: contentMinimum)
+                    }
+                })
+            }
             Self.showInDock(true)
+            let clearInitialFocus = initialFocusWindow !== window && NSApp.currentEvent?.type != .keyDown
+            initialFocusWindow = window
+            // Settings' native host applies its fixed-size style after attaching
+            // the view, even with Scene.contentMinSize. Keep SwiftUI's measured
+            // content/chrome constraints and enable only the resize affordance.
+            DispatchQueue.main.async { [weak window] in
+                guard let window else { return }
+                Self.configureChrome(window, allowsResizing: resize, minimumSize: contentMinimum)
+                // Native hosting may focus its first switch before any keyboard
+                // input. Clear only the initial mouse/startup selection; later
+                // Tab navigation, page changes and reactivation keep their focus.
+                if clearInitialFocus, NSApp.currentEvent?.type != .keyDown { window.makeFirstResponder(nil) }
+            }
+        }
+
+        static func enableResizing(_ window: NSWindow) {
+            if !window.styleMask.contains(.resizable) { window.styleMask.insert(.resizable) }
+        }
+
+        private static func configureChrome(_ window: NSWindow, allowsResizing: Bool, minimumSize: CGSize) {
+            // The automatic Settings host recomputes this after page changes.
+            // Reconcile only a changed constraint; do not resize the user's window.
+            if window.contentMinSize != minimumSize { window.contentMinSize = minimumSize }
+            // Settings can ignore the Scene toolbar style when presenting its
+            // own host. Reconcile the same native compact style, without custom chrome.
+            if window.toolbarStyle != .unifiedCompact { window.toolbarStyle = .unifiedCompact }
+            let buttons = [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton]
+            guard (allowsResizing && !window.styleMask.contains(.resizable))
+                || buttons.contains(where: { window.standardWindowButton($0)?.isHidden == true }) else { return }
+            if allowsResizing { enableResizing(window) }
+            for button in buttons {
+                window.standardWindowButton(button)?.isHidden = false
+            }
         }
 
         static func showInDock(_ on: Bool) {

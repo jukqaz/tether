@@ -3,29 +3,66 @@ import TetherCore
 
 /// The battery hold: its safety limits and Low Power Mode.
 extension Helper {
+    func updatePendingHold(_ snapshot: Snapshot) {
+        guard let minutes = control.pendingHoldMinutes else { return }
+        guard !effectiveEnabled || snapshot.power != .ac else { return }
+        var next = control; next.pendingHoldMinutes = nil
+        // Unknown power and Dark Wake cancel the reservation, never defer a surprise activation.
+        if effectiveEnabled, snapshot.power == .battery, snapshot.fullWake,
+           !enforcesGUIAuthority || guiControlConfirmed {
+            next.batteryHoldUntil = Date().addingTimeInterval(Double(minutes * 60)).timeIntervalSince1970
+        } else { next.holdSource = nil }
+        if !commitControl(next) { protection.block("stateWriteFailed") }
+    }
+
+    func updateAutomaticHold(_ snapshot: Snapshot) {
+        if enforcesGUIAuthority, !guiControlConfirmed { return }
+        // Wake state is not a new power transition. A dark wake must neither cancel a
+        // running timer nor re-arm one that the user already canceled.
+        let eligible = effectiveEnabled && control.condition.includesBattery && snapshot.power == .battery
+        // Brief AC/unknown observations must not re-arm a canceled timer.
+        let entered: Bool
+        if snapshot.power == .battery || !effectiveEnabled || !control.condition.includesBattery {
+            entered = automaticHoldGate.entering(eligible: eligible)
+        } else {
+            if powerGate.confirmedAC { automaticHoldGate.reset(eligible: false) }
+            entered = false
+        }
+        if control.holdSource == "automatic", !eligible {
+            var next = control; next.batteryHoldUntil = nil; next.holdSource = nil
+            if !commitControl(next) { protection.block("stateWriteFailed") }
+        }
+        guard entered, snapshot.fullWake, !holdWasActive,
+              state.holdDeadline(requested: control.batteryHoldUntil, now: Date()) == nil else { return }
+        var next = control
+        next.batteryHoldUntil = Date().addingTimeInterval(Double(control.automaticMinutes * 60)).timeIntervalSince1970
+        next.holdSource = "automatic"
+        if !commitControl(next) { protection.block("stateWriteFailed") }
+    }
+
     /// Applies the hold's safety limits and Low Power Mode; returns whether the hold is active.
     func updateBatteryHold(_ s: Snapshot, readings: SafetyReadings) -> Bool {
         let now = Date()
         let user = limits
-        var deadline = control.enabled
+        var deadline = effectiveEnabled
             ? state.holdDeadline(requested: control.batteryHoldUntil, now: now, maxHold: SafetyPolicy.maxHold(user))
             : nil
+        protection.prepareBatteryBudget(power: s.power, needed: deadline != nil, clock: ContinuousTime.now, boot: currentBootID)
+        if let requested = deadline, s.power == .battery {
+            let remaining = protection.batteryRemaining(clock: ContinuousTime.now, user: user)
+            if remaining <= 0 { protection.block("budget") }
+            deadline = min(requested, now.addingTimeInterval(remaining))
+        }
+        if let requested = deadline, let continuous = state.holdContinuousDeadline {
+            deadline = min(requested, now.addingTimeInterval(max(0, continuous - ContinuousTime.now)))
+        }
         if deadline == nil, holdWasActive { endHold(.cancelled, readings: nil) }
 
         if let d = deadline {
             if s.power == .battery {
-                // A lid change switches between the open and closed limits: restart the countdown.
-                if warmLidClosed != s.lidClosed {
-                    warmSince = nil
-                    warmLidClosed = s.lidClosed
-                }
-                if SafetyPolicy.isWarm(readings, lidClosed: s.lidClosed, user: user) {
-                    if warmSince == nil { warmSince = now }
-                } else {
-                    warmSince = nil
-                }
-                if let end = SafetyPolicy.verdict(readings, lidClosed: s.lidClosed, now: now,
-                                                  holdUntil: d, warmSince: warmSince, user: user) {
+                let clock = ContinuousTime.now
+                if let end = readings.batteryPercent == nil ? HoldEnd.sensor : SafetyPolicy.verdict(readings, lidClosed: s.lidClosed, now: Date(timeIntervalSince1970: clock),
+                                                  holdUntil: Date(timeIntervalSince1970: clock + d.timeIntervalSince(now)), warmSince: nil, user: user) {
                     endHold(end, readings: readings)
                     deadline = nil
                 }
@@ -44,11 +81,13 @@ extension Helper {
             usage.stats.recordBatteryHold(now: now)
         }
         holdingOnBattery = onBattery
-        manageLowPower(on: LowPowerPolicy.wantsOnBattery(holdingOnBattery: onBattery, allowed: control.holdLowPower))
         return active
     }
 
     func endHold(_ reason: HoldEnd, readings: SafetyReadings?) {
+        if reason != .cancelled, reason != .time {
+            protection.block(reason.rawValue)
+        }
         consumeHold()
         lastHoldEnd = reason
         lastHoldEndAt = Date().timeIntervalSince1970
@@ -66,24 +105,6 @@ extension Helper {
         state.consumedHold = state.holdValue
         saveState()
         holdWasActive = false
-        warmSince = nil
     }
 
-    /// Low Power Mode caps heat and drain while a closed Mac runs on battery, unless the user
-    /// turned that off (see `LowPowerPolicy`).
-    func manageLowPower(on: Bool) {
-        if on, state.savedBatteryLowPower == nil {
-            let current = SystemProbe.lowPowerMode(section: "Battery Power") ?? 0
-            state.savedBatteryLowPower = current
-            saveState()
-            log("battery hold: Low Power Mode on\(current == 1 ? " (already on)" : "")")
-            if current != 1 { pmset(["-b", "lowpowermode", "1"]) }
-        } else if !on, let saved = state.savedBatteryLowPower {
-            let restore = LowPowerPolicy.shouldRestore(current: SystemProbe.lowPowerMode(section: "Battery Power"), saved: saved)
-            log("battery hold: Low Power Mode off, \(restore ? "restored" : "left as it is")")
-            if restore { pmset(["-b", "lowpowermode", String(saved)]) }
-            state.savedBatteryLowPower = nil
-            saveState()
-        }
-    }
 }
