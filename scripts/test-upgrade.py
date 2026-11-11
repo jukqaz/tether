@@ -14,6 +14,10 @@ PREVIOUS=Path(os.environ['TETHER_TEST_PREVIOUS_HELPER']) if os.environ.get('TETH
 PREVIOUS_BUILD=int(os.environ.get('TETHER_TEST_PREVIOUS_BUILD','49'))
 CURRENT_COORDINATOR=10
 CURRENT_SCHEMA=4
+PREVIOUS_MANUAL_CLOCK=100
+PREVIOUS_MANUAL_SECONDS=600
+COORDINATOR_10_LEASE_SECONDS=15
+COORDINATOR_10_BATTERY_SECONDS=3600
 LOG_NAMES=['helper.log','helper.log.1','helper.log.2','helper.log.3']
 LOG_SUCCESS_CASES=['logs-private-upgrade','logs-new-umask077']
 LOG_UNSAFE_CASES=['logs-active-symlink','logs-active-hardlink','logs-active-fifo','logs-active-directory',
@@ -208,19 +212,30 @@ def wait_snapshot(support,build,old_epoch=None):
 def attach_previous_v3(support,old,holding):
  # Build 51+ is lease-only. Saved enabled settings cannot authorize legacy
  # attachApp/startHold; prepare and attach the same finite v3 decision as its GUI.
- clock=100
+ clock=PREVIOUS_MANUAL_CLOCK
  control=old['control']
  lease=dict(version=1,executionVersion=3,sessionID=str(uuid.uuid4()),sequence=1,power=old['status']['power'],
   reasons=[],configuration=dict(enabled=control['enabled'],automaticEnabled=True,
    condition=control['powerCondition'],automaticMinutes=control['automaticHoldMinutes'],limits=control['limits']))
+ prepared=rpc(support,'prepareWorkSession',workSession=lease,epoch=old['epoch'],revision=old['revision'])
  if holding:
   assert control['enabled'] and lease['power']=='battery',old
-  lease.update(expiry=clock+90,reasons=['manual'],manualDeadline=clock+600,manualStartedOnBattery=True,
-   lidPermit=dict(powerScopes=['ac','battery'],batteryPermitID=str(uuid.uuid4()),batteryDuration=600,
-    batteryDeadline=clock+600,disconnectAction='followOS',protectiveAction='sleepIfClosed'))
- empty=lease | dict(reasons=[])
- for key in ['expiry','manualDeadline','lidPermit']:empty.pop(key,None)
- prepared=rpc(support,'prepareWorkSession',workSession=empty,epoch=old['epoch'],revision=old['revision'])
+  request_id=str(uuid.uuid4())
+  lease.update(expiry=clock+90,reasons=['manual'],manualDeadline=clock+PREVIOUS_MANUAL_SECONDS,
+   manualStartedOnBattery=True,lidPermit=dict(powerScopes=['ac','battery'],batteryPermitID=request_id,
+    batteryDuration=PREVIOUS_MANUAL_SECONDS,batteryDeadline=clock+PREVIOUS_MANUAL_SECONDS,
+    disconnectAction='followOS',protectiveAction='sleepIfClosed'))
+  if old['status'].get('workSessionCoordinatorVersion')==10:
+   # Coordinator 10 has a 15-second renewable lease and tracks the request's
+   # own timer separately from its first, finite battery allowance.
+   expiry=prepared['workSessionPreparation']['expiresAt']
+   assert expiry==clock+COORDINATOR_10_LEASE_SECONDS,prepared
+   battery_cap=clock+COORDINATOR_10_BATTERY_SECONDS
+   lease['configuration'].update(disconnectPolicy='endAll',batteryTimeLimit='oneHour',manualPowerCondition='any')
+   lease.update(expiry=expiry,manualRequestID=request_id,manualBatteryMaximumDeadline=battery_cap,
+    manualBatteryTimeLimit='oneHour',manualPowerCondition='any')
+   lease['lidPermit'].update(powerScopes=['battery'],batteryDuration=COORDINATOR_10_BATTERY_SECONDS,
+    batteryDeadline=battery_cap,batteryMaximumDeadline=battery_cap,batteryTimeLimit='oneHour')
  return rpc(support,'attachWorkSession',workSession=lease,epoch=prepared['epoch'],revision=prepared['revision'])
 
 def cleanup_processes(root,owned_pids):
@@ -490,7 +505,7 @@ def run_case(case):
   (root/'fake.json').write_text(json.dumps(dict(power='ac',lid='open',sleepDisabled=False,fullWake=True,external=False,temperature=30,thermal=0,battery=80)))
   if previous_case:
    previous_fake=dict(power='battery',lid='open',sleepDisabled=False,fullWake=True,external=False,temperature=30,thermal=0,battery=80,displaySleeping=True)
-   if PREVIOUS_BUILD>=51:previous_fake.update(manualClock=100,lowPowerWarning=False)
+   if PREVIOUS_BUILD>=51:previous_fake.update(manualClock=PREVIOUS_MANUAL_CLOCK,lowPowerWarning=False)
    (root/'fake.json').write_text(json.dumps(previous_fake))
   if missing_daemon:
    fake=json.loads((root/'fake.json').read_text());fake.update(guiAuthority=True,guiConsoleUID=os.geteuid())
@@ -570,8 +585,15 @@ def run_case(case):
      old=attach_previous_v3(support,old,active_previous)
      assert old['workSessionBridge']['coordinated'] and old['status']['ownsOverride']==active_previous,old
      if active_previous:
-      assert old['status']['workSession']['executionVersion']==3 and old['status']['workSession']['expiry']==190,old
-      assert old['workSessionBridge']['batteryPermitReceipt']['deadline']==700,old
+      lease=old['status']['workSession'];receipt=old['workSessionBridge']['batteryPermitReceipt']
+      assert lease['executionVersion']==3 and lease['manualDeadline']==PREVIOUS_MANUAL_CLOCK+PREVIOUS_MANUAL_SECONDS,old
+      if old['status'].get('workSessionCoordinatorVersion')==10:
+       assert lease['expiry']==PREVIOUS_MANUAL_CLOCK+COORDINATOR_10_LEASE_SECONDS,old
+       assert receipt['permitID']==lease['manualRequestID']==lease['lidPermit']['batteryPermitID'],old
+       assert receipt['deadline']==lease['manualBatteryMaximumDeadline']==PREVIOUS_MANUAL_CLOCK+COORDINATOR_10_BATTERY_SECONDS,old
+      else:
+       assert lease['expiry']==PREVIOUS_MANUAL_CLOCK+90,old
+       assert receipt['deadline']==PREVIOUS_MANUAL_CLOCK+PREVIOUS_MANUAL_SECONDS,old
     else:
      rpc(support,'attachApp')
      if active_previous:

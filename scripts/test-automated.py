@@ -49,7 +49,7 @@ def source_hashes():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path)
-    parser.add_argument("--native-expiry", action="store_true", help="Observe the production driver's explicit 30-second OS health lease (separate native timing gate)")
+    parser.add_argument("--native-expiry", action="store_true", help="Observe expiry of the production driver's finite OS health lease (separate native timing gate)")
     parser.add_argument("--sparkle-cli", type=Path)
     parser.add_argument("--sparkle-tools", type=Path)
     parser.add_argument("--previous-helper", action="append", default=[], metavar="BUILD:PATH")
