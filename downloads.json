@@ -1,8 +1,8 @@
 {
   "stable": {
-    "version": "2026.11.1",
-    "build": 60,
-    "url": "https://github.com/jukqaz/tether/releases/download/v2026.11.1/Tether-2026.11.1-arm64.zip",
+    "version": "2026.11.2",
+    "build": 61,
+    "url": "https://github.com/jukqaz/tether/releases/download/v2026.11.2/Tether-2026.11.2-arm64.zip",
     "minimum_macos": "26.0"
   }
 }
