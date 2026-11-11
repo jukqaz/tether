@@ -2,14 +2,15 @@ import SwiftUI
 import TetherCore
 
 enum WorkSessionMetrics {
-    static let panelWidth: CGFloat = 304
-    static let panelMaximumHeight: CGFloat = 606
-    static let panelInset: CGFloat = 12
-    static let modulePadding: CGFloat = 10
+    static let panelWidth: CGFloat = 380
+    static let panelMaximumHeight: CGFloat = 680
+    static let panelInset: CGFloat = 20
+    static let modulePadding: CGFloat = 16
     static let iconWidth: CGFloat = 16
     static let iconSpacing: CGFloat = 8
-    static let settingsMinimum = CGSize(width: 600, height: 440)
-    static let pageInset: CGFloat = 16
+    static let settingsMinimum = CGSize(width: 720, height: 560)
+    static let settingsDefault = CGSize(width: 840, height: 660)
+    static let pageInset: CGFloat = 24
     static func panelHeightLimit(visibleHeight: CGFloat) -> CGFloat {
         min(panelMaximumHeight, max(202, visibleHeight - 32))
     }
@@ -34,6 +35,7 @@ extension EnvironmentValues {
 }
 
 struct WorkSessionNote: View {
+    @Environment(\.tetherSettingsStyle) private var settingsStyle
     let title: String
     var detail: String? = nil
     var symbol = "info.circle"
@@ -45,7 +47,7 @@ struct WorkSessionNote: View {
             Image(systemName: symbol).foregroundStyle(color).frame(width: 16).padding(.top, 2)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(TetherTypography.body.weight(.medium))
+                Text(title).font((settingsStyle ? TetherTypography.settingsBody : TetherTypography.body).weight(.medium))
                     .fixedSize(horizontal: false, vertical: true)
                 if let detail, !detail.isEmpty {
                     Text(detail).font(TetherTypography.body).foregroundStyle(Color.tetherSecondary)

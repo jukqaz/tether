@@ -1,5 +1,23 @@
 # Tether 자동 검증 실행
 
+## 전원·배터리 상세 검증 · 2026-11-05
+
+- `PowerBatteryReadingTests`: 단위·부호·누락·ETA·어댑터 조회와 실제 미연결 구분, read-only 수집 smoke. 실제 수집 검사는 한 번의 조회와 유효성 확인이며 센서 보정 정확도나 물리 전원 전환을 증명하지 않는다.
+- `PowerBatteryMonitorTests`: 숨김 시 무수집, 여러 패널의 조회 공유, 늦은 결과 폐기, 전원·깨움 invalidation, 10초 신선도, 조회 실패, fixture 격리, 현재 요청 ID·기한·저장 설정 불변.
+- `PowerBatteryPresentationTests`: 한국어·영어의 독립된 배터리/충전기 의미, `0`과 누락, AC 방전, 작은 전력·긴 수치, 재조회·오래된 값 문구.
+- 새 native UI 경로는 `testPowerBatteryDetailsKoreanLight`, `testPowerBatteryDetailsEnglishDark`, `testPowerBatteryExceptionsAndDesktop`다. 실제 MenuBarExtra에서 접힘/펼침, 우측 수치·영문 폭, 스크롤 끝·고정 하단 조작, 예외 문구와 데스크톱 생략을 확인한다. 메모리 fixture가 실제 collector를 호출하지 않았는지도 확인한다.
+- private 번들의 native 화면 검사·예시 데이터와 설치본·실제 물리 잠자기 시험은 구분한다. 설치·배포·OS 잠금/전원 설정 변경 없이 실행한다. 실패나 차단 실행을 통과 개수에 합산하지 않는다.
+
+전체 Swift 회귀에는 임시 Unix 소켓의 bind/listen 권한이 필요하다. 실행 환경이 AF_UNIX bind를 `EPERM`으로 거절하면 해당 IPC 실패와 이를 허용한 후속 검증을 별도로 기록한다. 제품의 endpoint 검증이나 권한 규칙을 완화해 테스트를 통과시키지 않는다.
+
+## 같은 Mac을 쓰는 채팅 간 UI 제어 · 2026-11-04
+
+동시 작업 중에는 Computer Use, XCTest, 테스트 앱 실행·활성화, 창을 띄우는 렌더를 한 작업만 수행한다. 터미널 빌드·정적 검사·전면 창을 바꾸지 않는 격리 검사는 병행할 수 있다. 현재 Mac의 공유 도구는 `/private/tmp/codex-cua-jukqaz/ui_lease.py`이며 제품이나 CI의 의존성은 아니다.
+
+상대 작업과 순서를 맞춘 뒤 `acquire`로 소유권을 얻고, 각 UI 실행 묶음 직전 자신의 owner/token으로 `check`한다. 실행 중에는 `renew`하며, 기한이 지나도 다른 작업의 소유권을 탈취하거나 앱을 종료하지 않는다. 실제 UI 실행과 자신의 테스트 앱 종료를 확인한 뒤 `release`하고 상대 채팅에 반납을 알린다. 도구·소유권을 확인하지 못하면 새 UI 실행을 시작하지 않는다.
+
+이번 잔여 검사에는 `.build/verification/native-ui-remaining-20261104/run-owned-ui.py`를 사용한다. 이 실행 경로는 XCTest 시작 전에 소유권을 갱신·확인하고, 실행 중 120초마다 갱신한다. `*-lease-checks.json`에 토큰을 제외한 확인 결과를 남긴다. 설치본·전원 설정·다른 앱은 변경하지 않는다. 다른 창이 검사 영역을 가린 캡처는 해당 UI의 정상·결함 증거와 구분하고, 제어권이 확보된 조건에서 해당 실패만 다시 검증한다.
+
 ## P0 구현 후보 검증 · 2026-10-21
 
 현재 P0 결과는 [구현·검증 보고서](../../../outputs/tether-p0-implementation-20261021/RESULT.ko.md)에 연결한다. 아래 2026-10-16 결과는 과거 후보의 근거이며 현재 합격으로 일괄 승계하지 않는다.

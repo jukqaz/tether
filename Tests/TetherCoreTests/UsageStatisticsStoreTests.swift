@@ -63,9 +63,7 @@ final class UsageStatisticsStoreTests: XCTestCase {
 
     @MainActor
     func testPersistenceRestoresTotalsWithoutSamplingOrRestartDoubleCount() throws {
-        let suite = "tether-usage-tests-\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        let defaults = CoreMemoryDefaults()
         let original = UsageStatisticsStore(defaults: defaults)
         observe(original)
         observe(original, after: 30, protection: "thermal")
@@ -84,9 +82,7 @@ final class UsageStatisticsStoreTests: XCTestCase {
 
     @MainActor
     func testRetainsOnlySevenDaySummariesInOneBoundedRecord() throws {
-        let suite = "tether-usage-tests-\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        let defaults = CoreMemoryDefaults()
         let store = UsageStatisticsStore(defaults: defaults)
         for day in 0..<10 {
             observe(store, after: Double(day) * 86_400)
@@ -96,14 +92,12 @@ final class UsageStatisticsStoreTests: XCTestCase {
         XCTAssertEqual(store.stats.days.count, 7)
         XCTAssertEqual(store.stats.days.reduce(0) { $0 + $1.lidClosedSeconds }, 210)
         XCTAssertLessThan(try XCTUnwrap(defaults.data(forKey: UsageStatisticsStore.storageKey)).count, 32_768)
-        XCTAssertEqual(defaults.persistentDomain(forName: suite)?.keys.sorted(), [UsageStatisticsStore.storageKey])
+        XCTAssertEqual(defaults.dictionaryRepresentation().keys.sorted(), [UsageStatisticsStore.storageKey])
     }
 
     @MainActor
     func testCorruptRecordIsPreservedWhileMemoryStatisticsContinue() throws {
-        let suite = "tether-usage-tests-\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        let defaults = CoreMemoryDefaults()
         let corrupt = Data("not valid statistics".utf8)
         defaults.set(corrupt, forKey: UsageStatisticsStore.storageKey)
         let store = UsageStatisticsStore(defaults: defaults)
@@ -117,9 +111,7 @@ final class UsageStatisticsStoreTests: XCTestCase {
 
     @MainActor
     func testWriteFailureDoesNotDiscardCollectedStatisticsOrThrow() throws {
-        let suite = "tether-usage-tests-\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(RejectingStatisticsDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        let defaults = RejectingStatisticsDefaults()
         let store = UsageStatisticsStore(defaults: defaults)
         observe(store)
         observe(store, after: 30)
@@ -130,6 +122,6 @@ final class UsageStatisticsStoreTests: XCTestCase {
     }
 }
 
-private final class RejectingStatisticsDefaults: UserDefaults {
+private final class RejectingStatisticsDefaults: CoreMemoryDefaults {
     override func set(_ value: Any?, forKey defaultName: String) {}
 }

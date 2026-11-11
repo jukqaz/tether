@@ -264,7 +264,7 @@ struct TetherScenes: Scene {
         }
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unifiedCompact)
-        .defaultSize(width: 640, height: 480)
+        .defaultSize(width: WorkSessionMetrics.settingsDefault.width, height: WorkSessionMetrics.settingsDefault.height)
         .windowResizability(.automatic)
         .commands {
             CommandGroup(replacing: .help) { HelpCommand() }

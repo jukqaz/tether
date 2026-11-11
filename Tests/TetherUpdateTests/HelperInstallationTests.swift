@@ -28,7 +28,7 @@ private final class InstallationFixture {
     let backend = InstallationAssertion()
     let controller: UserSessionController
     init() throws {
-        defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        defaults = TestMemoryDefaults(domain: name)
         var settings = IdleSessionSettings()
         settings.enabled = false; settings.automaticEnabled = false
         settings.runtimeMarkers = RuntimeMarkers()

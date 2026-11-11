@@ -70,74 +70,55 @@ struct WelcomeView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text(L("Prepare Tether", "Tether 시작 준비")).font(TetherTypography.page)
-                Spacer()
-                if model.userCommandsArePreview { PreviewIndicator() }
-            }.padding(.horizontal, 20).padding(.vertical, 14).background(.bar)
-            Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    HStack(spacing: 12) {
+                        Image(nsImage: NSApp.applicationIconImage)
+                            .resizable().frame(width: 44, height: 44)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(setupAlreadyCompleted
+                                ? L("Check setup", "준비 상태 확인")
+                                : L("Choose how Tether starts", "처음 사용할 동작"))
+                                .font(TetherTypography.page)
+                            Note(setupAlreadyCompleted
+                                ? L("Review your saved choices.", "저장된 선택을 확인하세요.")
+                                : L("You can change these choices later in Settings.", "선택은 나중에 설정에서 바꿀 수 있습니다."))
+                        }
+                        Spacer(minLength: 0)
+                        if model.userCommandsArePreview { PreviewIndicator() }
+                    }
                     if model.supportedMac {
-                        if closedLidDraft { helperPreparation }
-                        else {
-                            Note(L("General keep-awake works without installing a helper. Closed-lid work needs separate preparation only when selected.",
-                                   "일반 잠자기 방지는 도우미 설치 없이 사용합니다. 덮개 유지는 선택할 때만 별도 준비가 필요합니다."))
+                        SettingsToggle(title: model.v4Settings.automaticMode == .advanced
+                            ? L("Allow automatic start", "자동 시작 허용")
+                            : L("Start automatically on power", "전원을 연결하면 자동 유지"),
+                            isOn: $automaticDraft)
+                            .disabled(!choicesAvailable)
+                            .accessibilityIdentifier("welcome-automatic-toggle")
+                        if showsClosedLidChoice {
+                            SettingsToggle(title: L("Allow closed-lid use", "덮개 닫고 사용 허용"),
+                                detail: model.capabilities.lidControlAvailable
+                                    ? L("Requires a helper on MacBooks.", "MacBook에서는 도우미가 필요합니다.")
+                                    : L("This Mac’s lid support hasn’t been confirmed.", "이 Mac의 덮개 기능 지원 여부를 확인하지 못했습니다."),
+                                isOn: $closedLidDraft)
+                                .disabled(!closedLidChoiceAvailable)
+                                .accessibilityIdentifier("welcome-closed-lid-toggle")
                         }
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text(setupAlreadyCompleted ? L("Saved choices", "저장된 선택") : L("Choose your settings", "설정 선택"))
-                                .font(TetherTypography.section)
-                            SettingsToggle(title: L("Automatic keep-awake", "자동 유지"),
-                                detail: L("Selected power range: ", "선택한 전원 범위: ") + model.v3Settings.condition.title,
-                                isOn: $automaticDraft)
-                                .disabled(!choicesAvailable)
-                                .accessibilityIdentifier("welcome-automatic-toggle")
-                            if model.showsLidOptions || closedLidDraft {
-                                SettingsToggle(title: L("Allow closed-lid work", "덮개 유지 허용"),
-                                    detail: L("Whether to continue when the lid closes during active work.", "유지 중일 때 덮개를 닫아도 계속할지 정합니다."),
-                                    isOn: $closedLidDraft)
-                                    .disabled(!closedLidChoiceAvailable)
-                                    .accessibilityIdentifier("welcome-closed-lid-toggle")
-                            }
-                            PolicyNote(selectionResult)
-                                .accessibilityIdentifier("welcome-choice-result")
-                            Note(model.showsLidOptions
-                                ? L("These choices are independent. Closed-lid permission alone starts no work. Manual sessions remain available with automatic work off.",
-                                    "두 선택은 독립적입니다. 덮개 허용만으로 시작하지 않으며, 자동 유지를 꺼도 수동 유지는 가능합니다.")
-                                : L("Manual sessions remain available with automatic work off. Completing setup with automatic off starts no work.",
-                                    "자동 유지를 꺼도 수동 유지는 가능합니다. 자동을 끄고 준비를 완료하면 유지가 시작되지 않습니다."))
-                        }
-                        Divider()
-                        SettingRow(title: L("Saved choices", "저장된 선택")) {
-                            Text(savedSummary).foregroundStyle(Color.tetherSecondary)
-                                .fixedSize(horizontal: false, vertical: true).multilineTextAlignment(.trailing)
-                        }
-                        SettingRow(title: L("Running now", "지금 실행")) {
-                            Text(model.workSessionHolding ? L("Keeping work awake", "작업 유지 중") : L("No active work", "실행 중인 유지 없음"))
-                                .foregroundStyle(Color.tetherSecondary)
-                        }
-                        Note(setupAlreadyCompleted
-                            ? L("Existing automatic choices and work remain unchanged. You may turn closed-lid work off here to continue without preparing its helper. Authentication alone starts no work.",
-                                "기존 자동 선택과 작업은 보존합니다. 여기서 덮개 유지를 끄면 도우미 준비 없이 일반 유지로 계속할 수 있습니다. 인증만으로 시작하지 않습니다.")
-                            : L("Finish saves the selected choices. Confirming automatic on can start work when current conditions allow. Authentication alone starts nothing.",
-                                "완료하면 선택을 저장합니다. 자동을 켜서 확인 적용하면 현재 조건에 따라 유지가 시작될 수 있습니다. 인증만으로 시작하지 않습니다."))
-                        if model.hasInternalBattery {
-                            PolicyNote(model.disconnectPolicyDetail)
-                        }
+                        if closedLidDraft && model.capabilities.lidControlAvailable { helperPreparation }
+                        choiceResults
                     } else {
                         PolicyNote(L("Tether requires Apple Silicon and macOS 26 or later.", "Tether는 Apple Silicon과 macOS 26 이상이 필요합니다."))
                     }
                     if let applyError { Note(applyError, color: .tetherError) }
-                }.padding(20)
+                }.padding(.horizontal, 28).padding(.vertical, 22)
             }.scrollEdgeEffectHidden(true, for: .top)
             Divider()
-            HStack {
-                if !canConfirmChoices {
-                    Text(L("Prepare the selected closed-lid option first", "선택한 덮개 유지 준비를 먼저 완료하세요"))
-                        .font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
-                }
+            HStack(spacing: 12) {
+                Label(L("Locking follows macOS settings.", "잠금은 macOS 설정을 따릅니다."), systemImage: "lock")
+                    .font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
-                Button(setupAlreadyCompleted ? L("Finish preparation check", "준비 확인 완료") : L("Confirm and finish", "확인하고 완료")) {
+                Button(setupAlreadyCompleted ? L("Finish preparation check", "준비 확인 완료") : L("Save and Finish", "저장하고 완료")) {
                     if model.finishOnboarding(automaticEnabled: automaticDraft,
                                               allowClosedLid: closedLidDraft) {
                         done()
@@ -147,7 +128,7 @@ struct WelcomeView: View {
                 }.actionButton(prominent: true).keyboardShortcut(.defaultAction)
                     .disabled(!canConfirmChoices || model.commandPending || model.helperInstallInFlight)
                     .accessibilityIdentifier("welcome-confirm-choices")
-            }.padding(.horizontal, 20).padding(.vertical, 12).background(.bar)
+            }.padding(.horizontal, 28).padding(.vertical, 12).background(Color.tetherBackground)
         }.frame(width: 560, height: 448)
             .font(TetherTypography.body).foregroundStyle(Color.tetherPrimary)
             .background(Color.tetherBackground)
@@ -163,30 +144,63 @@ struct WelcomeView: View {
         !setupAlreadyCompleted && model.supportedMac
             && !model.helperInstallInFlight && !model.commandPending
     }
+    private var showsClosedLidChoice: Bool { model.showsLidOptions || closedLidDraft }
     private var closedLidChoiceAvailable: Bool {
-        if !setupAlreadyCompleted { return choicesAvailable }
+        if !setupAlreadyCompleted {
+            return choicesAvailable && (model.capabilities.lidControlAvailable || closedLidDraft)
+        }
         // An existing lid user may explicitly opt out without enabling any new
         // permission. Automatic choices stay read-only during preparation.
         return model.supportedMac && model.v3Settings.allowClosedLid
             && !model.helperInstallInFlight && !model.commandPending
     }
-    private var savedSummary: String {
-        let automatic = model.v3Settings.automaticEnabled
-            ? model.v3Settings.condition.title + " · " + L("Automatic on", "자동 켬")
-            : L("Automatic off", "자동 끔")
-        guard model.showsLidOptions else { return automatic }
-        return automatic + " · " + (model.v3Settings.allowClosedLid ? L("Lid allowed", "덮개 허용") : L("Lid off", "덮개 끔"))
+    private var choiceResults: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(setupAlreadyCompleted ? L("After you finish", "완료 후 동작") : L("After saving", "저장 후 동작"))
+                .font(TetherTypography.secondary.weight(.medium))
+            choiceResult(L("Automatic", "자동 유지"), automaticResult)
+                .accessibilityIdentifier("welcome-automatic-result")
+            if showsClosedLidChoice {
+                choiceResult(L("Lid closed", "덮개 닫힘"), closedLidResult)
+                    .accessibilityIdentifier("welcome-closed-lid-result")
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("welcome-choice-result")
     }
-    private var selectionResult: String {
-        guard model.showsLidOptions else {
-            return automaticDraft ? model.v3Settings.condition.title + " · " + L("General keep-awake", "일반 작업 유지") : L("Wait for a manual start", "수동 시작 대기")
+
+    private func choiceResult(_ title: String, _ detail: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(title).font(TetherTypography.secondary.weight(.medium))
+                .frame(width: 80, alignment: .leading)
+            Note(detail)
         }
-        switch (automaticDraft, closedLidDraft) {
-        case (false, false): return L("Selection: wait; no automatic work", "선택 결과: 대기 · 자동 유지 없음")
-        case (true, false): return L("Selection: general automatic work; closed-lid work off", "선택 결과: 일반 자동 유지 · 닫힘 유지 안 함")
-        case (false, true): return L("Selection: automatic waits; manual work may use the closed lid", "선택 결과: 자동 대기 · 수동 유지 시 덮개 사용 가능")
-        case (true, true): return L("Selection: automatic work may continue with the lid closed", "선택 결과: 자동 유지 중 닫힘 작업 유지 가능")
+        .accessibilityElement(children: .combine)
+    }
+
+    private var automaticResult: String {
+        if setupAlreadyCompleted {
+            return L("Your automatic settings stay as saved.", "저장한 자동 설정을 유지합니다.")
         }
+        guard automaticDraft else {
+            return L("Keep-awake won’t start automatically.", "자동으로 유지를 시작하지 않습니다.")
+        }
+        return model.v4Settings.automaticMode == .advanced
+            ? L("Starts when the saved conditions and protection checks allow.", "저장한 조건과 보호 기준을 충족하면 시작합니다.")
+            : L("Starts on power when this Mac is awake and protection allows.", "깨어 있는 Mac에서 전원이 연결되고 보호 중이 아니면 시작합니다.")
+    }
+
+    private var closedLidResult: String {
+        guard closedLidDraft else {
+            return L("Lid behavior follows macOS.", "덮개 닫힘은 macOS에 맡깁니다.")
+        }
+        guard model.capabilities.lidControlAvailable else {
+            return L("Turn off closed-lid use to finish without it.", "이 기능 없이 완료하려면 덮개 사용 허용을 끄세요.")
+        }
+        guard model.helperSetupConfirmed else {
+            return L("Prepare the helper before saving this choice.", "이 선택을 저장하려면 먼저 도우미를 준비하세요.")
+        }
+        return L("Allows closed-lid use during eligible keep-awake sessions.", "조건을 충족하는 유지에서 덮개를 닫고 사용할 수 있습니다.")
     }
     private var helperPreparation: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -201,8 +215,10 @@ struct WelcomeView: View {
                         .disabled(model.helperInstallInFlight || model.userCommandsArePreview || model.developmentService || model.isTranslocated)
                 }
             }.frame(minHeight: 30)
-            Note(L("Closed-lid work requires administrator-approved preparation. Turn this option off to use general work without it. Preparing the helper enables neither choice and starts no session.",
-                   "덮개 유지를 쓰려면 관리자 인증으로 준비해야 합니다. 이 선택을 끄면 일반 유지는 도우미 없이 사용할 수 있습니다. 준비만으로 선택이 켜지거나 유지가 시작되지 않습니다."))
+            if !model.helperSetupConfirmed {
+                Note(L("Requires macOS administrator approval. Setup alone does not start keep-awake.",
+                       "macOS 관리자 인증이 필요합니다. 준비만으로 유지를 시작하지 않습니다."))
+            }
             if model.isTranslocated { Note(L("Move Tether to Applications and reopen it.", "Tether를 응용 프로그램으로 옮기고 다시 여세요.")) }
             if let error = model.errorText { Note(error, color: .tetherError) }
         }

@@ -23,13 +23,14 @@ private final class SessionFeaturesDefaults: UserDefaults {
 
 private final class SessionFeaturesAssertion: IdleAssertionBackend {
     var creates = 0
+    var releases = 0
     private var ids: Set<UInt32> = []
     func create(timeout: TimeInterval) -> (code: Int32, id: UInt32?) {
         creates += 1; let id = UInt32(creates); ids.insert(id); return (0, id)
     }
     func renew(id: UInt32, timeout: TimeInterval) -> Int32 { ids.contains(id) ? 0 : -1 }
     func level(id: UInt32) -> Int? { ids.contains(id) ? 255 : 0 }
-    func release(id: UInt32) -> Int32 { ids.remove(id); return 0 }
+    func release(id: UInt32) -> Int32 { releases += 1; ids.remove(id); return 0 }
 }
 
 private final class SessionFeaturesBrightness: ClosedLidDisplayBrightnessBackend {
@@ -68,6 +69,7 @@ private final class SessionFeaturesFixture {
     let model: AppModel
 
     init(startWork: Bool = false, helperMode: ClosedLidDisplayMode? = nil,
+         lidClosed: Bool? = true, manualLidSelected: Bool = true,
          unsupportedIssue: ClosedLidDisplayIssue? = nil,
          recoveryOriginal: Float? = nil, recoveryReadUnavailable: Bool = false,
          coordinatorFolder: URL? = nil) throws {
@@ -76,6 +78,7 @@ private final class SessionFeaturesFixture {
         settings.automaticEnabled = false
         settings.allowClosedLid = true
         settings.closedLidDisplayMode = .zeroBrightness
+        settings.v4.nextManualOptions.closedLid = manualLidSelected
         defaults.set(try JSONEncoder().encode(settings), forKey: UserSessionController.preferenceKey)
         brightness.unsupportedIssue = unsupportedIssue
         brightness.readUnavailable = recoveryReadUnavailable
@@ -93,11 +96,11 @@ private final class SessionFeaturesFixture {
         if let helperMode {
             let now = ContinuousTime.now
             var status = Status(updatedAt: Date().timeIntervalSince1970, version: TetherPaths.version,
-                enabled: false, power: .ac, lidClosed: true, sleepDisabled: true,
+                enabled: false, power: .ac, lidClosed: lidClosed ?? false, sleepDisabled: true,
                 lastEvent: nil, lastEventAt: nil, thermal: 0)
             status.build = TetherPaths.build
             status.workSessionCoordinatorVersion = WorkSessionLease.coordinatorVersion
-            status.lidObservationAvailable = true
+            status.lidObservationAvailable = lidClosed != nil
             status.sleepOverrideObservationAvailable = true
             status.systemPowerObservationAvailable = true
             status.fullWake = true
@@ -118,6 +121,8 @@ private final class SessionFeaturesFixture {
         model = AppModel(preview: true,
             capabilities: .init(supportedPlatform: true, internalBattery: true, lid: true),
             previewSession: controller,
+            previewLegacyObservation: helperMode == nil ? nil : { .init(power: .ac, lidClosed: lidClosed,
+                sleepDisabled: true, fullWake: true) },
             previewWorkService: { _ in throw ServiceFailure("session-features-fixture-isolated") },
             previewHelperReply: reply, previewDefaults: defaults,
             previewCoordinatorPath: coordinatorFolder?.appendingPathComponent("owner.lock").path,
@@ -131,6 +136,81 @@ private final class SessionFeaturesFixture {
 
 /// Model-to-driver wiring only. All assertions, brightness values and journals are injected.
 final class SessionFeaturesModelTests: XCTestCase {
+    @MainActor
+    func testLidUsageStatusSeparatesObservedOpenClosedAndUnavailableWithoutMutatingWork() throws {
+        let previous = Localization.current
+        defer { Localization.current = previous }
+        for language in [Language.english, .korean] {
+            Localization.current = language
+            for lidClosed in [Optional(false), Optional(true), nil] {
+                let fixture = try SessionFeaturesFixture(startWork: true, helperMode: .zeroBrightness,
+                                                         lidClosed: lidClosed)
+                defer { fixture.close() }
+                XCTAssertEqual(fixture.model.snapshot.observedLidClosed, lidClosed)
+                let copy = assertLidUsageQueriesPreserveWork(fixture)
+                if let lidClosed {
+                    XCTAssertTrue(fixture.model.lidSupportConfirmed)
+                    XCTAssertEqual(copy, lidClosed
+                        ? L("Lid closed · closed-lid support active", "덮개 닫힘 · 덮개 유지 적용 중")
+                        : L("Lid open · ready for closed-lid use", "덮개 열림 · 닫고 사용 준비됨"))
+                } else {
+                    XCTAssertTrue(copy.localizedCaseInsensitiveContains(L("checking", "확인 중")), copy)
+                    XCTAssertNotEqual(copy, L("Lid closed · closed-lid support active", "덮개 닫힘 · 덮개 유지 적용 중"))
+                    XCTAssertNotEqual(copy, L("Lid open · ready for closed-lid use", "덮개 열림 · 닫고 사용 준비됨"))
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func testLidUsageStatusDoesNotClaimActiveAfterPermissionOffOrForUnselectedManualLid() throws {
+        let previous = Localization.current
+        defer { Localization.current = previous }
+        for language in [Language.english, .korean] {
+            Localization.current = language
+            for manualLidSelected in [true, false] {
+                let fixture = try SessionFeaturesFixture(startWork: true, helperMode: .zeroBrightness,
+                                                         manualLidSelected: manualLidSelected)
+                defer { fixture.close() }
+                XCTAssertTrue(fixture.controller.status.manualActive)
+                if manualLidSelected {
+                    fixture.controller.setAllowClosedLid(false)
+                    XCTAssertFalse(fixture.model.v3Settings.allowClosedLid)
+                } else {
+                    XCTAssertFalse(fixture.controller.v4LidRequested)
+                }
+                let copy = assertLidUsageQueriesPreserveWork(fixture)
+                XCTAssertNotEqual(copy, L("Lid closed · closed-lid support active", "덮개 닫힘 · 덮개 유지 적용 중"))
+                XCTAssertNotEqual(copy, L("Lid open · ready for closed-lid use", "덮개 열림 · 닫고 사용 준비됨"))
+            }
+        }
+    }
+
+    @MainActor
+    private func assertLidUsageQueriesPreserveWork(_ fixture: SessionFeaturesFixture,
+                                                  file: StaticString = #filePath, line: UInt = #line) -> String {
+        let status = fixture.controller.status
+        let requestID = fixture.controller.manualRequestID
+        let deadline = status.manualContinuousDeadline
+        let saved = fixture.defaults.data(forKey: UserSessionController.preferenceKey)
+        XCTAssertNotNil(saved, file: file, line: line)
+        let assertionCounts = [fixture.system.creates, fixture.system.releases,
+                               fixture.display.creates, fixture.display.releases]
+        let brightnessWrites = fixture.brightness.writes
+        let copy = fixture.model.lidUsageStatusText
+        for _ in 0..<10 {
+            XCTAssertEqual(fixture.model.lidUsageStatusText, copy, file: file, line: line)
+        }
+        XCTAssertEqual(fixture.controller.status, status, file: file, line: line)
+        XCTAssertEqual(fixture.controller.manualRequestID, requestID, file: file, line: line)
+        XCTAssertEqual(fixture.controller.status.manualContinuousDeadline, deadline, file: file, line: line)
+        XCTAssertEqual(fixture.defaults.data(forKey: UserSessionController.preferenceKey), saved, file: file, line: line)
+        XCTAssertEqual([fixture.system.creates, fixture.system.releases,
+                        fixture.display.creates, fixture.display.releases], assertionCounts, file: file, line: line)
+        XCTAssertEqual(fixture.brightness.writes, brightnessWrites, file: file, line: line)
+        return copy
+    }
+
     @MainActor
     func testHealthyZeroBrightnessOwnershipNeverOffersOrRunsEarlyRecovery() throws {
         let fixture = try SessionFeaturesFixture(startWork: true, helperMode: .zeroBrightness)

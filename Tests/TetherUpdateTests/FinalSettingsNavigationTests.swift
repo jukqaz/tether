@@ -24,7 +24,7 @@ final class FinalSettingsNavigationTests: XCTestCase {
             for language in [Language.english, .korean] {
                 Localization.current = language
                 XCTAssertEqual(SettingsPage.safety.title, L("Power & Lid", "전원·덮개"))
-                XCTAssertEqual(SettingsPage.general.title, L("Manual", "직접 유지"))
+                XCTAssertEqual(SettingsPage.general.title, L("Manual", "수동 유지"))
                 XCTAssertEqual(SettingsPage.protection.title, L("Protection & Diagnostics", "보호·진단"))
                 XCTAssertEqual(SettingsPage.protection.shortTitle, L("Protection", "보호·진단"))
                 XCTAssertEqual(SettingsPage.system.title, L("General", "일반"))

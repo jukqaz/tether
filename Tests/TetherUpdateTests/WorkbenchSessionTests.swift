@@ -120,6 +120,27 @@ final class WorkbenchSessionTests: XCTestCase {
     }
 
     @MainActor
+    func testDisplayKeepAwakeUsesOnlyAnIndependentPreviewAllocation() async throws {
+        let f = try WorkbenchFixture(); defer { f.close() }
+        let s = try await f.open()
+        try await wait("automatic preview holding") { s.model.workSessionHolding && !s.model.lidCommandPending }
+        XCTAssertEqual(s.displayBackend.creates, 0)
+
+        s.model.setKeepDisplayAwake(true)
+        try await wait("mock display allocation") { s.controller.status.displayHolding == true }
+        XCTAssertEqual(s.displayBackend.creates, 1,
+            "The preview must inject its display backend instead of using the native default")
+        XCTAssertEqual(s.backend.creates, 1)
+
+        s.model.setKeepDisplayAwake(false)
+        try await wait("mock display release preserves work") {
+            s.controller.status.displayHolding == false && s.model.workSessionHolding
+        }
+        XCTAssertEqual(s.displayBackend.releases, 1)
+        XCTAssertEqual(s.backend.releases, 0)
+    }
+
+    @MainActor
     func testAutomaticAndManualShareOneAllocationAndQuitDrainsOnlyPreview() async throws {
         let f = try WorkbenchFixture(); defer { f.close() }
         let s = try await f.open()
@@ -590,7 +611,7 @@ final class WorkbenchSessionTests: XCTestCase {
     @MainActor
     func testAdditionalDisplayPresentationUsesCurrentPanelObservationAndRejectsOldSamples() throws {
         let name = "TetherDisplayPresentation." + UUID().uuidString
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        let defaults = TestMemoryDefaults(domain: name)
         defer { defaults.removePersistentDomain(forName: name) }
         func preview(topology: DisplayTopology = .virtualOnly, sleeping: Bool? = true,
                      timestamp: Double = Date().timeIntervalSince1970, lid: Bool? = true,

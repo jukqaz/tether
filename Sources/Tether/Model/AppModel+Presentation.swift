@@ -27,53 +27,54 @@ extension AppModel {
     var presentation: Presentation {
         if let session = userSessionStatus {
             if let reason = session.blockReason {
-                return Presentation(title: L("Safety stopped", "보호를 위해 중지됨"), subtitle: protectionReason(reason),
+                return Presentation(title: L("Stopped for protection", "보호를 위해 중지됨"), subtitle: protectionReason(reason),
                     icon: .symbol("shield.lefthalf.filled"), color: .tetherWarning, menuBarIcon: .symbol("shield.lefthalf.filled"))
             }
             if session.ownReleasePending == true {
                 return Presentation(title: L("Confirming release", "유지 해제 확인 중"),
-                    subtitle: L("Tether has ended the request, but its native release is not confirmed. This is not OS Sleep evidence.",
-                                "유지 요청은 끝냈지만 Tether 요청 해제가 확인되지 않았습니다. 실제 잠자기를 뜻하지 않습니다."),
+                    subtitle: L("Tether has ended keep-awake, but macOS has not confirmed its release. This does not confirm that the Mac is asleep.",
+                                "유지는 종료했지만 macOS의 절전 방지 해제를 아직 확인하지 못했습니다. Mac이 실제로 잠들었는지는 별도 확인이 필요합니다."),
                     icon: .symbol("hourglass"), color: .tetherWarning, menuBarIcon: .symbol("hourglass"))
             }
             if session.observationLimited == true {
                 return Presentation(title: L("Checking power and protection", "전원·보호 상태 확인 중"),
-                    subtitle: L("No new work or extensions until the required observations return. Existing work retains only its original finite permission.",
-                                "필수 상태가 확인될 때까지 새 유지·연장은 허용하지 않습니다. 기존 유지는 원래 허가된 시간까지만 유지합니다."),
+                    subtitle: L("New starts and extensions wait for the required power and protection checks. Current keep-awake remains within its existing limits.",
+                                "필수 상태를 확인할 때까지 새로 시작하거나 시간을 추가할 수 없습니다. 실행 중인 유지에는 기존 제한이 적용됩니다."),
                     icon: .symbol("hourglass"), color: .tetherWarning, menuBarIcon: .symbol("hourglass"))
             }
             if session.error != nil || (session.manualActive && !session.holding) {
-                return Presentation(title: L("Review needed", "작업 유지 확인 필요"),
-                    subtitle: session.error ?? L("The work request has not been confirmed.", "작업 유지 요청을 확인하지 못했습니다."),
+                return Presentation(title: L("Review needed", "유지 상태 확인 필요"),
+                    subtitle: session.error ?? L("Keep-awake could not be confirmed.", "잠자기 방지 적용을 확인하지 못했습니다."),
                     icon: .symbol("exclamationmark.triangle"), color: .tetherWarning, menuBarIcon: .symbol("exclamationmark.triangle"))
             }
             if workPaused {
                 if v3Settings.runtimeMarkers?.pauseReason == .userSleep {
                     return Presentation(title: L("Waiting after Sleep request", "잠자기 요청 후 자동 시작 대기"),
-                        subtitle: L("Waking the Mac alone does not restart work. Resume explicitly or wait for a new selected trigger.",
-                                    "깨우기만 해서는 다시 시작하지 않습니다. 직접 다시 허용하거나 새로운 자동 조건을 기다립니다."),
+                        subtitle: L("Waking the Mac alone does not restart keep-awake. Choose Resume or wait for a new automatic condition.",
+                                    "깨우기만 해서는 유지를 다시 시작하지 않습니다. 중지를 해제하거나 새 자동 조건을 기다립니다."),
                         icon: .mark(.off), color: .secondary, menuBarIcon: .mark(.off))
                 }
-                return Presentation(title: L("Paused", "유지 중지됨"),
-                    subtitle: L("Resume explicitly before automatic work can start again.", "다시 시작하기 전까지 자동 유지도 멈춥니다."),
+                return Presentation(title: L("All keep-awake stopped", "모두 중지됨"),
+                    subtitle: L("Resume rechecks automatic conditions. Ended manual keep-awake does not restart.",
+                                "중지를 해제하면 자동 조건을 다시 확인합니다. 종료된 수동 유지는 다시 시작하지 않습니다."),
                     icon: .mark(.off), color: .secondary, menuBarIcon: .mark(.off))
             }
             if session.manualActive && session.holding {
                 return manualPresentation
             }
             if automaticPauseActive {
-                return Presentation(title: L("Automatic starts resting", "자동 잠깐 쉬는 중"),
+                return Presentation(title: L("Automatic starts are paused", "자동 유지 일시 중지됨"),
                     subtitle: automaticPauseUntil.map {
-                        L("Automatic starts rest until \(Texts.time($0)). Manual sessions remain available.",
-                          "\(Texts.time($0))까지 자동만 쉽니다. 수동 유지는 사용할 수 있습니다.")
-                    } ?? L("Automatic starts rest until you resume. Manual sessions remain available.",
-                           "직접 재개할 때까지 자동만 쉽니다. 수동 유지는 사용할 수 있습니다."),
+                        L("Automatic starts are paused until \(Texts.time($0)). Manual keep-awake remains available.",
+                          "\(Texts.time($0))까지 자동 시작을 중지합니다. 수동 유지는 사용할 수 있습니다.")
+                    } ?? L("Automatic starts are paused until you resume them. Manual keep-awake remains available.",
+                           "자동 유지를 재개할 때까지 일시 중지합니다. 수동 유지는 사용할 수 있습니다."),
                     icon: .symbol("pause.circle"), color: .secondary, menuBarIcon: .mark(.off))
             }
             if automaticBatteryEnded {
-                return Presentation(title: L("Automatic battery session ended", "자동 배터리 유지 종료"),
-                    subtitle: L("The original battery limit is used up. Waking or reconnecting power does not refill this activation.",
-                                "최초 배터리 한도를 소진했습니다. 깨우기·전원 왕복만으로 같은 자동 유지의 한도를 채우지 않습니다."),
+                return Presentation(title: L("Automatic battery keep-awake ended", "배터리 자동 유지 종료"),
+                    subtitle: L("The original battery limit has been reached. Waking the Mac or reconnecting power does not reset this automatic keep-awake limit.",
+                                "처음 정한 배터리 유지 한도에 도달했습니다. 깨우거나 전원을 다시 연결해도 같은 자동 유지의 한도는 초기화되지 않습니다."),
                     icon: .mark(.off), color: .secondary, menuBarIcon: .mark(.off))
             }
             if !session.holding, !session.manualActive, !session.automaticActive,
@@ -81,12 +82,12 @@ extension AppModel {
                let deferred = sleepDeferralPresentation {
                 return deferred
             }
-            return Presentation(title: session.holding ? L("Keeping work running", "작업 유지 중")
-                    : session.automaticEnabled ? L("Waiting for a trigger", "자동 유지 대기") : L("Keep-awake is off", "유지 꺼짐"),
+            return Presentation(title: session.holding ? L("Automatic keep-awake active", "자동 유지 중")
+                    : session.automaticEnabled ? L("Waiting for an automatic condition", "자동 유지 대기") : L("Keep-awake is off", "유지 꺼짐"),
                 subtitle: session.holding
                     ? activeWorkReasonSummary(at: Date()) ?? lidObservationNotice ?? L("Display sleep and locking follow macOS settings.", "화면 꺼짐과 잠금은 macOS 설정을 따릅니다.")
-                    : session.automaticEnabled ? L("Waiting for \(session.powerCondition.title). Manual sessions remain available.", "\(session.powerCondition.title) 조건을 기다립니다. 수동 유지도 사용할 수 있습니다.")
-                        : L("Manual sessions remain available.", "수동 유지는 계속 사용할 수 있습니다."),
+                    : session.automaticEnabled ? L("Waiting for \(session.powerCondition.title). Manual keep-awake remains available.", "\(session.powerCondition.title) 조건을 기다립니다. 수동 유지는 직접 시작할 수 있습니다.")
+                        : L("Manual keep-awake remains available.", "수동 유지는 직접 시작할 수 있습니다."),
                 icon: session.holding ? .mark(.on) : .symbol("timer"), color: session.holding ? .tetherAccent : .secondary,
                 menuBarIcon: session.holding ? .mark(.on) : .mark(.off))
         }
@@ -100,7 +101,7 @@ extension AppModel {
         }
         if helperResponding, supportedMac, let reason = protection?.blockReason {
             let subtitle = [protectionReason(reason), sleepDeferralPresentation?.subtitle].compactMap { $0 }.joined(separator: " · ")
-            return Presentation(title: L("Safety stopped", "보호를 위해 중지됨"), subtitle: subtitle,
+            return Presentation(title: L("Stopped for protection", "보호를 위해 중지됨"), subtitle: subtitle,
                 icon: .symbol("shield.lefthalf.filled"), color: .tetherWarning, menuBarIcon: .symbol("shield.lefthalf.filled"))
         }
         if helperResponding, (enabled || manualSessionActive), let notice = lidObservationNotice {
@@ -119,7 +120,7 @@ extension AppModel {
                 icon: .symbol("display.trianglebadge.exclamationmark"), color: .tetherWarning, menuBarIcon: .symbol("exclamationmark.triangle"))
         }
         if helperResponding, enabled, status?.appConnected == false {
-            return Presentation(title: L("Session disconnected", "연결 확인 중"), subtitle: L("The helper is waiting for the app", "도우미가 앱의 연결을 기다립니다"),
+            return Presentation(title: L("Connection unconfirmed", "연결 확인 중"), subtitle: L("The helper is waiting for the app", "도우미가 앱의 연결을 기다립니다"),
                 icon: .symbol("pause.circle"), color: .secondary, menuBarIcon: .mark(.off))
         }
         if helperResponding, snapshot.usesNativeClamshell {
@@ -135,7 +136,7 @@ extension AppModel {
                          icon: .mark(.disabled), color: .gray, menuBarIcon: .mark(.disabled))
         case .helperMissing:
             Presentation(title: L("Helper needed", "도우미 설치 필요"),
-                         subtitle: L("Install it once to apply the power rules", "전원 규칙을 적용하려면 한 번 설치해 주세요"),
+                         subtitle: L("Closed-lid use requires the helper", "덮개를 닫고 사용하려면 도우미가 필요합니다"),
                          icon: .symbol("wrench.and.screwdriver.fill"), color: .gray,
                          menuBarIcon: .symbol("exclamationmark.triangle"))
         case .helperDown:
@@ -144,7 +145,7 @@ extension AppModel {
                          icon: .symbol("exclamationmark.triangle.fill"), color: .red,
                          menuBarIcon: .symbol("exclamationmark.triangle"))
         case .off:
-            Presentation(title: L("Clamshell mode off", "클램쉘 모드 꺼짐"),
+            Presentation(title: L("Closed-lid use off", "덮개 닫고 사용 안 함"),
                          subtitle: L("Stays off until you turn it on", "다시 켜면 설정한 전원 조건을 적용합니다"),
                          icon: .mark(.disabled), color: .gray, menuBarIcon: .mark(.disabled))
         case .holdingOnBattery:
@@ -193,10 +194,13 @@ extension AppModel {
 
     private var manualPresentation: Presentation {
         let holding = manualSessionInfo?.holding == true
-        let subtitle = manualSessionUntil.map { L("Ends at \(Texts.time($0))", "\(Texts.time($0)) 종료") }
-            ?? (snapshot.power == .ac ? L("Unlimited while power is connected", "전원 연결 중 무제한")
+        let subtitle = manualSessionUntil.map { L("Ends at \(Texts.time($0))", "종료 시간: \(Texts.time($0))") }
+            ?? (snapshot.power == .ac ? L("Until ended", "종료할 때까지")
                 : L("Confirming the power source", "전원 연결 상태 확인 중"))
-        return Presentation(title: holding ? L("Manual session active", "수동 유지 중") : L("Checking manual session", "수동 유지 확인 중"),
+        let title = automaticWorkReasonActive
+            ? L("Automatic + manual active", "자동·수동 유지 중")
+            : L("Manual keep-awake active", "수동 유지 중")
+        return Presentation(title: holding ? title : L("Checking manual keep-awake", "수동 유지 확인 중"),
             subtitle: activeWorkReasonSummary(at: Date()) ?? subtitle, icon: .symbol("timer"), color: holding ? .tetherAccent : .tetherWarning,
             menuBarIcon: holding ? .mark(.held) : .symbol("hourglass"))
     }
@@ -253,11 +257,11 @@ extension AppModel {
 
         var title: String {
             switch self {
-            case .translocated: L("Move Tether to Applications", "Tether를 응용 프로그램 폴더로 옮겨 주세요")
-            case .missing: L("The helper isn't installed", "도우미가 설치되지 않았어요")
-            case .down: L("The helper isn't responding", "도우미가 응답하지 않아요")
-            case .outdated: L("The helper needs an update", "도우미 업데이트가 필요해요")
-            case .error: L("A request needs review", "요청 확인 필요")
+            case .translocated: L("Move Tether to Applications", "Tether를 응용 프로그램 폴더로 이동")
+            case .missing: L("The helper isn't installed", "도우미가 설치되지 않았습니다")
+            case .down: L("The helper isn't responding", "도우미가 응답하지 않습니다")
+            case .outdated: L("The helper needs an update", "도우미 업데이트가 필요합니다")
+            case .error: L("Keep-awake needs review", "유지 상태 확인 필요")
             case .lid: L("Closed-lid support needs review", "덮개 지원 확인 필요")
             }
         }
@@ -265,10 +269,10 @@ extension AppModel {
         var message: String {
             switch self {
             case .translocated: L("It's running from a temporary copy macOS made of the download. Quit, move Tether.app to Applications, and open it again.",
-                                  "macOS가 다운로드한 앱을 임시 위치에서 실행하고 있어요. 종료한 뒤 Tether.app을 응용 프로그램 폴더로 옮기고 다시 열어 주세요.")
-            case .missing: L("It installs with your administrator password, once.", "관리자 비밀번호를 한 번 입력하면 설치돼요.")
-            case .down: L("It may be off in Login Items, or stopped after a macOS update.", "로그인 항목에서 꺼졌거나 macOS 업데이트 뒤 멈췄을 수 있어요.")
-            case .outdated: L("An older helper than this app is running.", "앱보다 오래된 도우미가 실행 중이에요.")
+                                  "macOS가 다운로드한 앱을 임시 위치에서 실행하고 있습니다. 앱을 종료하고 Tether.app을 응용 프로그램 폴더로 옮긴 뒤 다시 실행해야 합니다.")
+            case .missing: L("Installation requires administrator authentication once.", "관리자 인증을 한 번 완료하면 설치됩니다.")
+            case .down: L("It may be off in Login Items, or stopped after a macOS update.", "로그인 항목에서 꺼졌거나 macOS 업데이트 뒤 멈췄을 수 있습니다.")
+            case .outdated: L("An older helper than this app is running.", "앱보다 오래된 도우미가 실행 중입니다.")
             case .error(let text): text
             case .lid(let text): text
             }
@@ -314,7 +318,7 @@ extension AppModel {
 
     /// One line for the settings window: is the helper there, alive, current?
     var helperStatus: (text: String, color: Color) {
-        if usesUserSession && !capabilities.lidControlAvailable { return (L("Not required for work sessions", "일반 작업 유지에는 필요 없음"), .secondary) }
+        if usesUserSession && !capabilities.lidControlAvailable { return (L("Not required for keep-awake", "일반 잠자기 방지에는 필요 없음"), .secondary) }
         if !helperInstalled { return (L("not installed", "설치되지 않음"), .tetherWarning) }
         guard helperResponding, let status else { return (L("not responding", "응답 없음"), .red) }
         if developmentService { return (L("preview · v\(status.version)", "미리보기 · v\(status.version)"), .tetherSuccess) }
@@ -351,8 +355,7 @@ extension AppModel {
             return L("Work continues · rechecking display connections", "작업 유지 중 · 화면 연결 다시 확인 중")
         }
         if capabilities.lidControlAvailable {
-            if clamshellActive { return L("Work and closed-lid support active · locking follows macOS", "작업·닫힌 덮개 유지 중 · 잠금은 macOS 설정을 따름") }
-            return L("General work is available; lid support needs a confirmed helper request", "일반 작업 유지 가능 · 덮개 유지는 도우미 요청 확인이 필요함")
+            return lidUsageStatusText + L(" · locking follows macOS", " · 잠금은 macOS 설정을 따름")
         }
         return capabilities.hardware == .desktop
             ? L("Display sleep and locking follow macOS settings", "화면 꺼짐과 잠금은 macOS 설정을 따릅니다")
@@ -361,7 +364,8 @@ extension AppModel {
     var lidDetail: String {
         if usesUserSession { return generalSessionDetail }
         if let notice = lidObservationNotice { return notice }
-        if !snapshot.lidClosed { return L("Lid open · macOS controls display sleep", "덮개 열림 · 화면 끄기는 macOS 설정에 따름") }
+        guard let closed = snapshot.observedLidClosed else { return L("Checking lid state", "덮개 상태 확인 중") }
+        if !closed { return L("Lid open · macOS controls display sleep", "덮개 열림 · 화면 끄기는 macOS 설정에 따름") }
         if snapshot.displayTopology == .unknown { return DisplayTopology.unknown.title }
         if snapshot.externalDisplay { return snapshot.displayTopology.title + L(" · no all-display sleep", " · macOS가 화면 관리") }
         if status?.displaySleeping == true { return L("display asleep", "화면 꺼짐으로 보고됨") }
@@ -395,8 +399,8 @@ extension AppModel {
             return L("A virtual display may be needed for remote rendering, so all-display sleep is withheld. Work and time limits continue; remote frames, input and lock state need separate confirmation.",
                      "원격 화면에 가상 화면이 필요할 수 있어 전체 화면 절전 명령을 보류합니다. 작업 유지와 시간 한도는 계속 적용되며, 원격 화면·입력과 잠금 상태는 별도 확인이 필요합니다.")
         }
-        return L("All-display sleep could turn connected screens off, so it is withheld. Work and session time limits continue.",
-                 "외장 화면까지 꺼질 수 있어 전체 화면 절전 명령을 보류합니다. 작업 유지와 세션 시간 한도는 계속 적용됩니다.")
+        return L("All-display sleep could turn connected screens off, so it is withheld. Keep-awake and its time limits still apply.",
+                 "외장 화면까지 꺼질 수 있어 전체 화면 절전을 보류합니다. 잠자기 방지와 유지 시간 제한은 계속 적용됩니다.")
     }
 
     var lidObservationNotice: String? {
@@ -422,7 +426,7 @@ extension AppModel {
     var thermalLevel: Int { userSessionStatus?.thermal ?? status?.thermal ?? ProcessInfo.processInfo.thermalState.rawValue }
 
     var sessionConditionTitle: String {
-        usesUserSession ? (userSessionStatus?.automaticEnabled == true ? powerCondition.title : L("Manual sessions", "수동 시작")) : powerCondition.title
+        usesUserSession ? (userSessionStatus?.automaticEnabled == true ? powerCondition.title : L("Manual keep-awake", "수동 유지")) : powerCondition.title
     }
 
     var thermalLabel: String {
@@ -478,15 +482,125 @@ extension AppModel {
     var automaticSelectionSummary: String {
         v3Settings.automaticEnabled ? v3Settings.condition.title : L("Off", "꺼짐")
     }
+    /// Shared execution copy, independent of the saved permission toggles.
+    var featureStopSummary: String? {
+        if workProtectionReason != nil { return L("Stopped for protection", "보호로 중지됨") }
+        guard workPaused else { return nil }
+        switch v3Settings.runtimeMarkers?.pauseReason {
+        case .userSleep: return L("Waiting after Sleep request", "잠자기 요청 후 대기")
+        case .ownerEnded: return L("Keep-awake ended", "유지 종료됨")
+        default: return L("All keep-awake stopped", "모두 중지됨")
+        }
+    }
+    var automaticStartStateDetail: String {
+        if userSessionStatus?.ownReleasePending == true || lidReleasePending {
+            return L("Checking keep-awake release. New starts wait for confirmation.",
+                     "유지 해제를 확인하고 있습니다. 확인 전에는 새로 시작하지 않습니다.")
+        }
+        if workProtectionReason != nil {
+            return L("Stopped for protection. Saved automatic settings remain; safety and resume settings are checked before work can restart.",
+                     "보호로 중지됨. 자동 시작 설정은 보존하며, 안전 상태와 재개 설정을 확인한 뒤 다시 시작할 수 있습니다.")
+        }
+        if workPaused {
+            if v3Settings.runtimeMarkers?.pauseReason == .userSleep {
+                return L("Waiting after a Sleep request. Resume or a new automatic condition is required; ended manual work does not restart.",
+                         "잠자기 요청 후 대기 중입니다. 중지 해제나 새 자동 조건이 필요하며, 종료된 수동 유지는 다시 시작하지 않습니다.")
+            }
+            if v3Settings.runtimeMarkers?.pauseReason == .ownerEnded, canStartManualSession {
+                return L("Automatic starts remain stopped. You can start new manual work separately.",
+                         "자동 시작은 멈춰 있습니다. 새 수동 유지는 따로 시작할 수 있습니다.")
+            }
+            return L("All keep-awake stopped. Resume rechecks automatic conditions; ended manual work does not restart.",
+                     "모두 중지됨. 중지를 해제하면 자동 조건을 다시 확인하며, 종료된 수동 유지는 다시 시작하지 않습니다.")
+        }
+        if automaticPauseActive {
+            return L("Only automatic starts are paused. Manual deadlines and saved automatic settings stay unchanged.",
+                     "자동 시작만 일시 중지합니다. 수동 유지 기한과 저장된 자동 설정은 바뀌지 않습니다.")
+        }
+        if !automaticEnabled {
+            if manualSessionActive, workSessionHolding {
+                return L("Automatic start is off. Current manual work keeps its original deadline and protection limits.",
+                         "자동 시작은 꺼져 있습니다. 현재 수동 유지는 원래 기한과 보호 한도를 따릅니다.")
+            }
+            return canStartManualSession
+                ? L("Automatic start is off. You can start manual keep-awake separately.", "자동 시작은 꺼져 있습니다. 수동 유지는 따로 시작할 수 있습니다.")
+                : L("Automatic start is off. Manual starts require current power and protection checks.", "자동 시작은 꺼져 있습니다. 수동 시작에는 현재 전원·보호 상태 확인이 필요합니다.")
+        }
+        if automaticWorkReasonActive, workSessionHolding {
+            return v4Settings.usesAdvancedAutomaticConditions
+                ? L("Automatic keep-awake is active for the selected conditions.", "선택한 조건으로 자동 유지 중입니다.")
+                : L("Automatic keep-awake is active while power is connected.", "전원 연결 조건으로 자동 유지 중입니다.")
+        }
+        return v4Settings.usesAdvancedAutomaticConditions
+            ? L("Starts when the selected conditions and protection checks allow.", "선택한 조건과 보호 기준을 충족하면 시작합니다.")
+            : L("Starts on power when this Mac is awake and protection allows.", "깨어 있는 Mac에서 전원이 연결되고 보호 중이 아니면 시작합니다.")
+    }
+    var displayUsageStatusText: String {
+        if userSessionStatus?.ownReleasePending == true {
+            return [featureStopSummary, L("Checking keep-awake release", "유지 해제 확인 중")]
+                .compactMap { $0 }.joined(separator: " · ")
+        }
+        if userSessionStatus?.displayError != nil {
+            return [featureStopSummary, L("Display keep-awake needs review", "화면 켜두기 확인 필요")]
+                .compactMap { $0 }.joined(separator: " · ")
+        }
+        if !v3Settings.keepDisplayAwake { return L("Display sleep follows macOS", "화면 절전은 macOS에 맡김") }
+        if let stopped = featureStopSummary { return stopped + L(" · permission stays enabled", " · 허용 설정 유지") }
+        if userSessionStatus?.displayHolding == true {
+            return L("Display keep-awake requested · locking follows macOS", "화면 켜두기 요청 중 · 잠금은 macOS 설정을 따름")
+        }
+        if !workSessionHolding {
+            return manualSessionActive || automaticWorkReasonActive
+                ? L("Allowed · keep-awake not confirmed", "허용 저장됨 · 유지 적용 확인 필요")
+                : L("Allowed · no keep-awake session active", "허용 저장됨 · 현재 유지 없음")
+        }
+        return userSessionStatus?.displayHolding == nil
+            ? L("Checking display keep-awake", "화면 켜두기 상태 확인 중")
+            : L("Allowed · not applied to this session", "허용됨 · 이번 유지에는 화면 켜두기 미적용")
+    }
     var lidSupportConfirmed: Bool {
         v3Settings.allowClosedLid && clamshellActive && coordinatedLidError == nil
             && coordinatedLidBlockReason == nil && !lidReleasePending
     }
     var lidSupportSummary: String {
-        if !v3Settings.allowClosedLid { return L("Off", "꺼짐") }
         if lidReleasePending { return L("Release unconfirmed", "해제 확인 중") }
-        if lidSupportConfirmed { return L("Request active", "요청 적용 중") }
+        if !v3Settings.allowClosedLid { return L("Off", "꺼짐") }
+        if lidSupportConfirmed { return L("Closed-lid support applied", "덮개 유지 기능 적용됨") }
         return L("Not confirmed", "준비 미확인")
+    }
+    /// A saved permission and an applied helper override do not prove that the
+    /// lid is physically closed. Share the observed position + execution status
+    /// between the menu and settings without changing a request or its policy.
+    var lidUsageStatusText: String {
+        let position: String = switch snapshot.observedLidClosed {
+        case true?: L("Lid closed", "덮개 닫힘")
+        case false?: L("Lid open", "덮개 열림")
+        case nil: L("Checking lid state", "덮개 상태 확인 중")
+        }
+        let execution: String
+        if lidReleasePending {
+            execution = L("checking support release", "덮개 유지 해제 확인 중")
+        } else if userSessionStatus?.ownReleasePending == true {
+            execution = L("Checking keep-awake release", "유지 해제 확인 중")
+        } else if !v3Settings.allowClosedLid {
+            execution = L("closed-lid permission off", "덮개 유지 허용 꺼짐")
+        } else if let stopped = featureStopSummary {
+            execution = stopped
+        } else if workSessionHolding, userSession?.v4LidRequested == false {
+            execution = L("closed-lid use not selected for this session", "이번 유지에는 덮개 기능 미선택")
+        } else if !workSessionHolding, helperSetupConfirmed {
+            execution = manualSessionActive || automaticWorkReasonActive
+                ? L("keep-awake not confirmed", "유지 적용 확인 필요")
+                : L("no keep-awake session", "현재 유지 없음")
+        } else if lidSupportConfirmed, let closed = snapshot.observedLidClosed {
+            execution = closed ? L("closed-lid support active", "덮개 유지 적용 중")
+                : L("ready for closed-lid use", "닫고 사용 준비됨")
+        } else if !helperSetupConfirmed {
+            execution = L("helper setup needed", "도우미 준비 필요")
+        } else {
+            execution = L("closed-lid support unconfirmed", "덮개 유지 적용 확인 필요")
+        }
+        return position + " · " + execution
     }
     var disconnectActionDetail: String {
         v3Settings.disconnectAction == .sleepIfClosed

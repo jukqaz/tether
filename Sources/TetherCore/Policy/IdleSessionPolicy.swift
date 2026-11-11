@@ -402,12 +402,18 @@ public struct IdleSessionPolicy: Equatable, Sendable {
             settings.limits = UserLimits(batteryFloor: max(floor, SafetyPolicy.floor(settings.limits)))
         }
     }
-    public mutating func mergeLegacyBudgets(automatic: ProtectionState, manual: ProtectionState?) {
+    public mutating func mergeLegacyBudgets(automatic: ProtectionState, manual: ProtectionState?, isNewIncident: Bool = true) {
         // Original root ledgers remain recovery evidence; v3 never executes them.
-        if let reason = WorkSessionBridge.generalWorkBlockReason(automatic.blockReason) { acceptProtection(reason) }
-        if let reason = WorkSessionBridge.generalWorkBlockReason(manual?.blockReason) { acceptProtection(reason) }
+        if let reason = WorkSessionBridge.generalWorkBlockReason(automatic.blockReason) { acceptProtection(reason, isNewIncident: isNewIncident) }
+        if let reason = WorkSessionBridge.generalWorkBlockReason(manual?.blockReason) { acceptProtection(reason, isNewIncident: isNewIncident) }
     }
-    public mutating func acceptProtection(_ reason: String) { stopForProtection(reason) }
+    /// Re-delivered evidence preserves an active block and its recovery window.
+    /// Once recovery has cleared that incident, only new evidence may consume
+    /// newly approved work. Live hazards always take the full-reset path.
+    public mutating func acceptProtection(_ reason: String, isNewIncident: Bool = true) {
+        guard isNewIncident || markers.protectionReason != nil else { return }
+        stopForProtection(reason, resetRecovery: isNewIncident)
+    }
     @discardableResult
     public mutating func extend(duration: TimeInterval, now: Double) -> Bool {
         guard canExtend(duration: duration, now: now) else { return false }
@@ -426,7 +432,8 @@ public struct IdleSessionPolicy: Equatable, Sendable {
               manual.startedAt == proposed.manual.startedAt,
               let oldDeadline = manual.requestedDeadline, let newDeadline = proposed.manual.requestedDeadline,
               proposed.manual.extensionID != nil, proposed.manual.extensionID != manual.extensionID,
-              canExtend(duration: newDeadline - oldDeadline, now: now),
+              let duration = WorkSessionExtensionPreparation.approvedDuration(from: oldDeadline, to: newDeadline),
+              canExtend(duration: duration, now: now),
               manual.batteryDeadline == proposed.manual.batteryDeadline else { return false }
         manual = proposed.manual
         manual.evaluate(power: latestPower, now: now)
@@ -541,8 +548,9 @@ public struct IdleSessionPolicy: Equatable, Sendable {
         guard settings.isSupported, latestPower != .unknown, latestFullWake == true, latestControllingUser,
               thermal.map({ (0..<2).contains($0) }) == true else { return false }
         guard !settings.v4.stopOnLowPowerMode || latestLowPowerMode == false else { return false }
-        if markers.protectionReason != nil {
-            guard let now = lastEvaluation, recoveryWindow.isReady(now: now) else { return false }
+        if let reason = markers.protectionReason {
+            guard (!Self.protectionRequiresAC(reason) || latestPower == .ac),
+                  let now = lastEvaluation, recoveryWindow.isReady(now: now) else { return false }
         }
         if latestPower == .battery {
             guard !settings.v4.stopOnLowPowerMode || latestLowPowerMode == false else { return false }
@@ -664,7 +672,8 @@ public struct IdleSessionPolicy: Equatable, Sendable {
     }
     public mutating func evaluate(power: PowerSource, thermal: Int?, fullWake: Bool?,
                                   controllingUser: Bool, now: Double, batteryPercent: Int? = nil,
-                                  lowPowerWarning: Bool? = false, lowPowerMode: Bool? = false) {
+                                  lowPowerWarning: Bool? = false, lowPowerMode: Bool? = false,
+                                  permitsAutomaticProtectionRecovery: Bool = true) {
         let previousDecision = decision
         expiry = nil; automaticActive = false; decision = WorkSessionDecision()
         guard validClock(now) else { return }
@@ -744,8 +753,8 @@ public struct IdleSessionPolicy: Equatable, Sendable {
             lastKnownPower = power
         }
         pruneIssuedBatteryPermits()
-        if settings.automaticallyResumeAfterProtection, markers.protectionReason != nil,
-           markers.pauseReason == nil, recoveryWindow.isReady(now: now) {
+        if permitsAutomaticProtectionRecovery, settings.enabled, settings.automaticallyResumeAfterProtection,
+           markers.protectionReason != nil, markers.pauseReason == nil, canResume(thermal: thermal) {
             // Protection consumed manual/lease work. Only current automatic
             // conditions can be evaluated again, with the original battery cap.
             mutateMarkers { $0.protectionReason = nil }
@@ -896,12 +905,22 @@ public struct IdleSessionPolicy: Equatable, Sendable {
         if automaticExecutionStartedAt.map({ $0 <= observedAt }) == true { finishAutomaticBattery() }
         pruneIssuedBatteryPermits()
     }
-    private mutating func stopForProtection(_ reason: String) {
+    private static func protectionRequiresAC(_ reason: String?) -> Bool {
+        reason == "time" || reason == "budget"
+    }
+    private mutating func stopForProtection(_ reason: String, resetRecovery: Bool = true) {
         manual.end(.protection); automaticActive = false; automaticExecutionID = nil
         automaticNeedsNewExecution = true; expiry = nil; decision = WorkSessionDecision()
         issuedBatteryPermits.removeAll()
-        recoveryWindow.reset()
-        mutateMarkers { $0.protectionReason = $0.protectionReason ?? reason }
+        if resetRecovery { recoveryWindow.reset() }
+        mutateMarkers {
+            // A simultaneous temperature or sensor stop must not drop a known
+            // exhausted battery allowance that only stable AC can clear.
+            if $0.protectionReason == nil
+                || (Self.protectionRequiresAC(reason) && !Self.protectionRequiresAC($0.protectionReason)) {
+                $0.protectionReason = reason
+            }
+        }
     }
     private mutating func beginAutomaticActivation() {
         let condition = effectiveAutomaticCondition, limit = settings.batteryTimeLimit

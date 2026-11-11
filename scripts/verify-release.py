@@ -132,11 +132,17 @@ def verify(archive, tag, require_clean):
             assert not run('git', 'status', '--porcelain', cwd=ROOT).stdout, 'source has uncommitted changes'
         run('codesign', '--verify', '--deep', '--strict', app)
         run('python3', ROOT / 'scripts/check-platform.py', app)
+        bundled_notice = app / 'Contents/Resources/Sparkle-LICENSE.txt'
+        sparkle_notice = ROOT / '.build/artifacts/sparkle/Sparkle/LICENSE'
+        assert bundled_notice.is_file() and bundled_notice.read_bytes() == sparkle_notice.read_bytes(), \
+            'archive is missing the original Sparkle distribution license and notices'
         binaries = [app / 'Contents/MacOS/Tether', app / 'Contents/Resources/tether-helper',
                     app / 'Contents/Resources/tether-power-recovery', app / 'Contents/Helpers/tether']
+        home_prefix = (Path.home().as_posix() + '/').encode()
         for binary in binaries:
             assert run('lipo', '-archs', binary).stdout.strip() == 'arm64'
             run('codesign', '--verify', '--strict', binary)
+            assert home_prefix not in binary.read_bytes(), f'build machine path in {binary.name}'
         tools = Path(os.environ['SPARKLE_TOOLS_DIR'])
         key = Path(os.environ['TETHER_SIGNING_KEY_FILE'])
         run(tools / 'bin/sign_update', '--ed-key-file', key, '--verify', feed)
@@ -152,7 +158,7 @@ def verify(archive, tag, require_clean):
                         source_dirty=info['TetherSourceDirty'], archive=archive.name, sha256=digest,
                         signature='ad-hoc', notarized=False, gatekeeper_accepted=assessment.returncode == 0,
                         gatekeeper_exit_code=assessment.returncode, gatekeeper_diagnostic=assessment.stderr.strip(),
-                        checks=['checksum', 'bundle/source/build identity', 'nested code signatures',
+                        checks=['checksum', 'bundle/source/build identity', 'nested code signatures', 'Sparkle license and notices',
                                 'packaged arm64 and minimum macOS metadata',
                                 'archive and feed Ed25519 signatures', 'packaged helper socket', 'packaged CLI',
                                 'packaged recovery/helper capabilities',

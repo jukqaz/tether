@@ -19,12 +19,13 @@ private enum WorkbenchFailure: LocalizedError {
 
 /// The interactive preview uses the production session policy and private helper IPC.
 /// Only its sensor inputs and idle assertion backend are simulated. It never installs a
-/// helper or creates an OS assertion, and its preferences are removed with the preview.
+/// helper or creates an OS assertion. Its preferences exist only in memory.
 @MainActor
 final class WorkbenchSession {
     let model: AppModel
     let controller: UserSessionController
     let backend: WorkbenchIdleBackend
+    let displayBackend: WorkbenchIdleBackend
     let suite: String
     private let defaults: UserDefaults
 
@@ -40,10 +41,12 @@ final class WorkbenchSession {
         guard initial.workSessionBridge?.version == 1 else { throw WorkbenchFailure.bridge }
         let input = folder.appendingPathComponent("fake.json")
         let name = "TetherWorkbench." + UUID().uuidString
-        guard let defaults = UserDefaults(suiteName: name) else { throw ServiceFailure("writeFailed") }
+        let defaults = PreviewDefaults()
         suite = name; self.defaults = defaults
         let backend = WorkbenchIdleBackend(); self.backend = backend
-        let controller = UserSessionController(defaults: defaults, backend: backend, guiProbe: guiProbe,
+        let displayBackend = WorkbenchIdleBackend(); self.displayBackend = displayBackend
+        let controller = UserSessionController(defaults: defaults, backend: backend,
+            displayBackend: displayBackend, guiProbe: guiProbe,
             environmentProbe: { WorkbenchInput.read(input).environment }, legacyControl: initial.control,
             requiresRootHandoff: initial.workSessionBridge?.coordinated != true)
         self.controller = controller

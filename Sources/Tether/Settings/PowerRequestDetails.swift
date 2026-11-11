@@ -33,7 +33,7 @@ struct PowerRequestEffects: View {
         if request.kinds.contains(.display) {
             effects.append(request.opposesDisplaySleep
                 ? L("May oppose display sleep", "화면 끄기와 충돌 가능")
-                : L("Display-awake request", "화면 유지 요청"))
+                : L("Display-awake request", "화면 켜두기 요청"))
         }
         if request.kinds.contains(.system) { effects.append(L("Prevents idle system sleep", "유휴 잠자기 방지")) }
         if request.kinds.contains(.network) { effects.append(L("Network-work request", "네트워크 활동 요청")) }
@@ -43,7 +43,7 @@ struct PowerRequestEffects: View {
     static func optionToReview(_ kinds: Set<SleepBlocker.Kind>) -> String {
         if kinds.contains(.display) {
             return L("To turn the screen off, check for a screen-awake option in this app.",
-                     "화면을 끄려면 앱에 화면 유지 옵션이 있는지 확인하세요.")
+                     "화면을 끄려면 앱에 화면 켜두기 옵션이 있는지 확인하세요.")
         }
         if kinds.contains(.system) || kinds.contains(.network) {
             return L("To change this behavior, check for a background-work option in this app.",
@@ -115,8 +115,8 @@ struct SystemFeatureOverlapView: View {
                 value: L("Other idle-sleep requests can coexist", "다른 앱의 일반 유지와 공존 가능"))
             LabeledContent(L("Display sleep", "화면 꺼짐"),
                 value: model.v3Settings.keepDisplayAwake
-                    ? L("Display keeping selected", "화면 유지 선택됨")
-                    : L("Display keeping off", "화면 유지 선택 꺼짐"))
+                    ? L("Display keeping selected", "화면 켜두기 선택됨")
+                    : L("Display keeping off", "화면 켜두기 선택 꺼짐"))
             LabeledContent(L("Tether display request", "Tether 화면 요청"), value: displayRequestStatus)
             if let error = model.userSessionStatus?.displayError {
                 Note(L("Display request error: \(error)", "화면 요청 오류: \(error)"))
@@ -143,9 +143,9 @@ struct SystemFeatureOverlapView: View {
                         displayOverlapDetail)
                     overlapDetail(L("Login lock", "로그인 잠금"),
                         L("Display keeping targets idle display sleep. Manual lock and macOS password requirements still apply. Closed-lid and screen-saver locking need separate verification.",
-                          "화면 유지는 유휴 화면 꺼짐에 적용합니다. 수동 잠금·암호 요구는 macOS에 따릅니다. 덮개·화면 보호기 잠금은 별도 확인이 필요합니다."))
+                          "화면 켜두기는 유휴 화면 꺼짐에 적용합니다. 수동 잠금·암호 요구는 macOS에 따릅니다. 덮개·화면 보호기 잠금은 별도 확인이 필요합니다."))
                     if model.showsLidOptions {
-                        overlapDetail(L("Closed-lid work", "덮개 유지"),
+                        overlapDetail(L("Closed-lid work", "덮개 닫고 사용"),
                             L("A global sleep override can overlap Tether's lid request; its writer cannot be reliably identified. Sleep on unplug can interrupt other apps' work, while releasing Tether alone need not put the Mac to sleep.",
                               "전역 잠자기 차단과 겹칠 수 있지만 설정한 앱은 구별할 수 없습니다. 분리 시 잠자기는 다른 앱 작업도 중단할 수 있고, Tether만 해제하면 Mac이 바로 잠들지는 않을 수 있습니다."))
                     }
@@ -164,14 +164,14 @@ struct SystemFeatureOverlapView: View {
     private var displayOverlapDetail: String {
         if !model.v3Settings.keepDisplayAwake {
             return L("Tether's display-keeping choice is off. Other apps can still request a lit screen; review their screen-awake options.",
-                     "Tether의 화면 유지 선택은 꺼져 있습니다. 다른 앱이 화면 켜짐을 요청하면 해당 앱의 화면 유지 옵션을 확인하세요.")
+                     "Tether의 화면 켜두기 선택은 꺼져 있습니다. 다른 앱이 화면 켜짐을 요청하면 해당 앱의 화면 켜두기 옵션을 확인하세요.")
         }
         if model.userSessionStatus?.displayHolding == true {
-            return L("Tether is requesting idle display-sleep prevention for all displays. Turn off display keeping in Work session settings to release this request.",
-                     "Tether가 모든 화면의 유휴 꺼짐 방지를 요청 중입니다. 작업 유지 설정에서 화면 유지를 끄면 이 요청을 해제합니다.")
+            return L("Tether is requesting display keep-awake for all displays. Turn off Allow display keep-awake in Power & Lid to release this request.",
+                     "Tether가 모든 화면의 자동 꺼짐 방지를 요청 중입니다. 전원·덮개에서 화면 켜두기 허용을 끄면 이 요청을 해제합니다.")
         }
         return L("Display keeping is selected, but an active request is not confirmed. It applies only during a valid work session; review the request state above.",
-                 "화면 유지는 선택되어 있지만 활성 요청은 확인되지 않았습니다. 유효한 작업 유지 중에만 적용하며, 위 요청 상태를 확인하세요.")
+                 "화면 켜두기는 선택되어 있지만 활성 요청은 확인되지 않았습니다. 유효한 작업 유지 중에만 적용하며, 위 요청 상태를 확인하세요.")
     }
     private func overlapDetail(_ title: String, _ text: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {

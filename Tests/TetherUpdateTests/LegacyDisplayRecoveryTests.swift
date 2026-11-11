@@ -8,7 +8,7 @@ final class LegacyDisplayRecoveryTests: XCTestCase {
     override func setUp() {
         super.setUp()
         domain = "io.github.jukqaz.tether.test.legacy-display." + UUID().uuidString
-        defaults = UserDefaults(suiteName: domain)!
+        defaults = TestMemoryDefaults(domain: domain)
     }
     override func tearDown() {
         defaults.removePersistentDomain(forName: domain)

@@ -54,6 +54,8 @@ final class AppModel: ObservableObject {
     @Published private(set) var helperSetupChecked = false
     /// Read-only inspection scope. A screen reconnect must not reuse old remote evidence.
     @Published private(set) var displayRevision: UInt64 = 0
+    /// Read-only menu telemetry, deliberately independent of the policy snapshot.
+    let powerBattery: PowerBatteryMonitor
     @Published private(set) var remoteInspectionSessionKey = "unavailable"
     private var remoteInspectionGeneration: UInt64 = 0
 
@@ -273,8 +275,12 @@ final class AppModel: ObservableObject {
          previewHelperReadiness: (() async throws -> ServiceReply)? = nil,
          previewHelperFiles: (() -> [HelperInstallationFile])? = nil,
          previewSystemSettings: SystemSettingsMonitor? = nil,
-         previewClosedLidDisplayDriver: ClosedLidDisplayDriver? = nil) {
+         previewClosedLidDisplayDriver: ClosedLidDisplayDriver? = nil,
+         previewPowerBattery: PowerBatteryMonitor? = nil) {
         self.capabilities = capabilities
+        self.powerBattery = preview
+            ? (previewPowerBattery ?? PowerBatteryMonitor(simulated: true))
+            : PowerBatteryMonitor(simulated: TetherPaths.serviceSocket != TetherPaths.productionSocket)
         self.systemSettings = previewSystemSettings ?? SystemSettingsMonitor(simulated: preview || TetherPaths.serviceSocket != TetherPaths.productionSocket)
         self.notificationSettings = NotificationSettingsMonitor(simulated: preview || TetherPaths.serviceSocket != TetherPaths.productionSocket)
         self.legacyObservationProbe = preview ? (previewLegacyObservation ?? { .init(power: .unknown, lidClosed: nil, sleepDisabled: nil, fullWake: nil) }) : { SystemProbe.snapshot() }
@@ -1411,7 +1417,7 @@ final class AppModel: ObservableObject {
         guard acceptingUserCommands, !commandPending, let userSession, !manualSessionActive,
               !v4ManualApprovalPending, canAcquireManualFeatures,
               userSession.start(duration: duration) else {
-            errorText = userSession?.status.error ?? L("This manual session cannot start with the current power or protection state.", "현재 전원·보호 상태에서는 수동 세션을 시작할 수 없습니다.")
+            errorText = userSession?.status.error ?? L("Manual keep-awake cannot start with the current power or protection state.", "현재 전원·보호 상태에서는 수동 유지를 시작할 수 없습니다.")
             return false
         }
         acceptedUserWorkIntent()

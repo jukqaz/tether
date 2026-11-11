@@ -90,10 +90,16 @@ public struct WorkSessionExtensionPreparation: Codable, Equatable, Sendable {
         self.id = id; self.requestID = requestID; self.currentDeadline = currentDeadline
         self.proposedDeadline = proposedDeadline; self.expiresAt = expiresAt
     }
+    static func approvedDuration(from currentDeadline: Double, to proposedDeadline: Double) -> TimeInterval? {
+        guard proposedDeadline > currentDeadline else { return nil }
+        // Match the exact sum the requester produces. Subtraction can round
+        // differently when the two deadlines have different floating-point precision.
+        return [900.0, 1800.0].first { currentDeadline + $0 == proposedDeadline }
+    }
     public func isValid(now: Double, maximumDeadline: Double? = nil) -> Bool {
-        let addition = proposedDeadline - currentDeadline
         return now.isFinite && currentDeadline.isFinite && proposedDeadline.isFinite && expiresAt.isFinite
-            && (addition == 900 || addition == 1800) && now < expiresAt && expiresAt <= currentDeadline
+            && Self.approvedDuration(from: currentDeadline, to: proposedDeadline) != nil
+            && now < expiresAt && expiresAt <= currentDeadline
             && expiresAt <= now + 5 && currentDeadline > now
             && (maximumDeadline.map { $0.isFinite && proposedDeadline <= $0 } ?? true)
     }

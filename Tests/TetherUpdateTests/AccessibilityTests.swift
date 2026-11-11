@@ -18,11 +18,11 @@ final class AccessibilityTests: XCTestCase {
         }
     }
 
-    func testIncreasedContrastAndTransparencyReductionIndependentlyRequireOpaqueControls() {
+    func testEveryConfigurationKeepsOpaqueControlsAndIncreasedContrastStrengthensBorders() {
         for contrast in [ColorSchemeContrast.standard, .increased] {
             for reduced in [false, true] {
                 let preferences = WorkSessionVisualPreferences(contrast: contrast, reduceTransparency: reduced)
-                XCTAssertEqual(preferences.usesOpaqueControls, contrast == .increased || reduced)
+                XCTAssertTrue(preferences.usesOpaqueControls)
                 if contrast == .increased {
                     XCTAssertGreaterThan(preferences.borderOpacity, 0.07)
                     XCTAssertGreaterThanOrEqual(preferences.borderWidth, 1)
@@ -43,10 +43,10 @@ final class AccessibilityTests: XCTestCase {
     }
 
     @MainActor
-    func testShippingControlSurfaceDrawsAnOpaqueFallbackWhenTransparencyIsReduced() throws {
+    func testShippingControlSurfaceRemainsOpaqueWhenTransparencyPreferenceChanges() throws {
         let standard = try renderCard(contrast: .standard, reduceTransparency: false, controlSurface: true)
         let opaque = try renderCard(contrast: .standard, reduceTransparency: true, controlSurface: true)
-        XCTAssertNotEqual(standard, opaque, "Interactive glass must still honor reduced transparency")
+        XCTAssertEqual(standard, opaque, "Controls stay opaque with or without the system transparency preference")
     }
 
     @MainActor

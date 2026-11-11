@@ -1,3 +1,4 @@
+import Combine
 import XCTest
 import Sparkle
 @testable import Tether
@@ -369,24 +370,45 @@ final class CommonSessionRoutingTests: XCTestCase {
         var observed = Self.portable
         let (name, defaults, _, controller, service, model) = fixture(capabilityProbe: { observed })
         defer { _ = controller.end(); defaults.removePersistentDomain(forName: name) }
-        await wait { service.gate.current != nil }
+        await wait { service.gate.current != nil && !model.lidCommandPending }
         model.startManualSession(minutes: 10)
-        await wait { model.clamshellActive && !model.lidCommandPending }
+        await wait { model.clamshellActive && !model.v4ManualApprovalPending && !model.lidCommandPending }
+        let request = controller.manualRequestID, deadline = controller.status.manualContinuousDeadline
+        let rejectedRelease = L("Closed-lid release is not confirmed: ", "덮개 유지 해제를 확인하지 못했습니다: ")
+            + ServiceFailure("powerVerificationFailed").localizedDescription
+        var rejectedReplies = 0
+        let observation = model.$coordinatedLidError.sink {
+            if $0 == rejectedRelease { rejectedReplies += 1 }
+        }
+        defer { observation.cancel() }
+
         service.omitDetachEffect = true
         observed = Self.unreadable; model.refresh()
-        await wait { service.requests.contains { $0.action == .detachApp } }
-        for _ in 0..<10 { await Task.yield() }
+        await wait { rejectedReplies == 1 }
+        XCTAssertEqual(service.requests.filter { $0.action == .detachApp }.count, 1)
+        XCTAssertTrue(service.reply().status?.ownsOverride == true)
         XCTAssertTrue(model.lidReleasePending); XCTAssertFalse(model.clamshellActive)
-        XCTAssertNotNil(model.coordinatedLidError); XCTAssertTrue(model.workSessionHolding)
-        XCTAssertTrue(model.generalSessionDetail.contains("확인"))
+        XCTAssertEqual(model.coordinatedLidError, rejectedRelease); XCTAssertTrue(model.workSessionHolding)
+        let originalLanguage = Localization.current
+        Localization.current = .english
+        XCTAssertEqual(model.generalSessionDetail, "General work continues; closed-lid release awaits confirmation")
+        Localization.current = .korean
+        XCTAssertEqual(model.generalSessionDetail, "일반 작업 유지 중 · 덮개 유지 해제 확인 중")
+        Localization.current = originalLanguage
         let receipt = model.userCommandReply(UserSessionRequest())
         XCTAssertEqual(receipt.lidSupport, .pending); XCTAssertNotNil(receipt.lidError)
         XCTAssertTrue(receipt.status?.holding == true)
+
         observed = Self.portable; model.refresh()
-        for _ in 0..<20 { await Task.yield() }
+        await wait { rejectedReplies == 2 }
+        XCTAssertEqual(service.requests.filter { $0.action == .detachApp }.count, 2)
         XCTAssertEqual(service.requests.filter { $0.action == .prepareWorkSession }.count, 1)
         service.omitDetachEffect = false; model.refresh()
         await wait { model.clamshellActive && !model.lidCommandPending }
+        XCTAssertEqual(service.requests.filter { $0.action == .detachApp }.count, 3)
+        XCTAssertEqual(service.requests.filter { $0.action == .prepareWorkSession }.count, 2)
+        XCTAssertEqual(controller.manualRequestID, request)
+        XCTAssertEqual(controller.status.manualContinuousDeadline, deadline)
     }
 
     @MainActor
@@ -599,7 +621,7 @@ final class CommonSessionRoutingTests: XCTestCase {
     func testKnownLegacyRootOffPreventsEarlyGeneralAcquisitionAndExplicitResumeAllowsManual() async throws {
         for startManual in [false, true] {
             let name = "TetherLegacyOff." + UUID().uuidString
-            let defaults = UserDefaults(suiteName: name)!
+            let defaults = TestMemoryDefaults(domain: name)
             var saved = IdleSessionSettings(); saved.version = 3; saved.automaticEnabled = true
             defaults.set(try JSONEncoder().encode(saved), forKey: UserSessionController.preferenceKey)
             let backend = CommonAssertionFixture()
@@ -629,7 +651,7 @@ final class CommonSessionRoutingTests: XCTestCase {
     @MainActor
     func testDelayedSuccessfulPreparationIsRecheckedBeforeNativeActivation() async {
         let name = "TetherDelayedPrepareAck." + UUID().uuidString
-        let defaults = UserDefaults(suiteName: name)!
+        let defaults = TestMemoryDefaults(domain: name)
         defer { defaults.removePersistentDomain(forName: name) }
         let backend = CommonAssertionFixture()
         let controller = UserSessionController(defaults: defaults, backend: backend, guiProbe: nil, requiresRootHandoff: true)
@@ -657,7 +679,7 @@ final class CommonSessionRoutingTests: XCTestCase {
     @MainActor
     func testStalePreparationCannotActivateAnOldRootChoiceAfterANewerStop() async throws {
         let name = "TetherPreparedHandoff." + UUID().uuidString
-        let defaults = UserDefaults(suiteName: name)!
+        let defaults = TestMemoryDefaults(domain: name)
         defer { defaults.removePersistentDomain(forName: name) }
         var previous = IdleSessionSettings(); previous.version = 2; previous.automaticEnabled = true
         defaults.set(try JSONEncoder().encode(previous), forKey: UserSessionController.preferenceKey)
@@ -694,7 +716,7 @@ final class CommonSessionRoutingTests: XCTestCase {
     func testAnExistingUneditedGeneralControllerAdoptsOnlyConfirmedExplicitLegacyChoices() async throws {
         for condition: PowerCondition? in [.battery, nil] {
             let name = "TetherLateHandoff." + UUID().uuidString
-            let defaults = UserDefaults(suiteName: name)!
+            let defaults = TestMemoryDefaults(domain: name)
             defer { defaults.removePersistentDomain(forName: name) }
             let backend = CommonAssertionFixture()
             let controller = UserSessionController(defaults: defaults, backend: backend, guiProbe: nil)
@@ -723,7 +745,7 @@ final class CommonSessionRoutingTests: XCTestCase {
     @MainActor
     func testGuiOffDuringPreparationWinsAndRemainsOffAfterRestart() async throws {
         let name = "TetherOffDuringHandoff." + UUID().uuidString
-        let defaults = UserDefaults(suiteName: name)!
+        let defaults = TestMemoryDefaults(domain: name)
         defer { defaults.removePersistentDomain(forName: name) }
         let backend = CommonAssertionFixture()
         let controller = UserSessionController(defaults: defaults, backend: backend, guiProbe: nil, requiresRootHandoff: true)
@@ -760,7 +782,7 @@ final class CommonSessionRoutingTests: XCTestCase {
     func testPreparationRetriesAreBoundedAndUnverifiedReceiptDoesNotAcquire() async {
         for invalidReceipt in [false, true] {
             let name = "TetherInvalidHandoff." + UUID().uuidString
-            let defaults = UserDefaults(suiteName: name)!
+            let defaults = TestMemoryDefaults(domain: name)
             let backend = CommonAssertionFixture()
             let controller = UserSessionController(defaults: defaults, backend: backend, guiProbe: nil, requiresRootHandoff: true)
             controller.update(power: .ac, thermal: 0, fullWake: true, controllingUser: true,
@@ -784,7 +806,7 @@ final class CommonSessionRoutingTests: XCTestCase {
     func testOtherCommonProtocolVersionsNeverFallBackToLegacyControl() async {
         for version in [1, 2, 3, 4, 5, WorkSessionLease.coordinatorVersion + 1] {
             let name = "TetherProtocolHandoff." + UUID().uuidString
-            let defaults = UserDefaults(suiteName: name)!
+            let defaults = TestMemoryDefaults(domain: name)
             let backend = CommonAssertionFixture()
             let controller = UserSessionController(defaults: defaults, backend: backend, guiProbe: nil)
             controller.update(power: .ac, thermal: 0, fullWake: true, controllingUser: true,
@@ -819,7 +841,7 @@ final class CommonSessionRoutingTests: XCTestCase {
                          native: IdleAssertionBackend? = nil,
                          coordinatorPath: String? = nil) -> (String, UserDefaults, CommonAssertionFixture, UserSessionController, CommonServiceFixture, AppModel) {
         let name = "TetherCommonSessionTests." + UUID().uuidString
-        let defaults = injectedDefaults ?? UserDefaults(suiteName: name)!
+        let defaults = injectedDefaults ?? TestMemoryDefaults(domain: name)
         let backend = CommonAssertionFixture(native: native)
         let controller = UserSessionController(defaults: defaults, backend: backend, guiProbe: nil)
         controller.update(power: power, thermal: 0, fullWake: true, controllingUser: true,
@@ -1246,7 +1268,7 @@ final class CommonSessionRoutingTests: XCTestCase {
         for changedLid: Bool? in [true, nil] {
             var lid: Bool? = false
             let name = "TetherLegacyUpdateQuitTests." + UUID().uuidString
-            let defaults = UserDefaults(suiteName: name)!
+            let defaults = TestMemoryDefaults(domain: name)
             defer { defaults.removePersistentDomain(forName: name) }
             let service = CommonServiceFixture()
             service.coordinatorVersion = nil; service.connected = false

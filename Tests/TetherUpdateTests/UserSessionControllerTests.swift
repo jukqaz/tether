@@ -427,8 +427,11 @@ final class UserSessionControllerTests: XCTestCase {
                     XCTAssertEqual(subject.status.enabled, true)
                     if power == .battery {
                         XCTAssertEqual(subject.status.manualBatteryRemaining, 7200, accuracy: 1)
-                        XCTAssertEqual(subject.status.batteryRemaining, 7197, accuracy: 1,
-                            "A fresh ordinary Wake uses the explicitly selected power range and the original first battery cap")
+                        let firstBatteryDeadline = try XCTUnwrap(original.automaticBatteryDeadline)
+                        XCTAssertEqual(fresh.automaticBatteryDeadline, firstBatteryDeadline,
+                            "A fresh ordinary Wake must retain the first battery cap")
+                        XCTAssertEqual(subject.status.batteryRemaining, firstBatteryDeadline - (base + 3),
+                            accuracy: 0.000_001)
                         XCTAssertTrue(subject.status.automaticActive)
                         XCTAssertTrue(subject.status.holding)
                     }
@@ -1404,7 +1407,7 @@ final class UserSessionControllerTests: XCTestCase {
             throw XCTSkip("A current native GUI login is required for the controller's live assertion test")
         }
         let suite = "tether-session-native-" + UUID().uuidString
-        let defaults = UserDefaults(suiteName: suite)!
+        let defaults = TestMemoryDefaults(domain: suite)
         defer { defaults.removePersistentDomain(forName: suite) }
         let foreign = Process()
         foreign.executableURL = URL(fileURLWithPath: "/usr/bin/caffeinate")
@@ -1526,7 +1529,7 @@ final class UserSessionControllerTests: XCTestCase {
     @MainActor
     private func withFixture(_ body: (UserDefaults, UserAssertionFixture) throws -> Void) rethrows {
         let name = "tether-session-test-" + UUID().uuidString
-        let defaults = UserDefaults(suiteName: name)!
+        let defaults = TestMemoryDefaults(domain: name)
         defer { defaults.removePersistentDomain(forName: name) }
         try body(defaults, UserAssertionFixture())
     }

@@ -1,6 +1,24 @@
 import SwiftUI
 import TetherCore
 
+/// Shared wording for the app-wide gates, separate from a future request's defaults.
+enum WorkPermissionText {
+    static var displayTitle: String { L("Allow display keep-awake", "화면 켜두기 허용") }
+    static var lidTitle: String { L("Allow closed-lid use", "덮개 닫고 사용 허용") }
+    static var scopeDetail: String {
+        L("Saved immediately. Applies to basic automatic work; advanced automatic and manual work use their selected features. Allowing a feature does not start keep-awake.",
+          "즉시 저장됩니다. 기본 자동 유지에 적용하며, 고급 자동·수동 유지는 선택한 기능에만 적용합니다. 허용만으로 유지를 시작하지 않습니다.")
+    }
+    static var displayHelp: String {
+        L("Saved immediately. Applies to basic automatic work and sessions with display keep-awake selected. Locking follows macOS settings.",
+          "즉시 저장됩니다. 기본 자동 유지와 화면 켜두기를 선택한 유지에 적용하며, 잠금은 macOS 설정을 따릅니다.")
+    }
+    static var lidHelp: String {
+        L("Saved immediately. Applies to basic automatic work and sessions with closed-lid use selected; it does not start keep-awake.",
+          "즉시 저장됩니다. 기본 자동 유지와 덮개 닫고 사용을 선택한 유지에 적용하며, 유지를 시작하지는 않습니다.")
+    }
+}
+
 /// Helper readiness is required to grant lid permission, never to revoke a
 /// saved grant. Both settings and the menu use this presentation-only guard.
 struct LidOptionAvailability {
@@ -30,15 +48,16 @@ extension LidOptionAvailability {
     }
 }
 
-/// Quick access to the same permissions used by General Settings. Selecting a
+/// Quick access to the same permissions used by Power & Lid. Selecting a
 /// permission never clears a stop/protection latch or starts a new work request.
 struct MenuKeepAwakeControls: View {
     @ObservedObject var model: AppModel
+    var canEdit = true
     var openHelperSetup: () -> Void = {}
 
-    var controlsDisabled: Bool { !model.acceptingUserCommands || model.commandPending }
+    var controlsDisabled: Bool { !canEdit || !model.acceptingUserCommands || model.commandPending }
     var lidAvailability: LidOptionAvailability { LidOptionAvailability(model: model) }
-    var lidControlDisabled: Bool { lidAvailability.isDisabled }
+    var lidControlDisabled: Bool { !canEdit || lidAvailability.isDisabled }
 
     var displayBinding: Binding<Bool> {
         Binding(get: { model.v3Settings.keepDisplayAwake }, set: { value in
@@ -49,85 +68,71 @@ struct MenuKeepAwakeControls: View {
 
     var lidBinding: Binding<Bool> {
         Binding(get: { model.v3Settings.allowClosedLid }, set: { value in
-            guard lidAvailability.permits(value) else { return }
+            guard canEdit && lidAvailability.permits(value) else { return }
             model.setAllowClosedLid(value)
         })
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 12) {
             if model.showsLidOptions {
-                HStack(spacing: 8) {
-                    Toggle(L("Keep awake with lid closed", "덮개를 닫아도 계속 사용"), isOn: lidBinding)
-                        .fixedSize(horizontal: false, vertical: true).disabled(lidControlDisabled)
-                        .accessibilityIdentifier("panel-allow-closed-lid")
-                    Spacer(minLength: 4)
-                    if !model.helperSetupConfirmed {
-                        Button(L("Set up…", "준비…"), action: openHelperSetup)
-                            .buttonStyle(.link).font(TetherTypography.secondary).fixedSize()
+                VStack(alignment: .leading, spacing: 4) {
+                    option(WorkPermissionText.lidTitle, symbol: "laptopcomputer", selection: lidBinding,
+                           identifier: "panel-allow-closed-lid")
+                        .disabled(lidControlDisabled)
+                        .help(WorkPermissionText.lidHelp)
+                    permissionDetail(lidStatusDetail)
+                        .accessibilityIdentifier("panel-lid-status")
+                    if canEdit && !model.helperSetupConfirmed {
+                        Button(L("Set up…", "도우미 설정…"), action: openHelperSetup)
+                            .buttonStyle(.link)
+                            .font(TetherTypography.secondary)
+                            .padding(.leading, 36)
                             .accessibilityIdentifier("panel-prepare-lid-helper")
                     }
                 }
-                .help(L("Applies to current and future work; does not start work by itself.",
-                        "현재와 다음 유지에 적용하며, 이 옵션만으로 새 유지를 시작하지 않습니다."))
             }
-            if model.showsLidOptions, model.v3Settings.allowClosedLid {
-                Text(lidStatusDetail).font(TetherTypography.secondary)
-                    .foregroundStyle(Color.tetherSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("panel-lid-status")
-            }
-            option(L("Keep display awake", "덮개가 열려 있을 때 화면 켜두기"), selection: displayBinding,
-                   identifier: "panel-keep-display-awake")
-                .disabled(controlsDisabled)
-                .help(L("Applies during work. macOS password requirements still apply; Tether never unlocks the Mac.",
-                        "유지 중인 작업에 적용합니다. macOS의 암호 요구는 계속 적용하며 잠긴 Mac을 해제하지 않습니다."))
-            if model.v3Settings.keepDisplayAwake {
-                Text(displayStatusDetail)
-                    .font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 4) {
+                option(WorkPermissionText.displayTitle, symbol: "sun.max", selection: displayBinding,
+                       identifier: "panel-keep-display-awake")
+                    .disabled(controlsDisabled)
+                    .help(WorkPermissionText.displayHelp)
+                permissionDetail(displayStatusDetail)
                     .accessibilityIdentifier("panel-display-status")
             }
         }
         .font(TetherTypography.body)
-        .toggleStyle(.checkbox).tint(.tetherAction).controlSize(.small)
+        .toggleStyle(.switch).tint(.tetherAction).controlSize(.regular)
     }
 
-    private func option(_ title: String, selection: Binding<Bool>, identifier: String) -> some View {
-        Toggle(title, isOn: selection)
+    private func permissionDetail(_ text: String) -> some View {
+        Text(text)
+            .font(TetherTypography.secondary)
+            .foregroundStyle(Color.tetherSecondary)
+            .lineSpacing(2)
             .fixedSize(horizontal: false, vertical: true)
+            .padding(.leading, 36)
+    }
+
+    private func option(_ title: String, symbol: String, selection: Binding<Bool>, identifier: String) -> some View {
+        Toggle(isOn: selection) {
+            HStack(spacing: 12) {
+                Image(systemName: symbol).font(.system(size: 20))
+                    .frame(width: 24).accessibilityHidden(true)
+                Text(title).fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityIdentifier(identifier)
+            .accessibilityLabel(title)
     }
 
     var lidStatusDetail: String {
-        if model.lidReleasePending { return model.lidSupportSummary }
-        if model.workSessionHolding, model.userSession?.v4LidRequested == false {
-            return L("This work does not request closed-lid use", "현재 작업은 덮개 유지를 요청하지 않음")
-        }
-        if !model.workSessionHolding, model.helperSetupConfirmed {
-            return L("Applies when work requests closed-lid use", "작업에서 덮개 유지를 요청할 때 적용")
-        }
-        return model.lidSupportSummary
+        model.lidUsageStatusText
     }
 
     var displayStatusDetail: String {
-        if !model.v3Settings.keepDisplayAwake {
-            return L("Display sleep follows macOS", "화면 절전은 macOS에 맡김")
-        }
-        if model.userSessionStatus?.displayError != nil {
-            return L("Display keep-awake needs review", "화면 유지 확인 필요")
-        }
-        if model.userSessionStatus?.displayHolding == true {
-            return L("Display kept awake · macOS lock policy applies", "화면 유지 중 · 잠금은 macOS 설정")
-        }
-        if model.workPaused {
-            return L("Choice saved · work is stopped", "선택 저장됨 · 작업은 중지 중")
-        }
-        if !model.workSessionHolding {
-            return L("Applies when work starts", "작업이 시작되면 적용")
-        }
-        return model.userSessionStatus?.displayHolding == nil
-            ? L("Checking display keep-awake", "화면 유지 상태 확인 중")
-            : L("Enabled · not currently applied", "선택 켬 · 현재 화면 유지는 미적용")
+        model.displayUsageStatusText
     }
 }

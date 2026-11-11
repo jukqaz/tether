@@ -72,28 +72,28 @@ extension AppModel {
     func manualExtensionUnavailableReason(by minutes: Int) -> String? {
         guard !canExtendManual(by: minutes) else { return nil }
         if commandPending {
-            return L("Wait for the previous request to be confirmed before extending.",
-                     "이전 요청을 확인한 뒤 연장할 수 있습니다.")
+            return L("Wait for the previous change to finish before adding time.",
+                     "이전 변경이 완료된 뒤 시간을 추가할 수 있습니다.")
         }
         if v4ManualApprovalPending || userSession?.manualExtensionPending == true
             || userSessionStatus?.manualApprovalPending == true {
-            return L("A manual request or extension is still being confirmed.",
-                     "수동 유지의 승인·연장을 확인 중입니다.")
+            return L("Manual keep-awake or its extension is still being confirmed.",
+                     "수동 유지 시작이나 시간 추가를 확인 중입니다.")
         }
         if let reason = workProtectionReason { return protectionReason(reason) }
         if workPaused {
-            return L("Keep-awake is paused. Resume before reviewing an extension.",
-                     "유지가 중지되어 있습니다. 다시 허용한 뒤 확인하세요.")
+            return L("Keep-awake is stopped. Choose Resume before reviewing an extension.",
+                     "유지가 중지되어 있습니다. 중지를 해제한 뒤 확인할 수 있습니다.")
         }
         guard manualSessionActive, manualSessionUntil != nil else {
-            return L("There is no active finite timer to extend.", "연장할 실행 중인 유한 타이머가 없습니다.")
+            return L("There is no running timer to extend.", "시간을 추가할 실행 중인 타이머가 없습니다.")
         }
         if v4AcquisitionBlocked {
             return L("Extensions are unavailable while preparing an update installation.",
                      "업데이트 설치를 준비하는 동안에는 연장할 수 없습니다.")
         }
         if !acceptingUserCommands {
-            return L("Confirm the current Tether session before extending.",
+            return L("Confirm Tether's control access before adding time.",
                      "현재 Tether 실행 권한을 확인해야 연장할 수 있습니다.")
         }
         if snapshot.power == .unknown {
@@ -101,49 +101,49 @@ extension AppModel {
                      "전원 상태가 확인될 때까지 연장할 수 없습니다.")
         }
         if userSessionStatus?.observationLimited == true {
-            return L("Extensions wait for the required power and protection observations.",
-                     "전원·보호 관측이 확인될 때까지 연장할 수 없습니다.")
+            return L("Extensions wait for the required power and protection checks.",
+                     "전원·보호 상태가 확인될 때까지 연장할 수 없습니다.")
         }
         if userSession?.hasConfirmedSessionAuthority != true {
-            return L("Confirm the logged-in session and wake state before extending.",
-                     "로그인 세션·깨움 상태를 확인해야 연장할 수 있습니다.")
+            return L("Confirm the logged-in user and wake state before adding time.",
+                     "현재 로그인 사용자와 깨움 상태를 확인해야 시간을 추가할 수 있습니다.")
         }
         if manualFeaturesNeedHelper && !canAcquireManualFeatures {
-            return L("Confirm the closed-lid helper and its current observations before extending.",
-                     "덮개 도우미의 연결·관측을 확인해야 연장할 수 있습니다.")
+            return L("Confirm the helper connection and closed-lid status before adding time.",
+                     "도우미 연결과 덮개 상태를 확인해야 시간을 추가할 수 있습니다.")
         }
         if snapshot.power == .battery,
            let request = userSession?.v4ManualSnapshot,
            let limit = request.batteryTimeLimit, limit != .unlimited {
             // The captured request limit is authoritative, not today's default.
             // Do not duplicate deadline arithmetic or claim which gate failed.
-            return L("The full \(minutes)-minute extension is unavailable. Review this request's battery limit and original deadline.",
-                     "\(minutes)분 전체를 연장할 수 없습니다. 이 요청의 배터리 한도와 원래 마감을 확인하세요.")
+            return L("The full \(minutes)-minute extension is unavailable. Check this manual keep-awake's battery limit and original end time.",
+                     "\(minutes)분 전체를 추가할 수 없습니다. 현재 수동 유지의 배터리 한도와 기존 종료 시간을 확인해야 합니다.")
         }
-        return L("The full \(minutes)-minute extension is not confirmed for the current timer, power and protection state.",
-                 "현재 타이머의 기한·전원·보호 상태에서 \(minutes)분 전체 연장이 확인되지 않습니다.")
+        return L("The full \(minutes)-minute extension is not confirmed for the current end time, power and protection state.",
+                 "현재 종료 시간·전원·보호 상태에서 \(minutes)분 전체 추가가 확인되지 않습니다.")
     }
 
     var manualEndingDetail: String {
         if automaticWorkReasonActive {
-            return L("Ending this session leaves automatic keep-awake active.", "끝내도 자동 유지는 계속됩니다.")
+            return L("Ending manual keep-awake leaves automatic keep-awake active.", "수동 유지를 종료해도 자동 유지는 계속됩니다.")
         }
         if automaticPauseActive {
-            return L("Ending manual work keeps automatic starts resting.", "수동 종료는 자동 쉬기를 해제하지 않습니다.")
+            return L("Ending manual keep-awake leaves automatic starts paused.", "수동 유지를 종료해도 자동 유지 일시 중지는 유지됩니다.")
         }
         return v3Settings.automaticEnabled
-            ? L("Ending this session waits for the next automatic condition.", "끝내면 자동 조건이 맞을 때까지 대기합니다.")
-            : L("Ending this session turns keep-awake off.", "끝내면 작업 유지가 꺼집니다.")
+            ? L("Ending manual keep-awake waits for the next automatic condition.", "수동 유지를 종료하면 다음 자동 조건이 맞을 때까지 대기합니다.")
+            : L("Ending manual keep-awake turns keep-awake off.", "수동 유지를 종료하면 잠자기 방지가 꺼집니다.")
     }
     var manualBatteryScopeDetail: String {
         disconnectPolicyDetail + " " + L("Battery limit: ", "배터리 한도: ") + batteryLimitTitle(v3Settings.batteryTimeLimit)
     }
     var manualStartBlockedDetail: String {
         if let reason = workProtectionReason { return protectionReason(reason) }
-        if workPaused { return L("Choose Resume before starting a manual session.", "‘다시 허용’을 누른 뒤 수동 유지를 시작하세요.") }
+        if workPaused { return L("Choose Resume before starting manual keep-awake.", "수동 유지를 시작하려면 먼저 ‘중지 해제’가 필요합니다.") }
         if let error = userSessionStatus?.error { return error }
         if snapshot.power == .unknown { return L("Confirming the power source.", "전원 연결 상태를 확인하고 있습니다.") }
-        return L("Start requires an active user session and confirmed power and protection readings.",
-                 "현재 로그인 사용자와 전원·보호 관측값을 확인한 뒤 시작할 수 있습니다.")
+        return L("Starting requires a confirmed logged-in user, power source and protection status.",
+                 "현재 로그인 사용자와 전원·보호 상태를 확인한 뒤 시작할 수 있습니다.")
     }
 }

@@ -21,7 +21,7 @@ final class NotifierTests: XCTestCase {
     func testRemovedTimingNoticesStaySilentWithLegacyPreferenceEnabledAndProtectionStillReports() async throws {
         try await MainActor.run {
             let suite = "TetherNotifier.\(UUID())", old = Localization.current
-            let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+            let defaults = TestMemoryDefaults(domain: suite)
             defer { defaults.removePersistentDomain(forName: suite); Localization.current = old }
             defaults.set(true, forKey: "notifyHoldEnd")
             Localization.current = .english
@@ -62,7 +62,7 @@ final class NotifierTests: XCTestCase {
     func testLegacyStartupConsumesCurrentProtectionEvenWithOlderStoredWatermarks() async throws {
         try await MainActor.run {
             let suite = "TetherNotifier.\(UUID())"
-            let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+            let defaults = TestMemoryDefaults(domain: suite)
             defer { defaults.removePersistentDomain(forName: suite) }
             for key in ["lastNotifiedHoldEnd", "lastNotifiedThermalAlert", "lastNotifiedOverheatSleep", "lastNotifiedWeakChargerSleep"] {
                 defaults.set(50, forKey: key)
@@ -84,7 +84,7 @@ final class NotifierTests: XCTestCase {
         try await MainActor.run {
             for oldChoice in [true, false] {
                 let suite = "TetherNotifier.\(UUID())"
-                let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+                let defaults = TestMemoryDefaults(domain: suite)
                 defer { defaults.removePersistentDomain(forName: suite) }
                 defaults.set(oldChoice, forKey: "notifyHoldEnd")
                 var count = 0
@@ -102,7 +102,7 @@ final class NotifierTests: XCTestCase {
         try await MainActor.run {
             for reason in [HoldEnd.heat, .thermal, .sensor, .battery] {
                 let suite = "TetherNotifier.\(UUID())"
-                let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+                let defaults = TestMemoryDefaults(domain: suite)
                 defer { defaults.removePersistentDomain(forName: suite) }
                 var count = 0
                 let notifier = legacyNotifier(defaults: defaults) { _, _ in count += 1 }
@@ -120,7 +120,7 @@ final class NotifierTests: XCTestCase {
         try await MainActor.run {
             for reason in [HoldEnd.thermal, .battery] {
                 let suite = "TetherNotifier.\(UUID())"
-                let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+                let defaults = TestMemoryDefaults(domain: suite)
                 defer { defaults.removePersistentDomain(forName: suite) }
                 var count = 0
                 let notifier = legacyNotifier(defaults: defaults) { _, _ in count += 1 }
@@ -136,7 +136,7 @@ final class NotifierTests: XCTestCase {
     func testIndependentPreferencesConsumeDisabledEvents() async throws {
         try await MainActor.run {
             let suite = "TetherNotifier.\(UUID())"
-            let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+            let defaults = TestMemoryDefaults(domain: suite)
             defer { defaults.removePersistentDomain(forName: suite) }
             var count = 0
             let notifier = Notifier(status: nil, defaults: defaults) { _, _ in count += 1 }
@@ -151,7 +151,7 @@ final class NotifierTests: XCTestCase {
     func testExistingOffPreferencesArePreservedAndNotificationSettingsDoNotChangeWorkPolicy() async throws {
         try await MainActor.run {
             let suite = "TetherNotifier.\(UUID())"
-            let defaults = try XCTUnwrap(UserDefaults(suiteName: suite)), backend = NoPowerWrites()
+            let defaults = TestMemoryDefaults(domain: suite), backend = NoPowerWrites()
             defer { defaults.removePersistentDomain(forName: suite) }
             defaults.set(false, forKey: "notifyHoldEnd"); defaults.set(false, forKey: "notifyHeat")
             defaults.set(false, forKey: "notifyBatteryProtection")

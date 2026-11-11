@@ -15,7 +15,7 @@ struct RemoteFindingsView: View {
     var body: some View {
         SettingsCard(title: L("Remote use", "원격 사용 확인"), symbol: "display.2") {
             Note(L("Keeping your Mac awake, receiving remote frames and accepting remote input are separate checks. The display-awake option prevents idle display sleep during a valid work session. Closed-lid display and lock behavior, screen-saver locking and manual locking follow macOS. This option does not unlock a locked screen or change password requirements.",
-                   "작업 유지, 원격 화면 수신, 원격 입력은 각각 별도로 확인합니다. 화면 유지 옵션은 유효한 작업 유지 동안 화면의 유휴 꺼짐을 막습니다. 덮개를 닫을 때의 화면·잠금, 화면 보호기와 수동 잠금은 macOS에 따릅니다. 잠긴 화면을 해제하거나 암호 요구 설정을 바꾸지 않습니다."))
+                   "작업 유지, 원격 화면 수신, 원격 입력은 각각 별도로 확인합니다. 화면 켜두기 옵션은 유효한 작업 유지 동안 화면의 유휴 꺼짐을 막습니다. 덮개를 닫을 때의 화면·잠금, 화면 보호기와 수동 잠금은 macOS에 따릅니다. 잠긴 화면을 해제하거나 암호 요구 설정을 바꾸지 않습니다."))
             Button(L("Open Lock Screen settings…", "잠금 화면 설정 열기…"), action: openLockScreenSettings)
                 .disabled(!canOpenSettings)
                 .help(L("Opens System Settings without changing the password requirement.",

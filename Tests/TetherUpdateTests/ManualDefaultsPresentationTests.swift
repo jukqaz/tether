@@ -27,7 +27,7 @@ final class ManualDefaultsPresentationTests: XCTestCase {
                 let permissionOn = view.displayApplicationDetail(for: .init(display: true))
                 XCTAssertNotEqual(permissionOn, permissionOff)
                 XCTAssertNotEqual(permissionOn, noRequest)
-                XCTAssertTrue(permissionOn.contains(L("rechecked at start", "시작할 때 다시 확인")),
+                XCTAssertTrue(permissionOn.contains(L("checked again at start", "시작할 때 다시 확인")),
                     "Permission alone cannot promise that a future request is already executing")
                 XCTAssertEqual(view.displayApplicationDetail(for: .init(display: false)), noRequest,
                     "A global permission does not turn an unrequested feature into a request")

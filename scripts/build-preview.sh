@@ -22,9 +22,11 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 if [ "$DESIGN_PREVIEW" = true ]; then
     mkdir -p "$APP/Contents/Frameworks"
     ditto .build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework "$APP/Contents/Frameworks/Sparkle.framework"
+    cp .build/artifacts/sparkle/Sparkle/LICENSE "$APP/Contents/Resources/Sparkle-LICENSE.txt"
     cp "$DESIGN_BIN/Tether" "$APP/Contents/MacOS/Tether"
 else
     ditto build/Tether.app/Contents/Frameworks "$APP/Contents/Frameworks"
+    cp build/Tether.app/Contents/Resources/Sparkle-LICENSE.txt "$APP/Contents/Resources/"
     cp build/Tether.app/Contents/MacOS/Tether "$APP/Contents/MacOS/Tether"
     cp build/Tether.app/Contents/Resources/tether-helper "$APP/Contents/Resources/tether-helper"
 fi
@@ -34,9 +36,6 @@ for icon in Assets.car AppIcon.icns; do
     fi
 done
 cp Resources/Info.plist "$APP/Contents/Info.plist"
-mkdir -p "$APP/Contents/Resources/Onboarding"
-cp Resources/Onboarding/connected.png Resources/Onboarding/disconnected.png Resources/Onboarding/motion-preview.mp4 \
-  "$APP/Contents/Resources/Onboarding/"
 if [ "$DESIGN_PREVIEW" = true ]; then
     /usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier io.github.jukqaz.tether.design' "$APP/Contents/Info.plist"
     /usr/libexec/PlistBuddy -c 'Set :CFBundleName Tether Design' "$APP/Contents/Info.plist"

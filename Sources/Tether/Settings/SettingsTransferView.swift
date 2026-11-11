@@ -19,7 +19,7 @@ struct SettingsTransferView: View {
             Text(L("Saved app choices and automatic presets", "저장된 앱 설정과 자동 프리셋"))
                 .font(TetherTypography.section).accessibilityAddTraits(.isHeader)
             Note(L("Active work, permissions and recovery records are excluded. Opening or importing a file does not start work or enable a rule.",
-                   "현재 작업·권한·원복 기록은 포함하지 않습니다. 파일을 열거나 가져오기만 해서는 작업이나 규칙이 실행되지 않습니다."))
+                   "현재 작업·권한·복구 기록은 포함하지 않습니다. 파일을 열거나 가져오기만 해서는 작업이나 규칙이 실행되지 않습니다."))
             HStack(spacing: 12) {
                 Button(L("Export saved settings…", "저장된 설정 내보내기…")) {
                     guard let data = model.exportV4Settings() else {
@@ -50,7 +50,7 @@ struct SettingsTransferView: View {
             }
             if model.userCommandsArePreview || model.developmentService {
                 Note(L("File transfer is disabled in preview. No files are read or written.",
-                       "미리보기에서는 파일을 옮기지 않습니다. 파일을 읽거나 저장하지 않습니다."))
+                       "미리보기에서는 설정을 가져오거나 내보내지 않습니다. 파일을 읽거나 저장하지 않습니다."))
             }
         } actions: {
             Button(L("Back", "뒤로")) { dismiss() }.actionButton().keyboardShortcut(.cancelAction)
@@ -64,7 +64,7 @@ struct SettingsTransferView: View {
                     }
                     clearImport()
                     feedback = L("Inactive copies saved. Select and confirm a copied preset separately to use it.",
-                                 "비활성 복사본을 저장했습니다. 사용하려면 프리셋을 별도로 선택해 확인 적용하세요.")
+                                 "자동 실행하지 않는 복사본을 저장했습니다. 사용하려면 프리셋을 별도로 선택해 확인한 뒤 적용하세요.")
                 }.actionButton(prominent: true).disabled(!canTransfer)
                     .accessibilityIdentifier("settings-transfer-confirm-import")
             }

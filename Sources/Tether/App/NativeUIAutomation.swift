@@ -125,7 +125,7 @@ private final class NativeUITestFixture {
         let scenario = environment["TETHER_UI_TEST_SCENARIO"] ?? "ac"
         let portable = scenario != "desktop" && scenario != "desktopBatteryCondition"
         let power: PowerSource = scenario == "battery" ? .battery : .ac
-        let defaults = NativeUITestDefaults()
+        let defaults = PreviewDefaults()
         if scenario == "desktopBatteryCondition" {
             var settings = IdleSessionSettings()
             settings.version = 6
@@ -144,7 +144,10 @@ private final class NativeUITestFixture {
         pump.refresh()
         model = AppModel(preview: true,
             capabilities: MacCapabilities(supportedPlatform: true, internalBattery: portable, lid: portable),
-            previewSession: controller, previewDefaults: defaults)
+            previewSession: controller, previewDefaults: defaults,
+            previewPowerBattery: PowerBatterySample.monitor(scenario:
+                scenario.hasPrefix("power-") ? String(scenario.dropFirst(6))
+                    : scenario == "battery" ? "discharging" : "charging"))
         model.language = environment["TETHER_UI_TEST_LANGUAGE"] == "en" ? .english : .korean
         if scenario != "desktopBatteryCondition" { model.setAutomaticEnabled(true) }
         model.selectManualDuration(1800)
@@ -193,6 +196,10 @@ private struct NativeUITestLanding: View {
             "automaticActive": model.automaticWorkReasonActive,
             "automaticPauseActive": model.automaticPauseActive,
             "menuBarDetails": model.menuBarDetails,
+            "powerBatterySimulated": model.powerBattery.simulated,
+            "powerBatteryVisible": model.powerBattery.isVisible,
+            "powerBatteryReads": model.powerBattery.refreshCount,
+            "powerBatteryPhase": String(describing: model.powerBattery.phase),
             "bundleID": Bundle.main.bundleIdentifier ?? "unknown",
             "executablePath": Bundle.main.executableURL?.path ?? "unknown",
             "manual": model.manualSessionActive, "holding": model.workSessionHolding,
@@ -239,7 +246,7 @@ private enum NativeUITestWindowObservation {
         guard let window = NSApp.windows.first(where: {
             $0.identifier?.rawValue == "com_apple_SwiftUI_Settings_window"
         }) else { return NSNull() }
-        return metadata(window)
+        return metadata(window, includeResponderDetails: true)
     }
 
     static var activityReviewSheet: Any {
@@ -256,8 +263,8 @@ private enum NativeUITestWindowObservation {
         return metadata(window)
     }
 
-    private static func metadata(_ window: NSWindow) -> [String: Any] {
-        return ["windowNumber": window.windowNumber,
+    private static func metadata(_ window: NSWindow, includeResponderDetails: Bool = false) -> [String: Any] {
+        var result = ["windowNumber": window.windowNumber,
                 "identifier": window.identifier?.rawValue ?? "",
                 "class": String(describing: type(of: window)),
                 "title": window.title,
@@ -287,6 +294,10 @@ private enum NativeUITestWindowObservation {
                 "contentAspectRatio": size(window.contentAspectRatio),
                 "styleMask": window.styleMask.rawValue,
                 "isResizable": window.styleMask.contains(.resizable)] as [String: Any]
+        if includeResponderDetails {
+            result["firstResponderDetails"] = NativeUITestResponderGeometry.inspect(window.firstResponder, in: window)
+        }
+        return result
     }
 
     private static func rect(_ value: NSRect) -> [String: Any] { NativeUITestGeometry.rect(value) }
@@ -305,6 +316,100 @@ enum NativeUITestGeometry {
     }
     private static func number(_ value: CGFloat) -> Any {
         value.isFinite ? Double(value) : NSNull()
+    }
+}
+
+/// Isolated-fixture inspection only. Never reads titles, text, values or view
+/// contents, changes focus, or guesses ownership from a private runtime name.
+@MainActor
+enum NativeUITestResponderGeometry {
+    static let maximumChainLength = 12
+
+    static func inspect(_ responder: NSResponder?, in window: NSWindow) -> [String: Any] {
+        var nextNodes: [[String: Any]] = []
+        var nextSeen = Set<ObjectIdentifier>()
+        var next = responder
+        while let current = next, nextNodes.count < maximumChainLength,
+              nextSeen.insert(ObjectIdentifier(current)).inserted {
+            nextNodes.append(node(current, in: window))
+            next = current.nextResponder
+        }
+
+        let focusView = responder as? NSView
+        var viewNodes: [[String: Any]] = []
+        var viewSeen = Set<ObjectIdentifier>()
+        var currentView = focusView
+        var outlineAncestor: NSOutlineView?
+        while let view = currentView, viewNodes.count < maximumChainLength,
+              viewSeen.insert(ObjectIdentifier(view)).inserted {
+            viewNodes.append(node(view, in: window))
+            if outlineAncestor == nil, let outline = view as? NSOutlineView { outlineAncestor = outline }
+            currentView = view.superview
+        }
+
+        // Identify the actual sidebar using its stable identifier and public
+        // NSOutlineView type. Missing or ambiguous identification stays unknown.
+        var pending = window.contentView.map { [$0] } ?? []
+        var visited = 0
+        var outlines: [NSOutlineView] = []
+        while visited < 512, let view = pending.popLast() {
+            visited += 1
+            if let outline = view as? NSOutlineView { outlines.append(outline) }
+            pending.append(contentsOf: view.subviews)
+        }
+        let sidebarMatches = outlines.filter { identifier($0) == "settings-sidebar" }
+        let sidebar = sidebarMatches.count == 1 && pending.isEmpty ? sidebarMatches.first : nil
+        let focusFrame = focusView.flatMap { frame($0, in: window) }
+        let sidebarFrame = sidebar.flatMap { frame($0, in: window) }
+        let hasCompleteViewChain = focusView != nil && currentView == nil
+        var result: [String: Any] = [
+            "coordinateSpace": "windowPointsYUp",
+            "nextResponderChain": responder == nil ? NSNull() : nextNodes as Any,
+            "nextResponderChainTruncated": responder == nil ? NSNull() : (next != nil) as Any,
+            "superviewChain": focusView == nil ? NSNull() : viewNodes as Any,
+            "superviewChainTruncated": focusView == nil ? NSNull() : (currentView != nil) as Any,
+            "hasPublicOutlineViewAncestor": outlineAncestor != nil ? true as Any
+                : hasCompleteViewChain ? false as Any : NSNull(),
+            "publicOutlineViewAncestor": outlineAncestor.map { node($0, in: window) as Any } ?? NSNull(),
+            "nativeOutlineViews": outlines.map { node($0, in: window) },
+            "sidebarSearchTruncated": !pending.isEmpty,
+            "sidebar": sidebar.map { node($0, in: window) as Any } ?? NSNull(),
+            "focusViewFrameInWindow": focusFrame.map { NativeUITestGeometry.rect($0) as Any } ?? NSNull(),
+            "sidebarContainsFocusViewFrame": NSNull(),
+            "sidebarIntersectsFocusViewFrame": NSNull(),
+            "focusViewIsDescendantOfSidebar": NSNull()
+        ]
+        if let focusView, let sidebar, focusView.window === window, sidebar.window === window {
+            result["focusViewIsDescendantOfSidebar"] = focusView === sidebar || focusView.isDescendant(of: sidebar)
+        }
+        if let focusFrame, let sidebarFrame {
+            result["sidebarContainsFocusViewFrame"] = sidebarFrame.contains(focusFrame)
+            result["sidebarIntersectsFocusViewFrame"] = sidebarFrame.intersects(focusFrame)
+        }
+        return result
+    }
+
+    private static func node(_ responder: NSResponder, in window: NSWindow) -> [String: Any] {
+        let view = responder as? NSView
+        return ["class": String(describing: type(of: responder)),
+                "identifier": view.flatMap(identifier).map { $0 as Any }
+                    ?? (responder as? NSWindow)?.identifier.map { $0.rawValue as Any } ?? NSNull(),
+                "frameInWindow": view.flatMap { frame($0, in: window) }
+                    .map { NativeUITestGeometry.rect($0) as Any } ?? NSNull()]
+    }
+
+    private static func identifier(_ view: NSView) -> String? {
+        let accessibilityIdentifier = view.accessibilityIdentifier()
+        return accessibilityIdentifier.isEmpty ? view.identifier?.rawValue : accessibilityIdentifier
+    }
+
+    private static func frame(_ view: NSView, in window: NSWindow) -> NSRect? {
+        guard view.window === window else { return nil }
+        let rect = view.convert(view.bounds, to: nil)
+        guard !rect.isEmpty, !rect.isInfinite, !rect.isNull,
+              rect.origin.x.isFinite, rect.origin.y.isFinite,
+              rect.width.isFinite, rect.height.isFinite else { return nil }
+        return rect
     }
 }
 
@@ -332,21 +437,4 @@ private final class NativeUITestAssertion: IdleAssertionBackend {
     func renew(id: UInt32, timeout: TimeInterval) -> Int32 { 0 }
     func level(id: UInt32) -> Int? { 255 }
     func release(id: UInt32) -> Int32 { 0 }
-}
-
-private final class NativeUITestDefaults: UserDefaults {
-    private var values: [String: Any] = [:]
-    private var registered: [String: Any] = [:]
-    override func object(forKey key: String) -> Any? { values[key] ?? registered[key] }
-    override func set(_ value: Any?, forKey key: String) { values[key] = value }
-    override func removeObject(forKey key: String) { values.removeValue(forKey: key) }
-    override func register(defaults: [String: Any]) { registered.merge(defaults) { _, new in new } }
-    override func string(forKey key: String) -> String? { object(forKey: key) as? String }
-    override func data(forKey key: String) -> Data? { object(forKey: key) as? Data }
-    override func bool(forKey key: String) -> Bool { object(forKey: key) as? Bool ?? false }
-    override func integer(forKey key: String) -> Int { object(forKey: key) as? Int ?? 0 }
-    override func double(forKey key: String) -> Double { object(forKey: key) as? Double ?? 0 }
-    override func persistentDomain(forName name: String) -> [String: Any]? { values }
-    override func setPersistentDomain(_ domain: [String: Any], forName name: String) { values = domain }
-    override func removePersistentDomain(forName name: String) { values.removeAll() }
 }

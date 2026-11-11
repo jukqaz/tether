@@ -16,7 +16,7 @@ final class UserSessionActivityControllerTests: XCTestCase {
     func testHelperlessDiagnosticsNeverWriteSettingsOrStartPowerWork() async throws {
         try await MainActor.run {
             let name = "tether-activity-\(UUID())", backend = ActivityAssertionFixture()
-            let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+            let defaults = TestMemoryDefaults(domain: name)
             defer { defaults.removePersistentDomain(forName: name) }
             let controller = UserSessionController(defaults: defaults, backend: backend, guiProbe: nil, environmentProbe: nil)
             controller.update(power: .ac, thermal: 0, fullWake: true, controllingUser: true, now: ContinuousTime.now)
@@ -41,7 +41,7 @@ final class UserSessionActivityControllerTests: XCTestCase {
     func testObservedWorkAndReleaseAreRecordedAndDetailEndsWithCoordinator() async throws {
         try await MainActor.run {
             let name = "tether-activity-\(UUID())", backend = ActivityAssertionFixture()
-            let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+            let defaults = TestMemoryDefaults(domain: name)
             defer { defaults.removePersistentDomain(forName: name) }
             let controller = UserSessionController(defaults: defaults, backend: backend, guiProbe: nil, environmentProbe: nil)
             controller.update(power: .ac, thermal: 0, fullWake: true, controllingUser: true, now: ContinuousTime.now)
@@ -59,7 +59,7 @@ final class UserSessionActivityControllerTests: XCTestCase {
     func testDetailedRecordingCanBeStoppedAfterARejectedQuit() async throws {
         try await MainActor.run {
             let name = "tether-activity-\(UUID())", backend = ActivityAssertionFixture()
-            let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+            let defaults = TestMemoryDefaults(domain: name)
             defer { defaults.removePersistentDomain(forName: name) }
             let controller = UserSessionController(defaults: defaults, backend: backend, guiProbe: nil, environmentProbe: nil)
             controller.update(power: .ac, thermal: 0, fullWake: true, controllingUser: true, now: ContinuousTime.now)
@@ -78,7 +78,7 @@ final class UserSessionActivityControllerTests: XCTestCase {
     func testRecordingAndMarkersRejectLostCoordinatorOwnership() async throws {
         try await MainActor.run {
             let name = "tether-activity-\(UUID())", backend = ActivityAssertionFixture()
-            let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+            let defaults = TestMemoryDefaults(domain: name)
             defer { defaults.removePersistentDomain(forName: name) }
             let controller = UserSessionController(defaults: defaults, backend: backend, guiProbe: nil, environmentProbe: nil)
             controller.ownershipProbe = { false }

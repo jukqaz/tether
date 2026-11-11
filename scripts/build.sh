@@ -15,6 +15,7 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Helpers"
 mkdir -p "$APP/Contents/Frameworks"
 ditto .build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework "$APP/Contents/Frameworks/Sparkle.framework"
+cp .build/artifacts/sparkle/Sparkle/LICENSE "$APP/Contents/Resources/Sparkle-LICENSE.txt"
 cp "$BIN/Tether" "$APP/Contents/MacOS/Tether"
 # Helpers/, not MacOS/: "tether" and "Tether" collide on a case-insensitive volume.
 cp "$BIN/TetherCLI" "$APP/Contents/Helpers/tether"
@@ -35,19 +36,25 @@ p.write_bytes(plistlib.dumps(info, sort_keys=False))
 PY
 cp Resources/local.tether.helper.plist Resources/local.tether.watchdog.plist Resources/tether-watchdog.sh Resources/tether-recovery-lock.sh \
   Resources/install-helper.sh Resources/uninstall-helper.sh "$APP/Contents/Resources/"
-mkdir -p "$APP/Contents/Resources/Onboarding"
-cp Resources/Onboarding/connected.png Resources/Onboarding/disconnected.png Resources/Onboarding/motion-preview.mp4 \
-  "$APP/Contents/Resources/Onboarding/"
 # Compile both the flat icon and Liquid Glass catalog for the source runtime minimum.
 # Info.plist names both representations "AppIcon".
 MIN_MACOS=$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' Resources/Info.plist)
-xcrun actool Resources/AppIcon.icon --compile "$APP/Contents/Resources" --platform macosx \
-  --minimum-deployment-target "$MIN_MACOS" --app-icon AppIcon --output-partial-info-plist build/icon-info.plist \
-  --output-format human-readable-text >/dev/null
+xcrun actool "$PWD/Resources/AppIcon.icon" --compile "$PWD/$APP/Contents/Resources" --platform macosx \
+  --minimum-deployment-target "$MIN_MACOS" --app-icon AppIcon --output-partial-info-plist "$PWD/build/icon-info.plist" \
+  --output-format human-readable-text
+if [ ! -s "$APP/Contents/Resources/AppIcon.icns" ] || [ ! -s "$APP/Contents/Resources/Assets.car" ]; then
+  echo 'Icon Composer did not produce both app icon files.' >&2
+  exit 1
+fi
 # Strings live in code (English and Korean); these tell macOS which languages the app speaks.
 for lang in en ko; do mkdir -p "$APP/Contents/Resources/$lang.lproj"; done
 # Required system-action metadata is extracted before signing; failure aborts packaging.
 ./scripts/extract-app-intents.sh "$APP" Release
+# The compiler's debug map includes local build paths. Keep it in the build
+# products and omit it from the binaries that will be signed and distributed.
+for executable in MacOS/Tether Helpers/tether Resources/tether-helper Resources/tether-power-recovery; do
+  xcrun strip -S "$APP/Contents/$executable"
+done
 python3 scripts/check-platform.py "$APP"
 
 # Extended attributes (com.apple.provenance and the like) would ride along into the release zip.

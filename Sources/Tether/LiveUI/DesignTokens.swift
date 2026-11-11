@@ -1,13 +1,16 @@
 import SwiftUI
 
-/// Compact desktop typography; controls still use their native intrinsic sizes.
+/// Comfortable desktop reading scale; controls retain their native intrinsic sizes.
 enum TetherTypography {
-    static let bodySize: CGFloat = 12
-    static let secondarySize: CGFloat = 11
-    static let sectionSize: CGFloat = 12
-    static let statusSize: CGFloat = 13
-    static let pageSize: CGFloat = 14
-    static let countdownSize: CGFloat = 17
+    static let bodySize: CGFloat = 14
+    static let secondarySize: CGFloat = 12
+    static let sectionSize: CGFloat = 14
+    static let statusSize: CGFloat = 17
+    static let pageSize: CGFloat = 19
+    static let countdownSize: CGFloat = 28
+    static let settingsBodySize: CGFloat = 14
+    static let settingsSecondarySize: CGFloat = 12
+    static let settingsSectionSize: CGFloat = 15
 
     static let body = Font.system(size: bodySize)
     static let secondary = Font.system(size: secondarySize)
@@ -15,6 +18,21 @@ enum TetherTypography {
     static let status = Font.system(size: statusSize, weight: .semibold)
     static let page = Font.system(size: pageSize, weight: .semibold)
     static let countdown = Font.system(size: countdownSize, weight: .medium)
+    static let settingsBody = Font.system(size: settingsBodySize)
+    static let settingsSecondary = Font.system(size: settingsSecondarySize)
+    static let settingsSection = Font.system(size: settingsSectionSize, weight: .semibold)
+}
+
+/// Settings and menu panels share the same hierarchy with distinct reading roles.
+private struct TetherSettingsStyleKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var tetherSettingsStyle: Bool {
+        get { self[TetherSettingsStyleKey.self] }
+        set { self[TetherSettingsStyleKey.self] = newValue }
+    }
 }
 
 /// Approved graphite + blue palette. The native window/popover still owns its
@@ -22,6 +40,8 @@ enum TetherTypography {
 enum TetherPalette {
     static let accent = adaptive("TetherBlueInk", light: 0x175CB0, dark: 0x76ADFF)
     static let action = adaptive("TetherBlueAction", light: 0x1762BD, dark: 0x1762BD)
+    /// Small supporting text stays readable on the intentionally opaque body.
+    static let secondary = adaptive("TetherSecondaryInk", light: 0x59616E, dark: 0xB5BAC5)
 
     private static func adaptive(_ name: String, light: UInt32, dark: UInt32) -> NSColor {
         NSColor(name: NSColor.Name(name)) { appearance in
@@ -38,7 +58,7 @@ extension Color {
     static let tetherBackground = Color(nsColor: .windowBackgroundColor)
     static let tetherControlSurface = Color(nsColor: .controlBackgroundColor)
     static let tetherPrimary = Color.primary
-    static let tetherSecondary = Color(nsColor: .secondaryLabelColor)
+    static let tetherSecondary = Color(nsColor: TetherPalette.secondary)
     static let tetherChrome = Color(nsColor: .windowBackgroundColor)
     static let tetherControlBorder = Color(nsColor: .separatorColor)
     static let tetherDivider = Color(nsColor: .separatorColor)

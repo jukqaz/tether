@@ -10,6 +10,7 @@ description: Review and refine Tether's macOS menu and settings design by combin
 ## 기준과 범위
 
 - 사용자 요청과 현재 제품 계약을 먼저 따르고, macOS HIG·native 동작을 외부의 일반 스타일 취향보다 우선한다. 기존 스타일 변경이 승인되지 않았다면 현재 정보 구조·문구·아이콘·색상 방향을 보존한다.
+- 현재 계약은 Liquid Glass 제외, 불투명 시스템 표면, Graphite+Blue, 380pt 메뉴, 네 설정 페이지, 14pt 본문·12pt 보조다. 외부 기준의 새 수치·스타일 제안은 승인값으로 승격하지 않는다.
 - macOS 26 이상 Apple Silicon 앱이다. 모바일의 16px 본문·44pt 터치 영역이나 웹 폰트·CSS 규칙을 컴팩트한 Mac 메뉴에 일괄 적용하지 않는다. 정확한 현재 수치는 DESIGN.md와 공유 토큰에서 읽는다.
 - 디자인 작업에서 전원·보호 정책이나 시스템 잠금 설정을 바꾸지 않는다. 설치·실제 전원 시험·배포는 별도 요청 범위다. 상태를 작게 만들기 위해 중요한 경고·잠금 제약·분리 결과를 숨기지 않는다.
 - native 접근성 이름·역할·키보드 포커스는 유지한다. 사용자 결정에 따라 VoiceOver 전용 튜닝·시험은 새 완료 조건으로 추가하지 않는다.
@@ -20,7 +21,7 @@ description: Review and refine Tether's macOS menu and settings design by combin
 |---|---|---|
 | 실제 사용 흐름·우선순위·중복 검수 | 사용 가능한 Product Design Audit + Computer Use | 화면·상태에 연결한 문제와 사용자 영향 |
 | 글자 위계·간격·정렬·밀도·표현 정리 | [외부 디자인 기준](references/external-criteria.md)의 Impeccable·UI UX Pro Max·frontend-design | 우선 수정할 시각적 문제와 구체적 변경 |
-| SwiftUI 구성·재질·탐색·상태 보존 검토 | 사용 가능한 macOS Liquid Glass·SwiftUI Patterns 및 외부 SwiftUI Expert 기준 | 해당 macOS 버전의 구현 근거 |
+| SwiftUI 구성·탐색·상태 보존 검토 | 사용 가능한 macOS SwiftUI Patterns 및 외부 SwiftUI Expert 기준 | 불투명 시스템 표면과 native 컨트롤의 구현 근거 |
 | 변경 후 시안·앱 대조 | 기존 캡처·컴포넌트와 Computer Use, 필요한 회귀 검사 | 같은 후보의 변경 결과와 남은 검증 |
 
 현재 세션에서 실제 제공하는 스킬 목록을 확인하고 해당 역할이 필요한 스킬만 읽는다. 특정 플러그인의 워크플로를 사용할 때는 그 스킬의 선행 지침을 따른다. 외부 원본을 설치·실행했다고 추정하지 않는다. 출처 링크를 열어 검토하는 것과 설치된 스킬 호출은 구분한다.
@@ -41,7 +42,7 @@ description: Review and refine Tether's macOS menu and settings design by combin
 
 - 메뉴의 주 상태·전원 분리 결과·시작/종료/일시 중지 범위가 모순되지 않는지 확인한다.
 - 설정의 제목·탭과 본문 스크롤이 분리되는지, 탭 왕복·창 재열기에 선택·펼침·사용자 크기가 보존되는지 확인한다.
-- Liquid Glass는 실제 지원되는 native 표면에서 확인한다. offscreen 렌더의 불투명 대체 표면으로 실제 재질을 통과시키지 않는다. 읽기 표면·재질·포커스를 꾸미기 위해 전역 시스템 동작을 억제하지 않는다.
+- 현재 계약에 따라 Liquid Glass·사용자 정의 blur를 추가하지 않는다. 읽기 표면·컨트롤·포커스를 꾸미기 위해 전역 시스템 동작을 억제하지 않는다. HTML 시안의 표면과 포커스는 native 구현 검증으로 계산하지 않는다.
 - pointer hover·click과 keyboard focus를 구분한다. 마우스 진입의 불필요한 링을 없앤다는 이유로 키보드 포커스 자체를 숨기지 않는다.
 - 표시 축약 뒤에도 준비·복구·보호 재개·기록 종료 등 현재 필요한 해결 조작을 찾을 수 있어야 한다.
 

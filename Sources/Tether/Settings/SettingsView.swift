@@ -1,7 +1,7 @@
 import SwiftUI
 import TetherCore
 
-/// macOS owns sidebar selection, toolbar material and scroll-edge treatment.
+/// Native navigation owns selection; opaque surfaces keep the reading area stable.
 /// Page and disclosure selections remain presentation state of this window.
 struct SettingsView: View {
     @ObservedObject var model: AppModel
@@ -27,6 +27,7 @@ struct SettingsView: View {
                 ActivityReviewView(model: model, sample: model.userCommandsArePreview || model.developmentService,
                     presentationOrigin: model.activityReviewPresentationOrigin)
             }
+            .environment(\.tetherSettingsStyle, true)
     }
 }
 
@@ -47,11 +48,11 @@ struct SettingsNavigation: View {
             List(SettingsPage.allCases, selection: $selection) { page in
                 Label {
                     Text(page.shortTitle)
-                        .font(.system(size: 12))
+                        .font(TetherTypography.settingsBody)
                         .fixedSize(horizontal: false, vertical: true)
                 } icon: {
                     Image(systemName: page.symbol)
-                        .font(.system(size: 13))
+                        .font(.system(size: 18))
                         .foregroundStyle(.secondary)
                 }
                 .tag(page)
@@ -59,13 +60,35 @@ struct SettingsNavigation: View {
                 .accessibilityIdentifier("settings-tab-\(page.rawValue)")
             }
             .listStyle(.sidebar)
+            .scrollContentBackground(.hidden)
+            .environment(\.defaultMinListRowHeight, 44)
             .toolbar(removing: .sidebarToggle)
-            .navigationSplitViewColumnWidth(min: 148, ideal: 160, max: 190)
+            .navigationSplitViewColumnWidth(min: 176, ideal: 190, max: 220)
+            .background(Color(nsColor: .windowBackgroundColor))
             .accessibilityIdentifier("settings-sidebar")
         } detail: {
             model.settingsPage.page(model: model, disclosures: $disclosures)
                 .accessibilityIdentifier("settings-page-\(model.settingsPage.rawValue)")
-                .navigationTitle(model.settingsPage.title)
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(model.settingsPage.title).font(TetherTypography.page)
+                            .foregroundStyle(Color.tetherPrimary)
+                            .accessibilityAddTraits(.isHeader)
+                            .accessibilityIdentifier("settings-page-heading")
+                        Text(model.settingsPage.subtitle).font(TetherTypography.settingsSecondary)
+                            .foregroundStyle(Color.tetherSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: SettingsMetrics.contentWidth, alignment: .leading)
+                    .padding(.horizontal, SettingsMetrics.gutter)
+                    .padding(.top, 22).padding(.bottom, 18)
+                    .frame(maxWidth: .infinity)
+                    .background(Color(nsColor: .windowBackgroundColor))
+                }
+                // A stable reading surface belongs to the detail pane only;
+                // the native sidebar and titlebar retain their own materials.
+                .background(Color(nsColor: .windowBackgroundColor))
+                .navigationTitle(L("Tether Settings", "Tether 환경설정"))
                 // An opaque toolbar prevents scrolled text ghosting behind the title.
                 .toolbarBackground(Color(nsColor: .windowBackgroundColor), for: .windowToolbar)
                 .toolbarBackground(.visible, for: .windowToolbar)
@@ -107,7 +130,15 @@ struct SettingsNavigation: View {
 /// Presentation state belongs to the settings window, not power preferences.
 /// Standalone page renderers can continue using their local State fallback.
 struct SettingsDisclosureState {
+    var powerDisconnect = true
     var manualBattery = false
+    var manualApplication = false
+    var manualLimitsApplication = false
+    var powerScope = false
+    var protectionBasis = false
+    var appBehavior = false
+    var notifications = false
+    var appAdvanced = false
     var workRules = false
     var protectionAlerts = false
     var protectionRules = false
@@ -120,6 +151,9 @@ struct SettingsDisclosureState {
     var otherAppRequests = false
     init(expanded: Bool = false) {
         manualBattery = expanded; workRules = expanded; protectionAlerts = expanded; protectionRules = expanded
+        manualApplication = expanded; manualLimitsApplication = expanded; powerScope = expanded
+        protectionBasis = expanded; appBehavior = expanded
+        notifications = expanded; appAdvanced = expanded
         diagnostics = expanded; updates = expanded; helper = expanded
         automaticConnections = expanded; closedLidDisplay = expanded
         usageStatistics = expanded; otherAppRequests = expanded
@@ -133,7 +167,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .safety: L("Power & Lid", "전원·덮개")
-        case .general: L("Manual", "직접 유지")
+        case .general: L("Manual", "수동 유지")
         case .protection: L("Protection & Diagnostics", "보호·진단")
         case .system: L("General", "일반")
         }
@@ -212,7 +246,6 @@ struct SettingsWindowBridge: NSViewRepresentable {
                     DispatchQueue.main.async { [weak window] in
                         guard let window else { return }
                         Self.configureChrome(window, allowsResizing: resize, minimumSize: contentMinimum)
-                        Self.migrateCompactGeometry(window, allowsResizing: resize)
                     }
                     Self.showInDock(true)
                 }
@@ -230,7 +263,6 @@ struct SettingsWindowBridge: NSViewRepresentable {
                     DispatchQueue.main.async { [weak window] in
                         guard let window, window.isVisible else { return }
                         Self.configureChrome(window, allowsResizing: true, minimumSize: contentMinimum)
-                        Self.migrateCompactGeometry(window, allowsResizing: true)
                     }
                 })
             }
@@ -243,7 +275,6 @@ struct SettingsWindowBridge: NSViewRepresentable {
             DispatchQueue.main.async { [weak window] in
                 guard let window else { return }
                 Self.configureChrome(window, allowsResizing: resize, minimumSize: contentMinimum)
-                Self.migrateCompactGeometry(window, allowsResizing: resize)
                 // Native hosting may focus its first switch before any keyboard
                 // input. Clear only the initial mouse/startup selection; later
                 // Tab navigation, page changes and reactivation keep their focus.
@@ -253,25 +284,6 @@ struct SettingsWindowBridge: NSViewRepresentable {
 
         static func enableResizing(_ window: NSWindow) {
             if !window.styleMask.contains(.resizable) { window.styleMask.insert(.resizable) }
-        }
-
-        private static func migrateCompactGeometry(_ window: NSWindow, allowsResizing: Bool) {
-            // Settings can restore the previous design's frame instead of the
-            // Scene default. Migrate that presentation once; a later resize or
-            // reopen, including subsequent compact builds, belongs to the user.
-            // Fixtures, Preview and unmarked source bundles never write it.
-            guard allowsResizing, window.isVisible,
-                  Bundle.main.bundleIdentifier == "io.github.jukqaz.tether",
-                  let design = Bundle.main.object(forInfoDictionaryKey: "TetherDesignRevision") as? String,
-                  design.hasPrefix("2026-10-13-compact-approved")
-                    || design.hasPrefix("2026-10-14-compact")
-                    || design.hasPrefix("2026-10-15-v4-compact-approved") else { return }
-            let key = "settingsWindowGeometryRevision"
-            let revision = "2026-10-15-v4-compact-tabs-560x448"
-            let defaults = UserDefaults.standard
-            guard defaults.string(forKey: key) != revision else { return }
-            window.setContentSize(WorkSessionMetrics.settingsMinimum)
-            defaults.set(revision, forKey: key)
         }
 
         private static func configureChrome(_ window: NSWindow, allowsResizing: Bool, minimumSize: CGSize) {

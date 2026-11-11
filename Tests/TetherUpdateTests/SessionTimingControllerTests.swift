@@ -54,8 +54,6 @@ final class SessionTimingControllerTests: XCTestCase {
             XCTAssertEqual(subject.status.manualContinuousDeadline, deadline)
             XCTAssertFalse(subject.extend(duration: 3600))
             XCTAssertFalse(subject.rescheduleManual(duration: 3600))
-            XCTAssertFalse(model.finishManualSession(after: 60))
-            XCTAssertFalse(model.scheduleManualSession(until: Date().addingTimeInterval(3600), replacing: true))
             XCTAssertEqual(subject.status.manualContinuousDeadline, deadline)
             XCTAssertTrue(subject.extend(duration: 900))
             XCTAssertEqual(subject.status.manualContinuousDeadline, deadline + 900)
@@ -74,18 +72,21 @@ final class SessionTimingControllerTests: XCTestCase {
         try await MainActor.run {
             let defaults = TimingDefaults()
             var wall = Date()
+            let now = 512.0.nextDown.nextDown
             let subject = UserSessionController(defaults: defaults, backend: TimingAssertion(),
-                guiProbe: nil, environmentProbe: nil, boot: "fixture", wallClock: { wall })
+                guiProbe: nil, environmentProbe: nil, boot: "fixture", wallClock: { wall },
+                continuousClock: { now })
             defer { _ = subject.end() }
-            let now = ContinuousTime.now
             subject.update(power: .ac, thermal: 0, fullWake: true, controllingUser: true, now: now)
             let model = AppModel(preview: true,
                 capabilities: MacCapabilities(supportedPlatform: true, internalBattery: false, lid: false),
                 previewSession: subject, previewDefaults: defaults)
             XCTAssertTrue(subject.start(duration: 900, now: now))
             let deadline = try XCTUnwrap(subject.status.manualContinuousDeadline)
+            XCTAssertGreaterThan(deadline - (now + 120), 780, "Exercise clock subtraction rounding above the boundary")
             XCTAssertEqual(model.manualRemaining(at: wall, continuousNow: now + 120), 780)
             XCTAssertEqual(model.manualCountdown(at: wall, continuousNow: now + 120), "13:00")
+            XCTAssertEqual(model.manualCountdown(at: wall, continuousNow: now + 119.75), "13:01")
             wall = wall.addingTimeInterval(3600)
             subject.update(power: .ac, thermal: 0, fullWake: true, controllingUser: true, now: now + 120)
             XCTAssertEqual(subject.status.manualContinuousDeadline, deadline)
@@ -129,19 +130,4 @@ final class SessionTimingControllerTests: XCTestCase {
         }
     }
 
-    func testRetiredEndTimeEntryPointsCannotStartARequest() async {
-        await MainActor.run {
-            let defaults = TimingDefaults(), backend = TimingAssertion()
-            let subject = UserSessionController(defaults: defaults, backend: backend, guiProbe: nil, environmentProbe: nil, boot: "fixture")
-            defer { _ = subject.end() }
-            subject.update(power: .ac, thermal: 0, fullWake: true, controllingUser: true, now: ContinuousTime.now)
-            let model = AppModel(preview: true,
-                capabilities: MacCapabilities(supportedPlatform: true, internalBattery: false, lid: false),
-                previewSession: subject, previewDefaults: defaults)
-            XCTAssertEqual(model.manualSchedulingMaximum(forActive: false), 0)
-            XCTAssertFalse(model.scheduleManualSession(until: Date().addingTimeInterval(3600), replacing: false))
-            XCTAssertFalse(model.finishManualSession(after: 15))
-            XCTAssertFalse(model.manualSessionActive); XCTAssertEqual(backend.creates, 0)
-        }
-    }
 }

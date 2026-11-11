@@ -28,7 +28,21 @@ final class ShellTerminationTests: XCTestCase {
     }
 
     func testClosedOutputPipeDoesNotMistakeLiveProcessForExit() {
-        let result = Shell.run("/bin/sh", ["-c", "exec 1>&- 2>&-; trap '' TERM; while :; do :; done"], timeout: 0.05)
+        let ready = FileManager.default.temporaryDirectory.appendingPathComponent("tether-shell-ready-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: ready) }
+        // Report readiness out of band, after the TERM handler and closed pipes are in place.
+        let writer = #"trap '' TERM; exec 1>&- 2>&-; : > "$1" || exit 1; while :; do :; done"#
+        let result = Shell.run("/bin/sh", ["-c", writer, "tether-test", ready.path], timeout: 0.05,
+                               didStart: { pid in
+            let deadline = ContinuousTime.now + 3
+            while !FileManager.default.fileExists(atPath: ready.path) {
+                guard ContinuousTime.now < deadline, !ProcessIdentity.exited(pid: pid) else { return false }
+                usleep(1_000)
+            }
+            return true
+        })
+        XCTAssertTrue(FileManager.default.fileExists(atPath: ready.path), "The live child must close its output before timeout handling")
+        XCTAssertTrue(result.timedOut)
         XCTAssertEqual(result.status, 124); XCTAssertEqual(result.exitStatus, SIGKILL)
         XCTAssertTrue(result.terminationConfirmed)
         XCTAssertTrue(ProcessIdentity.exited(pid: result.processID!))

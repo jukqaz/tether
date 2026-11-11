@@ -8,7 +8,7 @@ import TetherCore
 ///     Tether --render-preview out.png [dark] [--sample] [--hold]
 ///     Tether --render-settings out.png general|safety|system [dark] [--sample] [--narrow] [--english]
 ///     Tether --render-settings out.png general dark --desktop|--hardware-unavailable
-///     Tether --render-welcome out.png [dark] [--desktop] [--english]
+///     Tether --render-welcome out.png [dark] [--desktop] [--english] [--sample] [--prepared-lid]
 ///     Tether --render-menubar out.png [--1x]
 ///     Tether --render-manual-controls out.png dark [--manual] [--timed] [--battery]
 ///     Tether --render-preview out.png --sample --prepared-lid --display-on [--paused|--protection]
@@ -63,7 +63,7 @@ enum PreviewRenderer {
                 DiagnosticControls(model: idleModel(arguments: args))
             }.padding(20).frame(width: 640).background(Color(nsColor: .windowBackgroundColor)), to: out, dark: dark)
         } else if let out = path(after: "--render-manual-controls") {
-            let defaults = RenderSessionDefaults()
+            let defaults = PreviewDefaults()
             let work = UserSessionController(defaults: defaults, backend: RenderSessionBackend(), displayBackend: RenderSessionBackend(),
                 guiProbe: nil, environmentProbe: nil, boot: "render-only")
             let power: PowerSource = args.contains("--battery") ? .battery : .ac
@@ -80,7 +80,7 @@ enum PreviewRenderer {
             render(ManualSessionControls(model: model, clock: model.clock, compact: true)
                 .padding(18).frame(width: 368).background(Color(nsColor: .windowBackgroundColor)), to: out, dark: dark)
         } else if let out = path(after: "--render-recent") {
-            let defaults = RenderSessionDefaults()
+            let defaults = PreviewDefaults()
             let work = UserSessionController(defaults: defaults, backend: RenderSessionBackend(), displayBackend: RenderSessionBackend(),
                 guiProbe: nil, environmentProbe: nil, boot: "render-only")
             work.update(power: .ac, thermal: 0, fullWake: true, controllingUser: true,
@@ -115,16 +115,17 @@ enum PreviewRenderer {
             }
             model.settingsPage = page
             let minimum = WorkSessionMetrics.settingsMinimum
+            let standard = WorkSessionMetrics.settingsDefault
             render(SettingsView(model: model, screenshot: true, expandedDetails: args.contains("--expanded"))
                 .environment(\.tetherSettingsScrollToEnd, args.contains("--scroll-end"))
-                .frame(width: args.contains("--wide") ? 1240 : args.contains("--narrow") ? minimum.width : 920,
-                       height: args.contains("--narrow") ? minimum.height : 700), to: out, dark: dark)
+                .frame(width: args.contains("--wide") ? 1240 : args.contains("--narrow") ? minimum.width : standard.width,
+                       height: args.contains("--narrow") ? minimum.height : standard.height), to: out, dark: dark)
 
         } else if let out = path(after: "--render-welcome") {
             let hardware: MacCapabilities = args.contains("--desktop")
                 ? .init(supportedPlatform: true, internalBattery: false, lid: false)
                 : .init(supportedPlatform: true, internalBattery: true, lid: true)
-            let model = idleModel(arguments: args, capabilities: hardware)
+            let model = makeModel(arguments: args, sample: sample, idle: !sample, capabilities: hardware)
             defer { _ = model.userSession?.end() }
             render(WelcomePreview(model: model), to: out, dark: dark)
         } else if let out = path(after: "--render-preview") {
@@ -132,7 +133,8 @@ enum PreviewRenderer {
                 ? sampleModel(arguments: args)
                 : idleModel(arguments: args)
             defer { _ = model.userSession?.end() }
-            render(TetherPanel(model: model, expandedDetails: args.contains("--expanded")).background(.regularMaterial), to: out, dark: dark)
+            render(TetherPanel(model: model, expandedDetails: args.contains("--expanded"),
+                expandedPowerDetails: args.contains("--power-expanded")).background(Color.tetherBackground), to: out, dark: dark)
         } else {
             return false
         }
@@ -151,7 +153,7 @@ enum PreviewRenderer {
 
     private static func makeModel(arguments: [String], sample: Bool, idle: Bool,
                                   capabilities: MacCapabilities? = nil) -> AppModel {
-        let defaults = RenderSessionDefaults()
+        let defaults = PreviewDefaults()
         let work = UserSessionController(defaults: defaults, backend: RenderSessionBackend(),
             displayBackend: RenderSessionBackend(), guiProbe: nil, environmentProbe: nil, boot: "render-only")
         let battery = arguments.contains("--hold") || arguments.contains("--battery")
@@ -188,7 +190,13 @@ enum PreviewRenderer {
                 guard let helper else { throw ServiceFailure("renderOnly") }
                 return try helper.perform(request)
             }, previewHelperReply: helper?.reply(), previewDefaults: defaults,
-            previewHelperFiles: helper == nil ? nil : { [] })
+            previewHelperFiles: helper == nil ? nil : { [] },
+            previewPowerBattery: PowerBatterySample.monitor(scenario: {
+                if let index = arguments.firstIndex(of: "--power-state"), index + 1 < arguments.count {
+                    return arguments[index + 1]
+                }
+                return battery ? "discharging" : "charging"
+            }()))
         if helper != nil {
             FileHandle.standardError.write(Data("Render-only simulated helper; no installed helper, OS assertion or physical lid behavior is verified.\n".utf8))
         }
@@ -258,28 +266,6 @@ enum PreviewRenderer {
         func level(id: UInt32) -> Int? { 255 }
         func release(id: UInt32) -> Int32 { 0 }
     }
-    private final class RenderSessionDefaults: UserDefaults {
-        private var values: [String: Any] = [:]
-        private var registered: [String: Any] = [:]
-        override func object(forKey key: String) -> Any? { values[key] ?? registered[key] }
-        override func set(_ value: Any?, forKey key: String) { values[key] = value }
-        override func set(_ value: Bool, forKey key: String) { values[key] = value }
-        override func set(_ value: Int, forKey key: String) { values[key] = value }
-        override func set(_ value: Float, forKey key: String) { values[key] = value }
-        override func set(_ value: Double, forKey key: String) { values[key] = value }
-        override func removeObject(forKey key: String) { values.removeValue(forKey: key) }
-        override func register(defaults: [String: Any]) { registered.merge(defaults) { _, new in new } }
-        override func string(forKey key: String) -> String? { object(forKey: key) as? String }
-        override func data(forKey key: String) -> Data? { object(forKey: key) as? Data }
-        override func bool(forKey key: String) -> Bool { object(forKey: key) as? Bool ?? false }
-        override func integer(forKey key: String) -> Int { object(forKey: key) as? Int ?? 0 }
-        override func double(forKey key: String) -> Double { object(forKey: key) as? Double ?? 0 }
-        override func persistentDomain(forName name: String) -> [String: Any]? { values }
-        override func setPersistentDomain(_ domain: [String: Any], forName name: String) { values = domain }
-        override func removePersistentDomain(forName name: String) { values.removeAll() }
-        override func synchronize() -> Bool { true }
-    }
-
     /// Ordered states: automatic, off, manual, protection, error, pending, macOS-managed.
     /// Every sample has the same 18x20pt canvas, on light and dark bars.
     private static func renderMenuBar(to path: String, scale: CGFloat) {
@@ -328,7 +314,7 @@ enum PreviewRenderer {
 
     /// Hosts the panel in an offscreen window and caches its display, so real AppKit controls
     /// (switches, progress bars, menus) are drawn, unlike ImageRenderer.
-    private static func render<V: View>(_ view: V, to path: String, dark: Bool) {
+    static func render<V: View>(_ view: V, to path: String, dark: Bool) {
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)
         let contrast = CommandLine.arguments.contains("--high-contrast")

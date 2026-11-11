@@ -2,9 +2,7 @@
 
 A menu-bar app for keeping Apple Silicon Macs working, with optional closed-lid support on MacBooks. [한국어 안내](README.ko.md)
 
-**Product direction: simple and reliable.** [The feature specification](docs/PRODUCT-SPEC.ko.md) is the single source for scope and defaults. [The document index](docs/README.md) separates current requirements, UI/copy, acceptance plans and historical evidence. The existing source candidate described below does not yet implement every newly specified brightness or compact statistics/diagnostics view.
-
-**Local candidate58 · macOS26+ · P0 power, termination and recovery update.** This ad-hoc signed development candidate has not replaced the installed app or been published. [Current implementation and evidence](../../outputs/tether-p0-implementation-20261021/RESULT.ko.md). The complete V5 extension catalog is not yet implemented.
+Requires an Apple Silicon Mac running macOS 26 or later. See [release notes](CHANGELOG.md) for changes and the [feature specification](docs/PRODUCT-SPEC.ko.md) for options and defaults.
 
 ## Features
 
@@ -16,7 +14,7 @@ A menu-bar app for keeping Apple Silicon Macs working, with optional closed-lid 
 - Advanced automatic triggers can observe selected apps, processes and structured AC task events. Process-bound manual work and `tether run` are no longer provided.
 - Optional timer-end notifications and once-per-request expiry warnings (OFF by default). Updates are explicitly installed, with the existing restoration and safe-replacement checks.
 - Global hotkeys, rule rehearsal, settings history/rollback and after-work update reservations have been removed to keep the app focused on sleep prevention.
-- Compact menu and three Settings tabs, collapsed advanced details, optional display-idle prevention and bounded local diagnostics. Desktop Macs skip helper installation and hide lid/battery options.
+- One menu and four Settings pages: Power & Lid, Manual Keep-awake, Protection & Diagnostics, and General. Advanced editors, optional display-idle prevention and bounded local diagnostics remain available from their owning pages. Desktop Macs skip helper installation and hide lid/battery options.
 
 Display-idle prevention does not promise unlocked display-off operation, defeat manual locking or change macOS password policy. No automatic unlock, fake input, fan/charging control or guaranteed wake from cable attachment. CPU/transfer conditions are experimental; unverified media/partial-download inference and widgets/Controls remain staged.
 
@@ -24,13 +22,9 @@ Display-idle prevention does not promise unlocked display-off operation, defeat 
 
 ## Validation and installation
 
-Current source, isolated integration, live bounded IOKit and native UI results are reported separately in [the P0 evidence report](../../outputs/tether-p0-implementation-20261021/RESULT.ko.md). Installation and physical testing are deferred. UI authorization/AX errors are not counted as passing results. [Earlier V4 records](docs/IMPLEMENTATION-V4-20261015.ko.md) remain historical evidence for their original artifacts.
+General keep-awake works without the administrator helper. To use a MacBook with the lid closed, open the lid and prepare the helper in **Settings → Power & Lid**. Automatic start and closed-lid permission are separate choices.
 
-Physical lid/cable/Sleep/Wake, authenticated remote/display setups, macOS26 hardware and long-term behavior are separate gates. Simulated observations and request acknowledgements do not prove actual Sleep.
-
-General keep-awake work needs no administrator helper. On a MacBook, selecting closed-lid support requires the current helper and normal macOS approval with the lid open. Authentication alone enables neither automatic nor lid work. Desktop Macs require no lid helper. Distribution/update acceptance remains deferred.
-
-[Published releases](https://github.com/jukqaz/tether/releases) · [Installation](docs/INSTALL-AND-TEST.ko.md) · [Release procedure](docs/RELEASING.ko.md)
+[Published releases](https://github.com/jukqaz/tether/releases) · [Installation](docs/INSTALL-AND-TEST.ko.md) · [Validation checklist](docs/VALIDATION-CHECKLIST.ko.md) · [Release procedure](docs/RELEASING.ko.md)
 
 ## Build and test
 
@@ -43,8 +37,10 @@ CLANG_MODULE_CACHE_PATH="$PWD/.build/p0-module-cache" \
 
 The native assertion checks own only their test requests and do not put the Mac to sleep. Helper tests use isolated sensor/power fixtures. `sh scripts/build-preview.sh` builds an unprivileged dry-run UI preview, with separate preferences and no production power writes.
 
-[DESIGN.md](DESIGN.md) defines the current palette, Liquid Glass controls, native components, spacing and input behavior for the shipping Settings and menu panel. Follow it when changing UI, and use [automated testing](docs/AUTOMATED-TESTING.ko.md) and [the design review](docs/DESIGN-REVIEW.ko.md) to distinguish source tests, shared-Scene UI tests, installation inspection and physical acceptance. Dated mockups and earlier validation totals are reference history, not the current design or acceptance result.
+[DESIGN.md](DESIGN.md) defines the current palette, standard macOS bordered controls, opaque reading surfaces, spacing and input behavior for Settings and the menu panel. Custom Liquid Glass effects are not used. Follow it when changing UI, and use [automated testing](docs/AUTOMATED-TESTING.ko.md) and [the design review](docs/DESIGN-REVIEW.ko.md) to distinguish source tests, shared-Scene UI tests, installation inspection and physical acceptance. Dated mockups and earlier validation totals are reference history, not the current design or acceptance result.
 
 CLI session commands use a running app of the same version. Examples include `condition ac`, `manual unlimited`, `manual 30m`, `manual +15m`/`+30m`, `manual off`, structured `task` events, `hold`, `sleep`, `doctor`, `diagnose` and `displays`. Removed `run` and `manual --pid` commands are rejected before execution. Extensions and power changes never bypass the request's captured scope or battery ceiling. Use `tether --help` for exact syntax.
+
+General → Advanced Integrations → Command-line Control provides copyable commands and URLs from the running app's bundled CLI. Notifications are edited inline in General; importing settings still requires review and saves inactive preset copies. Quitting ends Tether keep-awake and restores its power and display changes while retaining saved preferences.
 
 Previous records remain in [the changelog](docs/CHANGELOG.ko.md); they are not acceptance evidence for this candidate.

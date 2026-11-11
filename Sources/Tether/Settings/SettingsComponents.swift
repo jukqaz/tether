@@ -1,20 +1,6 @@
 import SwiftUI
 import TetherCore
 
-/// A System Settings style icon: a white symbol on a coloured rounded square.
-struct SidebarIcon: View {
-    let symbol: String
-    let color: Color
-
-    var body: some View {
-        Image(systemName: symbol)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(.white)
-            .frame(width: 22, height: 22)
-            .background(color.gradient, in: .rect(cornerRadius: 6, style: .continuous))
-    }
-}
-
 struct Page<Content: View>: View {
     @ViewBuilder var content: Content
 
@@ -26,13 +12,13 @@ struct Page<Content: View>: View {
 
 /// One content column for headings and scroll content, including wide windows.
 enum SettingsMetrics {
-    static let contentWidth: CGFloat = 520
-    static let gutter: CGFloat = 16
-    static let sectionSpacing: CGFloat = 12
+    static let contentWidth: CGFloat = 620
+    static let gutter: CGFloat = 24
+    static let sectionSpacing: CGFloat = 22
     static let cardInset: CGFloat = 12
-    static let rowHeight: CGFloat = 22
-    static let rowSpacing: CGFloat = 6
-    static let controlWidth: CGFloat = 190
+    static let rowHeight: CGFloat = 48
+    static let rowSpacing: CGFloat = 12
+    static let controlWidth: CGFloat = 240
     static let conditionWidth: CGFloat = 190
 
     /// Keep the scroll viewport as wide as its toolbar. Only the readable
@@ -47,6 +33,7 @@ enum SettingsMetrics {
 struct SettingsForm<Content: View>: View {
     @ViewBuilder var content: Content
     @Environment(\.tetherSettingsScrollToEnd) private var scrollToEnd
+    @Environment(\.tetherSettingsStyle) private var settingsStyle
 
     var body: some View {
         ScrollView {
@@ -55,7 +42,7 @@ struct SettingsForm<Content: View>: View {
                 .padding(SettingsMetrics.gutter)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .font(TetherTypography.body)
+        .font(settingsStyle ? TetherTypography.settingsBody : TetherTypography.body)
         .toggleStyle(.checkbox)
         .controlSize(.small)
         .defaultScrollAnchor(scrollToEnd ? .bottom : .top)
@@ -98,12 +85,13 @@ struct PageHeading: View {
     let title: String
     let subtitle: String
     var compact = false
+    @Environment(\.tetherSettingsStyle) private var settingsStyle
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title).font(TetherTypography.page)
                 .foregroundStyle(Color.tetherPrimary)
             if !compact {
-                Text(subtitle).font(TetherTypography.secondary).lineSpacing(2).foregroundStyle(Color.tetherSecondary)
+                Text(subtitle).font(settingsStyle ? TetherTypography.settingsSecondary : TetherTypography.secondary).lineSpacing(2).foregroundStyle(Color.tetherSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -119,6 +107,7 @@ struct SettingsSection<Content: View>: View {
     let symbol: String
     var footer: String? = nil
     @ViewBuilder var content: Content
+    @Environment(\.tetherSettingsStyle) private var settingsStyle
     var body: some View {
         Section {
             content
@@ -126,7 +115,7 @@ struct SettingsSection<Content: View>: View {
             SettingsSectionHeading(title: title, symbol: symbol)
         } footer: {
             if let footer {
-                Text(footer).font(TetherTypography.secondary)
+                Text(footer).font(settingsStyle ? TetherTypography.settingsSecondary : TetherTypography.secondary)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -137,22 +126,45 @@ struct SettingsSection<Content: View>: View {
 /// Flat section headings and dividers keep dense utility settings legible.
 struct SettingsContentGroup<Content: View>: View {
     let title: String
+    var summary: String? = nil
+    var summaryIdentifier: String? = nil
     @ViewBuilder var content: Content
+    @Environment(\.tetherSettingsStyle) private var settingsStyle
 
-    init(_ title: String, @ViewBuilder content: () -> Content) {
+    init(_ title: String, summary: String? = nil, summaryIdentifier: String? = nil,
+         @ViewBuilder content: () -> Content) {
         self.title = title
+        self.summary = summary
+        self.summaryIdentifier = summaryIdentifier
         self.content = content()
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(TetherTypography.section)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityAddTraits(.isHeader)
+        VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
+            HStack(alignment: .firstTextBaseline, spacing: 16) {
+                Text(title).font(settingsStyle ? TetherTypography.settingsSection : TetherTypography.section)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+                if let summary {
+                    Spacer(minLength: 8)
+                    if let summaryIdentifier {
+                        summaryText(summary).accessibilityIdentifier(summaryIdentifier)
+                    } else {
+                        summaryText(summary)
+                    }
+                }
+            }
             content
             Divider().padding(.top, 6)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func summaryText(_ text: String) -> some View {
+        Text(text).font(settingsStyle ? TetherTypography.settingsSecondary : TetherTypography.secondary)
+            .foregroundStyle(Color.tetherSecondary)
+            .multilineTextAlignment(.trailing)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 
@@ -162,12 +174,13 @@ struct SettingsDisclosure<Content: View>: View {
     @Binding var isExpanded: Bool
     var groupsSection = true
     @ViewBuilder var content: Content
+    @Environment(\.tetherSettingsStyle) private var settingsStyle
 
     @ViewBuilder var body: some View {
         if groupsSection {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 disclosure
-                Divider().padding(.top, 6)
+                Divider()
             }
         } else {
             disclosure
@@ -176,28 +189,45 @@ struct SettingsDisclosure<Content: View>: View {
 
     private var disclosure: some View {
         DisclosureGroup(isExpanded: $isExpanded) {
-            VStack(alignment: .leading, spacing: 6) { content }.padding(.top, 6).padding(.bottom, 2)
+            VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) { content }
+                .padding(.leading, 12).padding(.top, 8).padding(.bottom, 2)
         } label: {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text(title).font(TetherTypography.body)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 8)
-                if let summary {
-                    Text(summary).font(TetherTypography.secondary)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.trailing)
-                        .fixedSize(horizontal: false, vertical: true)
+            Group {
+                if let summary, !isExpanded {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .firstTextBaseline, spacing: 12) {
+                            titleText.fixedSize()
+                            Spacer(minLength: 8)
+                            summaryText(summary).fixedSize()
+                        }
+                        VStack(alignment: .leading, spacing: 4) {
+                            titleText.fixedSize(horizontal: false, vertical: true)
+                            summaryText(summary).fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                } else {
+                    titleText.fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .frame(minHeight: SettingsMetrics.rowHeight)
+            .frame(maxWidth: .infinity, minHeight: SettingsMetrics.rowHeight, alignment: .leading)
         }
         .accessibilityElement(children: .contain)
+    }
+
+    private var titleText: some View {
+        Text(title).font(settingsStyle ? TetherTypography.settingsBody : TetherTypography.body)
+    }
+
+    private func summaryText(_ text: String) -> some View {
+        Text(text).font(settingsStyle ? TetherTypography.settingsSecondary : TetherTypography.secondary)
+            .foregroundStyle(Color.tetherSecondary)
     }
 }
 
 private struct SettingsSectionHeading: View {
     let title: String
     let symbol: String
+    @Environment(\.tetherSettingsStyle) private var settingsStyle
 
     var body: some View {
         Label {
@@ -206,7 +236,7 @@ private struct SettingsSectionHeading: View {
             Image(systemName: symbol).foregroundStyle(.secondary)
                 .accessibilityHidden(true)
         }
-        .font(TetherTypography.section)
+        .font(settingsStyle ? TetherTypography.settingsSection : TetherTypography.section)
         .foregroundStyle(Color.tetherPrimary)
         .accessibilityAddTraits(.isHeader)
         .accessibilityLabel(title)
@@ -237,21 +267,22 @@ struct SettingRow<Content: View>: View {
     var detail: String? = nil
     var showsAccessibleTitle = true
     @ViewBuilder var content: Content
+    @Environment(\.tetherSettingsStyle) private var settingsStyle
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ViewThatFits(in: .horizontal) {
                 // Keep aligned value columns while allowing long translations
                 // to fall back to a vertical row instead of clipping.
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    Text(title).font(TetherTypography.body).fixedSize()
+                    Text(title).font(settingsStyle ? TetherTypography.settingsBody : TetherTypography.body).fixedSize()
                         .accessibilityHidden(!showsAccessibleTitle)
                     Spacer(minLength: 0)
-                    content.frame(width: SettingsMetrics.controlWidth, alignment: .trailing)
+                    content.frame(minWidth: SettingsMetrics.controlWidth, alignment: .trailing)
                         .fixedSize(horizontal: true, vertical: true)
                         .multilineTextAlignment(.trailing)
                 }
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(title).font(TetherTypography.body)
+                    Text(title).font(settingsStyle ? TetherTypography.settingsBody : TetherTypography.body)
                         .lineSpacing(2)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityHidden(!showsAccessibleTitle)
@@ -271,9 +302,10 @@ struct StatusBadge: View {
     let text: String
     var color: Color = .tetherSecondary
     var symbol: String = "circle.fill"
+    @Environment(\.tetherSettingsStyle) private var settingsStyle
     var body: some View {
         Label(text, systemImage: symbol)
-            .font(TetherTypography.secondary.weight(.medium))
+            .font((settingsStyle ? TetherTypography.settingsSecondary : TetherTypography.secondary).weight(.medium))
             .foregroundStyle(color)
             .padding(.horizontal, 9).padding(.vertical, 5)
             .background(color.opacity(0.10), in: .capsule)
@@ -289,12 +321,25 @@ struct SettingsToggle: View {
     var hint: String? = nil
     @Binding var isOn: Bool
     var identifier: String? = nil
+    var detailIdentifier: String? = nil
+    @Environment(\.tetherSettingsStyle) private var settingsStyle
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            identifiedToggle
-                .frame(maxWidth: .infinity, minHeight: SettingsMetrics.rowHeight, alignment: .leading)
-            if let detail { Note(detail).padding(.leading, 18) }
+        HStack(alignment: .center, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title).font(settingsStyle ? TetherTypography.settingsBody : TetherTypography.body)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let detail {
+                    if let detailIdentifier {
+                        Note(detail).accessibilityIdentifier(detailIdentifier)
+                    } else {
+                        Note(detail)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            identifiedToggle.fixedSize()
         }
+        .frame(maxWidth: .infinity, minHeight: SettingsMetrics.rowHeight, alignment: .leading)
     }
 
     @ViewBuilder private var identifiedToggle: some View {
@@ -303,8 +348,8 @@ struct SettingsToggle: View {
     }
 
     private var nativeToggle: some View {
-        Toggle(title, isOn: $isOn).toggleStyle(.checkbox)
-            .font(TetherTypography.body)
+        Toggle(title, isOn: $isOn).labelsHidden().toggleStyle(.switch).controlSize(.regular)
+            .font(settingsStyle ? TetherTypography.settingsBody : TetherTypography.body)
             .accessibilityLabel(title)
             .accessibilityHint(hint ?? detail ?? "")
     }
@@ -315,11 +360,12 @@ struct Reading: View {
     let value: String
     let symbol: String
     var color: Color = .primary
+    @Environment(\.tetherSettingsStyle) private var settingsStyle
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Label { Text(title).fixedSize(horizontal: false, vertical: true) } icon: {
                 Image(systemName: symbol).frame(width: 16).accessibilityHidden(true)
-            }.font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
+            }.font(settingsStyle ? TetherTypography.settingsSecondary : TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
             Text(value).font(TetherTypography.countdown)
                 .monospacedDigit().foregroundStyle(color)
                 .fixedSize(horizontal: false, vertical: true)
@@ -333,12 +379,13 @@ struct Reading: View {
 
 /// Noninteractive identity for the isolated build, not a toolbar action.
 struct PreviewIndicator: View {
+    @Environment(\.tetherSettingsStyle) private var settingsStyle
     var body: some View {
         Label(L("Preview", "미리보기"), systemImage: "eye")
             // Window toolbars default labels to icon-only. This is an identity
             // warning, so its text must remain visible in every host.
             .labelStyle(.titleAndIcon)
-            .font(TetherTypography.secondary.weight(.medium))
+            .font((settingsStyle ? TetherTypography.settingsSecondary : TetherTypography.secondary).weight(.medium))
             .foregroundStyle(Color.tetherSecondary)
             .fixedSize()
             .help(L("Simulated sensors and sleep requests; no system power changes.",
@@ -350,11 +397,12 @@ struct PreviewIndicator: View {
 }
 
 struct PreviewNotice: View {
+    @Environment(\.tetherSettingsStyle) private var settingsStyle
     // Store the translated value so a language change also invalidates this leaf.
     private let text = L("Preview · simulated sensors and sleep requests", "미리보기 · 기기 상태와 절전 요청은 모의값입니다")
     var body: some View {
         Label(text, systemImage: "testtube.2")
-            .font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
+            .font(settingsStyle ? TetherTypography.settingsSecondary : TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
             .fixedSize(horizontal: false, vertical: true)
     }
 }
@@ -364,6 +412,7 @@ struct PreviewNotice: View {
 struct InfoButton: View {
     let text: String
     @State private var shown = false
+    @Environment(\.tetherSettingsStyle) private var settingsStyle
 
     init(_ text: String) { self.text = text }
 
@@ -378,7 +427,7 @@ struct InfoButton: View {
         .accessibilityHint(L("Open an explanation", "설명 창을 엽니다"))
         .popover(isPresented: $shown, arrowEdge: .bottom) {
             VStack(alignment: .leading, spacing: 12) {
-                Text(text).font(TetherTypography.secondary).fixedSize(horizontal: false, vertical: true)
+                Text(text).font(settingsStyle ? TetherTypography.settingsSecondary : TetherTypography.secondary).fixedSize(horizontal: false, vertical: true)
                 HStack {
                     Spacer()
                     Button(L("Close", "닫기")) { shown = false }.keyboardShortcut(.cancelAction)
@@ -412,6 +461,7 @@ struct InfoLabel: View {
 struct Note: View {
     let text: String
     let color: Color
+    @Environment(\.tetherSettingsStyle) private var settingsStyle
 
     init(_ text: String, color: Color = .tetherSecondary) {
         self.text = text
@@ -420,8 +470,8 @@ struct Note: View {
 
     var body: some View {
         Text(text)
-            .font(TetherTypography.secondary)
-            .lineSpacing(1)
+            .font(settingsStyle ? TetherTypography.settingsSecondary : TetherTypography.secondary)
+            .lineSpacing(settingsStyle ? 2 : 1)
             .foregroundStyle(color)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -432,6 +482,7 @@ struct Note: View {
 struct DisplaySleepNotice: View {
     @ObservedObject var model: AppModel
     var showsReview = true
+    @Environment(\.tetherSettingsStyle) private var settingsStyle
 
     var body: some View {
         if let status = model.displaySleepStatus {
@@ -439,7 +490,7 @@ struct DisplaySleepNotice: View {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(alignment: .top, spacing: 10) {
                     Label(model.displaySleepSummary ?? status.summary, systemImage: needsReview ? "display.trianglebadge.exclamationmark" : "display")
-                        .font(TetherTypography.secondary)
+                        .font(settingsStyle ? TetherTypography.settingsSecondary : TetherTypography.secondary)
                         .foregroundStyle(needsReview ? Color.tetherWarning : Color.tetherSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .help(L("This is a macOS observation or a request status, not a measurement of panel power.",
@@ -447,13 +498,13 @@ struct DisplaySleepNotice: View {
                     Spacer(minLength: 0)
                     if showsReview && needsReview {
                         Button(L("Review…", "점검하기…")) { model.presentActivityReview() }
-                            .buttonStyle(.borderless).font(TetherTypography.secondary.weight(.medium)).fixedSize()
+                            .buttonStyle(.borderless).font((settingsStyle ? TetherTypography.settingsSecondary : TetherTypography.secondary).weight(.medium)).fixedSize()
                             .accessibilityLabel(L("Review display sleep status", "디스플레이 절전 상태 점검"))
                     }
                 }
                 if model.displaySleepDetail != nil || status.phase == .deferred || status.phase == .unavailable {
-                    Text(model.displaySleepDetail ?? L("Work and session time limits continue.", "작업 유지와 세션 시간 한도는 계속 적용됩니다."))
-                        .font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
+                    Text(model.displaySleepDetail ?? L("Keep-awake and its time limits continue.", "작업 유지와 시간 한도는 계속 적용됩니다."))
+                        .font(settingsStyle ? TetherTypography.settingsSecondary : TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -495,9 +546,10 @@ func temperatureSummary(_ stats: TempStats) -> String {
 /// A fixed behavior contract remains readable above secondary explanations.
 struct PolicyNote: View {
     let text: String
+    @Environment(\.tetherSettingsStyle) private var settingsStyle
     init(_ text: String) { self.text = text }
     var body: some View {
-        Text(text).font(TetherTypography.body).foregroundStyle(Color.tetherSecondary)
+        Text(text).font(settingsStyle ? TetherTypography.settingsBody : TetherTypography.body).foregroundStyle(Color.tetherSecondary)
             .fixedSize(horizontal: false, vertical: true)
     }
 }

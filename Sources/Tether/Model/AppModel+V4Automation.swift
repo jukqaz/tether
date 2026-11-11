@@ -50,12 +50,12 @@ extension AppModel {
         case .startManual:
             guard !v4ManualApprovalPending, !manualSessionActive else {
                 return reply(.rejected, L("A manual request already exists or is being checked. Its deadline was kept.",
-                                          "이미 수동 유지가 있거나 확인 중입니다. 기존 마감을 보존했습니다."))
+                                          "이미 수동 유지가 있거나 확인 중입니다. 기존 종료 시각을 보존했습니다."))
             }
             let duration = useSavedDuration ? (selectedManualMinutes == 0 ? nil : selectedManualMinutes) : minutes
             if !useSavedDuration, let duration, ![5, 10, 15, 30, 60, 120].contains(duration) {
-                return reply(.limited, L("Choose 5, 10, 15, 30, 60, 120 minutes or Unlimited on AC.",
-                                         "5·10·15·30·60·120분 또는 AC 무제한을 선택하세요."))
+                return reply(.limited, L("Choose 5, 10, 15, 30, 60, 120 minutes, or Until ended while connected to power.",
+                                         "5·10·15·30·60·120분을 선택하거나, 전원 연결 중에는 종료할 때까지를 선택하세요."))
             }
             startManualSession(minutes: duration)
             guard let controller = userSession, let requestID = controller.manualRequestID else {

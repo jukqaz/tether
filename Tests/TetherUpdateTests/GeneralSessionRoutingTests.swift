@@ -171,7 +171,7 @@ final class GeneralSessionRoutingTests: XCTestCase {
     @MainActor
     private func withFixture(_ body: (UserDefaults, GeneralSessionAssertionFixture) throws -> Void) rethrows {
         let suite = "tether-general-routing-" + UUID().uuidString
-        let defaults = UserDefaults(suiteName: suite)!
+        let defaults = TestMemoryDefaults(domain: suite)
         defer { defaults.removePersistentDomain(forName: suite) }
         try body(defaults, GeneralSessionAssertionFixture())
     }

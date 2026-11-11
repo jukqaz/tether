@@ -6,6 +6,7 @@ lock, installed service or remote application settings are changed.
 """
 import argparse
 import json
+import math
 import os
 from pathlib import Path
 import selectors
@@ -13,7 +14,7 @@ import signal
 import subprocess
 import time
 
-EXPECTED_HEALTH_TTL = 30
+EXPECTED_HEALTH_TTL = 15
 
 
 def run(fixture, output):
@@ -62,8 +63,11 @@ def run(fixture, output):
         if not line:
             raise RuntimeError("Native driver exited before confirming its lease")
         lease = json.loads(line)
-        if lease["pid"] != child.pid or lease["healthTTL"] != EXPECTED_HEALTH_TTL:
-            raise RuntimeError("Unexpected production lease contract")
+        interval = lease["expiry"] - lease["started"]
+        if (lease["pid"] != child.pid or lease["healthTTL"] != EXPECTED_HEALTH_TTL
+                or not math.isclose(interval, EXPECTED_HEALTH_TTL, rel_tol=0, abs_tol=1e-6)):
+            raise RuntimeError("The reported native lease must belong to the fixture and span exactly "
+                               f"{EXPECTED_HEALTH_TTL} seconds")
         (output / "lease.json").write_text(json.dumps(lease, indent=2) + "\n")
         foreign = subprocess.Popen(["/usr/bin/caffeinate", "-i", "-t", str(EXPECTED_HEALTH_TTL + 35)])
         prepared_until = time.monotonic() + 3
@@ -97,7 +101,8 @@ def run(fixture, output):
             raise RuntimeError("The native request stayed active beyond the observation deadline")
         if last_active < lease["expiry"] - 2:
             raise RuntimeError("No active observation near the actual timeout; timing is unverified")
-        report = {"passed": True, "scope": "production idle driver with an explicit 30-second health lease and observed OS timeout on this host",
+        report = {"passed": True, "scope": (f"production idle driver with an explicit {EXPECTED_HEALTH_TTL}-second "
+                            "health lease and observed OS timeout on this host"),
                   "child_pid": child.pid, "child_alive_at_expiry": child.poll() is None,
                   "foreign_pid": foreign.pid, "foreign_alive_and_active_at_expiry": True,
                   "lease": lease, "last_active": last_active, "first_inactive": absent,

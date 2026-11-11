@@ -24,7 +24,7 @@ final class AutomaticPauseUITests: XCTestCase {
             XCTAssertFalse(model.automaticWorkReasonActive)
             XCTAssertNil(TetherPanel(model: model).automaticStartWaitingDetail)
             XCTAssertEqual(model.manualEndingDetail, language == .english
-                ? "Ending manual work keeps automatic starts resting." : "수동 종료는 자동 쉬기를 해제하지 않습니다.")
+                ? "Ending manual keep-awake leaves automatic starts paused." : "수동 유지를 종료해도 자동 유지 일시 중지는 유지됩니다.")
             let summary = AutomaticPauseControls(model: model).pauseSummary
             XCTAssertTrue(summary.contains(Texts.time(try XCTUnwrap(model.automaticPauseUntil))))
             XCTAssertTrue(model.resumeAutomatic())
@@ -42,11 +42,11 @@ final class AutomaticPauseUITests: XCTestCase {
         defer { _ = model.userSession?.end() }
         XCTAssertTrue(model.automaticPauseActive)
         XCTAssertNil(model.automaticPauseUntil)
-        XCTAssertEqual(model.presentation.title, "Automatic starts resting")
+        XCTAssertEqual(model.presentation.title, "Automatic starts are paused")
         XCTAssertTrue(AutomaticPauseControls(model: model).pauseSummary.contains("until you resume"))
         model.setEnabled(false)
         XCTAssertTrue(model.workPaused)
-        XCTAssertNotEqual(model.presentation.title, "Automatic starts resting")
+        XCTAssertNotEqual(model.presentation.title, "Automatic starts are paused")
         _ = model.resumeAutomatic()
         XCTAssertTrue(model.workPaused, "Resume automatic must never clear Stop all")
         XCTAssertFalse(model.workSessionHolding)
@@ -68,7 +68,7 @@ final class AutomaticPauseUITests: XCTestCase {
                     let panel = NSHostingView(rootView: TetherPanel(model: model, maximumHeight: 360)
                         .environment(\.colorScheme, dark ? .dark : .light)
                         .environment(\.tetherReduceTransparencyOverride, true))
-                    XCTAssertEqual(panel.fittingSize.width, 304, accuracy: 0.5)
+                    XCTAssertEqual(panel.fittingSize.width, WorkSessionMetrics.panelWidth, accuracy: 0.5)
                     XCTAssertLessThanOrEqual(panel.fittingSize.height, 360.5)
                     model.settingsPage = .safety
                     let settings = NSHostingView(rootView: SettingsView(model: model, screenshot: true)

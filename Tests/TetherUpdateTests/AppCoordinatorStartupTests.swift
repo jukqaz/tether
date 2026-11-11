@@ -16,7 +16,7 @@ final class AppCoordinatorStartupTests: XCTestCase {
         let directory = URL(fileURLWithPath: "/tmp").appendingPathComponent("tether-app-lease-" + UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
         let name = "TetherStartupTests." + UUID().uuidString
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        let defaults = TestMemoryDefaults(domain: name)
         defer { defaults.removePersistentDomain(forName: name); try? FileManager.default.removeItem(at: directory) }
         try await body(directory, defaults, StartupAssertionFixture(), name)
     }

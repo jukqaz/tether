@@ -1,8 +1,8 @@
 import Foundation
 
 public enum TetherPaths {
-    public static let version = "2026.10.1"
-    public static let build = 58
+    public static let version = "2026.11.1"
+    public static let build = 59
     public static let supportDirectory = "/Library/Application Support/Tether"
     public static let controlPath = supportDirectory + "/control.json"
     public static let productionSocket = supportDirectory + "/service.sock"

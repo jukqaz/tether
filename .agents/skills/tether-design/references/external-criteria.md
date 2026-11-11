@@ -1,13 +1,13 @@
 # Tether 외부 디자인 참고 기준
 
-확인일: 2026-10-14. 외부 원문에서 Tether에 필요한 판단 기준만 직접 요약했다.
+최초 확인일: 2026-10-14. 최신 적용 확인일: 2026-11-11. 외부 원문에서 Tether에 필요한 판단 기준만 직접 요약했다.
 이 문서는 참고 체크리스트이며, 원문 전체 설치·외부 스크립트 실행·훅 추가를 요구하지 않는다.
 
 ## 우선순위와 적용 범위
 
 - 현재 시각 디자인 계약은 저장소 루트 `DESIGN.md`를 따른다. 기능 의미는 해당 소스·제품 문서와 대조하며 디자인 검토에서 바꾸지 않는다.
-- macOS 26 이상 SwiftUI 메뉴바 앱, SF 시스템 글꼴, Graphite+Blue, 컴팩트한 메뉴·설정 밀도를 유지한다.
-- 시스템 재질·컨트롤·창·포커스 구현은 기존 macOS Liquid Glass·SwiftUI Patterns 기준으로 판단한다.
+- macOS 26 이상 SwiftUI 메뉴바 앱, SF 시스템 글꼴, Graphite+Blue, 380pt 메뉴, 네 설정 페이지, 14pt 본문·12pt 보조를 유지한다. 정확한 역할별 수치는 `DESIGN.md`를 따른다.
+- 사용자 최신 결정에 따라 Liquid Glass·사용자 정의 blur를 제외한다. 불투명 시스템 표면·일반 native 컨트롤·창·포커스 구현은 macOS HIG·SwiftUI Patterns 기준으로 판단한다.
 - 화면 문제와 우선순위는 기존 Product Design Audit, 시안 비교는 Ideate, 실제 조작·캡처는 Computer Use에 맡긴다.
 - 외부 체크리스트는 위 산출물에서 남은 문제를 좁히는 데 사용하고 별도 중복 감사 절차를 만들지 않는다.
 - VoiceOver 전용 기능·낭독·검증은 이번 범위에 추가하지 않는다. 기존 컨트롤의 이름·의미·상태는 보존한다.
@@ -15,6 +15,8 @@
 - 모바일 44pt 터치 타깃, 웹 16px 본문·CSS·GSAP·반응형 breakpoint를 macOS 치수·구현 규칙으로 강제하지 않는다.
 
 ## 고정 출처
+
+아래 SHA는 최초 검토 당시의 근거로 보존한다. 현재 제품 계약과 충돌하는 과거 재질·치수 권고를 다시 적용하지 않는다.
 
 | 참고 원본 | 확인한 버전과 역할 |
 |---|---|
@@ -25,6 +27,26 @@
 
 [Impeccable](https://github.com/pbakaus/impeccable/blob/2f98774f86bc05563876643db37e6c37c322850f/LICENSE)·[Anthropic frontend-design](https://github.com/anthropics/skills/blob/41bbe19d1a1a7eaab5e7bb9050a417e5c6cffc8f/skills/frontend-design/LICENSE.txt) 원문은 Apache-2.0, [UI UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill/blob/7246805992a42b7bba37d4cac83b01416f0c6c44/LICENSE)·[SwiftUI Expert](https://github.com/AvdLee/SwiftUI-Agent-Skill/blob/204dba7c67256a8b707ee3fbc5759a824191974f/LICENSE) 원문은 MIT다.
 원문을 재배포하거나 수정 배포할 때는 해당 저장소의 라이선스·고지 조건을 별도로 유지한다.
+
+## 2026-11-11 재확인과 이번 적용
+
+| 현재 참고 원본 | 이번에 가져온 판단 기준과 한계 |
+|---|---|
+| Apple HIG [Settings](https://developer.apple.com/design/human-interface-guidelines/settings), [Layout](https://developer.apple.com/design/human-interface-guidelines/layout) | 관련 설정의 그룹화, 제목·값·컨트롤의 관계와 정렬, 읽는 순서. Tether의 저장·적용 범위와 고정 치수는 제품 계약을 따른다. |
+| Apple HIG [Typography](https://developer.apple.com/design/human-interface-guidelines/typography), [Disclosure controls](https://developer.apple.com/design/human-interface-guidelines/disclosure-controls) | 읽기 쉬운 서체 위계, 필요한 상세의 단계적 공개, 펼침 동작과 내용 계층의 일치. 새 글자 크기나 기본 펼침 정책을 일괄 도입하지 않는다. |
+| [Impeccable 현재 README](https://github.com/pbakaus/impeccable) | `typeset`·`layout`·`distill`·`clarify`·`polish`·`harden`의 글자·배치·문구·마감 관점을 참고한다. 웹 중심 규칙을 macOS 수치로 옮기지 않고 외부 CLI·엔진·hook을 설치하거나 실행하지 않는다. |
+| [UI UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) | 현재 SwiftUI 항목은 iOS 계열로 분류된다. 대비·문구·피드백의 문제별 참고로만 사용하고 모바일 치수·탐색 관례를 Mac에 일괄 적용하지 않는다. |
+
+이번 개선의 적용 대상은 비교 시안과 이 검수 가이드다. 앱 소스·설치본·전원 정책의 변경이나 native 동작의 검증 완료를 뜻하지 않는다. 아래 항목은 기존 계약을 더 명확하게 표현하기 위한 검수이며 새 토큰값·동작·기본값의 승인이 아니다.
+
+- [ ] **허용과 실제 상태:** 저장된 허용과 현재 적용 결과를 가까이 놓되 각각 이름 붙인다. 허용 스위치를 실제 실행 성공 표시로 사용하지 않는다.
+- [ ] **저장·적용 범위:** 즉시 저장과 명시적 `적용`을 구분하고, 현재 유지·다음 시작 중 어디에 영향을 주는지 관련 조작 가까이 표시한다. 긴 안내를 접어도 필요한 범위 요약은 남긴다.
+- [ ] **주요·보조 조작:** 현재 상태에서 필요한 시작·종료·재개를 먼저 찾게 하고 설정·진단·추가 안내는 보조 위계로 둔다. 종료·전체 중지처럼 범위가 다른 조작은 합치지 않는다.
+- [ ] **선택값과 기준선:** 제목·현재 선택·설명·컨트롤의 열과 기준선을 맞춘다. 긴 한국어·영어는 줄바꿈·세로 배치를 사용하고 컨트롤의 고유 폭을 보존한다.
+- [ ] **중복 문구:** 상단 상태·섹션 제목·배지·상세에 같은 사실을 반복하지 않는다. 중복을 줄여도 보호 이유·도우미 준비·복구 조작은 필요한 위치에 남긴다.
+- [ ] **첫 진입과 키보드 포커스:** 마우스 첫 진입의 불필요한 강조와 키보드 탐색의 포커스를 구분한다. 시안의 hover·선택 표시를 native 포커스 동작으로 보고하지 않는다.
+- [ ] **KO/EN과 색 대비:** 같은 상태의 한국어·영어, 밝음·어두움에서 핵심 문구·의미 색·선택 표시를 확인한다. 대비 계산은 실제 화면 가독성·native 조작 검증과 구분한다.
+- [ ] **헤더·펼침·스크롤:** 페이지 제목과 현재 선택 요약을 일관되게 배치하고 펼친 상세의 제목·화살표·내용을 대응시킨다. 접힘 상태의 필수 경고와 본문 끝의 조작을 가리지 않는다.
 
 ## Impeccable: 글자와 배치
 

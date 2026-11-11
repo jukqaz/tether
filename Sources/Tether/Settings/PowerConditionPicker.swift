@@ -37,9 +37,9 @@ struct PowerConditionPicker: View {
     }
     private func detail(_ condition: PowerCondition) -> String {
         switch condition {
-        case .ac: L("Automatic work requires AC. Unplugging also applies the end policy selected in Keep awake.", "자동 유지는 AC에서만 시작합니다. 전원 분리 시 잠자기 방지에서 선택한 종료 규칙도 적용합니다.")
-        case .battery: L("The automatic session ends when power is connected.", "전원을 연결하면 자동 유지는 끝납니다.")
-        case .any: L("Automatic work can start on either source. A policy that ends work on unplug still takes priority; original battery limits remain.", "두 전원에서 자동 시작할 수 있습니다. 전원 분리 시 종료 규칙은 우선 적용하며 최초 배터리 한도도 유지합니다.")
+        case .ac: L("Automatic keep-awake starts only while connected to power. Unplugging also applies the end policy in Power & Lid.", "자동 유지는 전원에 연결했을 때만 시작합니다. 전원을 분리하면 전원·덮개에서 선택한 종료 규칙을 적용합니다.")
+        case .battery: L("Automatic keep-awake ends when power is connected.", "전원을 연결하면 자동 유지는 끝납니다.")
+        case .any: L("Automatic keep-awake can start on either power source. The unplug policy takes priority, and the original battery limits remain.", "두 전원에서 자동 시작할 수 있습니다. 전원 분리 시 종료 규칙은 우선 적용하며 최초 배터리 한도도 유지합니다.")
         }
     }
 }

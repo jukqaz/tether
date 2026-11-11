@@ -134,7 +134,7 @@ extension AppModel {
                 pid != getpid() && PowerProcessIdentity.read(pid)?.executable != TetherPaths.helperPath
             }
         guard !pids.isEmpty else { return nil }
-        return L("Other apps still request keep-awake (\(pids.count))…", "다른 앱의 잠자기 방지 요청 \(pids.count)개…")
+        return L("Requests from \(pids.count) other processes…", "다른 프로세스 \(pids.count)개의 잠자기 방지 요청…")
     }
     func showOtherAppKeepAwakeDetails() {
         settingsPage = .protection

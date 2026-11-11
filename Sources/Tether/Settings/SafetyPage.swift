@@ -1,13 +1,14 @@
 import SwiftUI
 import TetherCore
 
-/// Retains the saved raw page identity while grouping power and automation.
+/// Edits app-wide permissions and event policies; automatic conditions have one editor.
 struct SafetyPage: View {
     @ObservedObject var model: AppModel
     var disclosures: Binding<SettingsDisclosureState>? = nil
-    @State private var showAdvancedRules = false
-    @State private var connectionsExpanded = false
+    @State private var showAutomaticConditions = false
+    @State private var unplugExpanded = true
     @State private var closedLidDisplayExpanded = false
+    @State private var scopeDetailsExpanded = false
 
     var body: some View {
         SettingsForm {
@@ -15,149 +16,207 @@ struct SafetyPage: View {
                 ProblemBanner(problem: problem, model: model, compact: false, embeddedInForm: true)
                     .accessibilityIdentifier("settings-translocation-context")
             }
-            SettingsContentGroup(L("Automatic start", "자동 시작")) {
-                SettingsToggle(title: model.v4Settings.usesAdvancedAutomaticConditions
-                    ? L("Start with selected conditions", "선택한 조건으로 자동 시작")
-                    : L("Start automatically on power", "전원 연결 시 자동 시작"),
+            SettingsContentGroup(L("Automatic keep-awake", "자동 유지"),
+                summary: L("Saves immediately", "즉시 저장"), summaryIdentifier: "settings-power-save-scope") {
+                SettingsToggle(title: L("Allow automatic start", "자동 시작 허용"),
+                    detail: automaticConditionSummary,
                     isOn: Binding(get: { model.automaticEnabled }, set: { model.setAutomaticEnabled($0) }),
-                    identifier: "automatic-ac-toggle")
+                    identifier: "automatic-ac-toggle", detailIdentifier: "settings-automatic-mode-summary")
                     .disabled(settingsControlsDisabled)
-                SettingRow(title: L("Automatic mode", "자동 시작 방식")) {
-                    Text(model.v4Settings.automaticMode == .advanced
-                        ? L("Additional conditions", "추가 조건") : L("Power connection only", "전원 연결만"))
-                        .foregroundStyle(Color.tetherSecondary)
-                }.accessibilityIdentifier("settings-automatic-mode-summary")
-                if model.automaticPauseActive {
-                    Note(L("Automatic starts are paused. Resume from the menu; manual timer deadlines stay unchanged.",
-                           "자동 시작만 쉬는 중입니다. 메뉴에서 재개할 수 있으며 수동 타이머 기한은 바뀌지 않습니다."))
-                        .accessibilityIdentifier("settings-automatic-pause-summary")
-                } else {
-                    Note(model.automaticEnabled
-                        ? model.v4Settings.usesAdvancedAutomaticConditions
-                            ? L("Starts when the selected power range and conditions match, after protection checks.",
-                                "선택한 전원 범위·추가 조건을 만족하고 보호 확인을 마치면 시작합니다.")
-                            : L("Starts on an awake Mac after AC power and protection checks.",
-                                "깨어 있는 Mac에서 전원 연결·보호 상태를 확인한 뒤 시작합니다.")
-                        : L("Automatic start is off. Manual work and saved rules remain available.",
-                            "자동 시작은 꺼져 있습니다. 수동 유지와 저장한 규칙은 그대로 사용할 수 있습니다."))
+                HStack(alignment: .center, spacing: 12) {
+                    Text(automaticStatusSummary)
+                        .font(TetherTypography.settingsBody).foregroundStyle(.primary)
+                        .lineLimit(nil).fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .help(model.automaticStartStateDetail)
+                        .accessibilityIdentifier("settings-automatic-start-state")
+                    CompactPushButton(L("Conditions…", "조건 설정…"),
+                        identifier: "settings-automatic-rules") { showAutomaticConditions = true }
+                        .disabled(settingsControlsDisabled)
                 }
             }
 
-            if model.hasInternalBattery {
-                SettingsContentGroup(L("When Power Is Unplugged", "전원을 빼면")) {
-                    SettingRow(title: L("Existing work", "기존 작업 유지")) {
-                        CompactPopUp(title: L("Unplug policy", "전원 분리 규칙"), selection: Binding(
-                            get: { model.v3Settings.disconnectPolicy }, set: { model.setDisconnectPolicy($0) }), choices: [
-                            PopupChoice(WorkSessionDisconnectPolicy.endAll, L("End all · Recommended", "모두 끝내기 · 권장")),
-                            PopupChoice(.endAutomatic, L("End automatic only", "자동 유지 끝내기")),
-                            PopupChoice(.continueEligible, L("Continue eligible work", "허용된 유지 계속"))
-                        ], identifier: "settings-unplug-policy-control").disabled(settingsControlsDisabled)
-                    }.accessibilityIdentifier("settings-unplug-policy")
-                    Note(model.disconnectPolicyDetail)
-                    if model.showsLidOptions && model.v3Settings.allowClosedLid {
-                        SettingRow(title: L("If the lid is closed", "덮개가 닫혀 있다면"), showsAccessibleTitle: false) {
-                            CompactPopUp(title: L("Unplugged with lid closed", "닫힌 채 전원 분리"), selection: Binding(
-                                get: { model.v3Settings.disconnectAction }, set: { model.setDisconnectAction($0) }), choices: [
-                                PopupChoice(WorkSessionEndAction.sleepIfClosed, L("Request sleep · Recommended", "잠자기 요청 · 권장")),
-                                PopupChoice(.followOS, L("Follow macOS", "macOS에 맡김"))
-                            ], identifier: "closed-lid-disconnect-picker").disabled(settingsControlsDisabled)
+            SettingsContentGroup(L("Power & lid behavior", "전원·덮개 동작")) {
+                if model.hasInternalBattery {
+                    PowerEventSettingsSection(title: L("When power disconnects", "전원을 분리하면"),
+                        outcome: disconnectEventSummary, outcomeIdentifier: "settings-unplug-policy-summary",
+                        isExpanded: unplugExpansion) {
+                        SettingRow(title: L("Existing work", "진행 중인 유지")) {
+                            CompactPopUp(title: L("Unplug policy", "전원 분리 규칙"), selection: Binding(
+                                get: { model.v3Settings.disconnectPolicy }, set: { model.setDisconnectPolicy($0) }), choices: [
+                                PopupChoice(WorkSessionDisconnectPolicy.endAll, L("End all · Recommended", "모두 끝내기 · 권장")),
+                                PopupChoice(.endAutomatic, L("End automatic only", "자동 유지 끝내기")),
+                                PopupChoice(.continueEligible, L("Continue eligible work", "허용된 유지 계속"))
+                            ], identifier: "settings-unplug-policy-control").disabled(settingsControlsDisabled)
+                        }.accessibilityIdentifier("settings-unplug-policy")
+                        Note(disconnectSummary)
+                        if model.showsLidOptions && model.v3Settings.allowClosedLid {
+                            SettingRow(title: L("When the last hold ends with the lid closed", "덮개가 닫힌 채 마지막 유지가 끝나면"), showsAccessibleTitle: false) {
+                                CompactPopUp(title: L("Unplugged with lid closed", "닫힌 채 전원 분리"), selection: Binding(
+                                    get: { model.v3Settings.disconnectAction }, set: { model.setDisconnectAction($0) }), choices: [
+                                    PopupChoice(WorkSessionEndAction.sleepIfClosed, L("Request sleep · Recommended", "잠자기 요청 · 권장")),
+                                    PopupChoice(.followOS, L("Follow macOS", "macOS에 맡김"))
+                                ], identifier: "closed-lid-disconnect-picker").disabled(settingsControlsDisabled)
+                            }
                         }
+                    } status: { EmptyView() }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("settings-unplug-details")
+                }
+
+                if model.showsLidOptions {
+                    PowerEventSettingsSection(title: L("When the lid closes", "덮개를 닫으면"),
+                        outcome: closedLidEventSummary, outcomeIdentifier: "settings-closed-lid-saved-summary",
+                        isExpanded: closedLidDisplayExpansion) {
+                        SettingsToggle(title: WorkPermissionText.lidTitle,
+                            detail: L("Used only during valid keep-awake.", "유효한 유지에만 사용합니다."),
+                            isOn: GeneralPage(model: model).lidBinding, identifier: "closed-lid-allow-toggle")
+                            .disabled(GeneralPage(model: model).lidControlDisabled)
+                        if model.v3Settings.allowClosedLid { closedLidDisplayControls }
+                    } status: { closedLidStatus }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("settings-closed-lid-display-details")
+                } else if showsClosedLidStatus {
+                    VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
+                        Text(L("Closed-lid recovery", "덮개·화면 복구"))
+                            .font(TetherTypography.settingsBody.weight(.medium))
+                        closedLidStatus
+                        if let error = model.coordinatedLidError { Note(error, color: .tetherWarning) }
+                    }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("settings-closed-lid-recovery")
+                }
+                displayPermission
+                SettingsDisclosure(title: L("Display sleep & behavior", "화면 꺼짐과 동작 안내"),
+                    isExpanded: scopeDetailsExpansion, groupsSection: false) {
+                    lockPolicyNote
+                    lockScreenSettingsButton
+                    Note(WorkPermissionText.scopeDetail)
+                        .accessibilityIdentifier("settings-global-permission-scope")
+                    if model.showsLidOptions {
+                        Note(closedLidDisplayExplanation)
+                        if let reason = model.closedLidDisplayAvailabilityReason {
+                            Note(reason).accessibilityIdentifier("settings-closed-lid-display-availability")
+                        }
+                    }
+                    if model.hasInternalBattery, model.showsLidOptions, model.v3Settings.allowClosedLid {
                         Note(disconnectExplanation)
                     }
-                }
-
+                    Note(L("Connecting power may not wake a sleeping Mac. Unavailable conditions never authorize a start. Pausing automatic starts does not change a manual deadline.",
+                           "전원을 연결해도 잠든 Mac이 깨어나지 않을 수 있습니다. 확인되지 않은 조건으로는 시작하지 않으며, 자동 시작을 쉬어도 수동 유지 기한은 바뀌지 않습니다."))
+                }.accessibilityIdentifier("settings-power-scope-details")
             }
-
-            displayAndLidPermissions
-            if model.showsLidOptions { ClosedLidHelperSettingsContent(model: model, disclosures: disclosures) }
-
-            SettingsDisclosure(title: L("Additional Conditions & Presets", "추가 조건과 프리셋"),
-                summary: model.v4Settings.automaticMode == .advanced ? L("Advanced", "고급") : L("Saved", "보존됨"),
-                isExpanded: connectionsExpansion) {
-                VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
-                    Text(model.v4Settings.automaticMode == .advanced ? model.v4RuleSummary
-                        : L("Saved advanced rules are inactive", "저장한 고급 규칙은 사용하지 않는 중"))
-                        .font(TetherTypography.body).foregroundStyle(Color.tetherSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("settings-automatic-condition-summary")
-                    Button(L("Edit advanced rules and presets…", "고급 규칙·프리셋 편집…")) { showAdvancedRules = true }
-                        .actionButton().disabled(settingsControlsDisabled)
-                        .accessibilityIdentifier("settings-automatic-rules")
-                    Note(L("Connecting power cannot be guaranteed to wake a sleeping Mac. Unavailable conditions cannot authorize a start.",
-                           "잠든 Mac을 전원 연결만으로 깨우지는 못할 수 있습니다. 확인하지 못한 조건으로는 시작하지 않습니다."))
-                    Note(L("Changes take effect only after confirmation. Unplug, Stop all and protection still apply.",
-                           "검토 후 적용해야 바뀝니다. 전원 분리·모두 중지·보호 규칙은 그대로 적용됩니다."))
-                    if model.v4Settings.automaticMode == .advanced {
-                        Button(L("Use AC power only", "AC 전원 연결 조건만 사용")) { model.setV4BasicAutomaticMode() }
-                            .buttonStyle(.link).disabled(settingsControlsDisabled)
-                            .accessibilityIdentifier("settings-use-basic-ac-mode")
-                        SettingRow(title: L("Saved advanced power range", "고급 규칙의 저장된 전원 범위")) {
-                            PowerConditionPicker(selection: Binding(get: { model.v3Settings.condition },
-                                set: { model.setPowerCondition($0) }),
-                                choices: model.hasInternalBattery ? PowerCondition.allCases : [.ac])
-                                .disabled(settingsControlsDisabled)
-                                .accessibilityIdentifier("settings-automatic-power-condition")
-                        }
-                    }
-                }
-            }.accessibilityIdentifier("settings-automatic-behavior-details")
+            if model.showsLidOptions { ClosedLidHelperSettingsContent(model: model, disclosures: disclosures, summaryOnly: true) }
         }
-        .sheet(isPresented: $showAdvancedRules) {
-            V4AutomaticRulesView(model: model, startInAdvancedMode: true)
+        .sheet(isPresented: $showAutomaticConditions) {
+            V4AutomaticRulesView(model: model)
         }
     }
 
-    private var displayAndLidPermissions: some View {
-        SettingsContentGroup(L("Display & Lid", "화면과 덮개")) {
-            SettingsToggle(title: L("Allow display keep-awake", "화면 켜두기 허용"),
-                isOn: Binding(get: { model.v3Settings.keepDisplayAwake }, set: { model.setKeepDisplayAwake($0) }),
-                identifier: "keep-display-awake-toggle")
-                .disabled(settingsControlsDisabled)
-            if model.showsLidOptions {
-                SettingsToggle(title: L("Allow closed-lid work", "덮개 유지 허용"),
-                    isOn: GeneralPage(model: model).lidBinding, identifier: "closed-lid-allow-toggle")
-                    .disabled(GeneralPage(model: model).lidControlDisabled)
-                if model.v3Settings.allowClosedLid { closedLidDisplayControls }
-                else {
-                    SettingsDisclosure(title: L("Saved built-in display choice", "저장된 내장 화면 선택"),
-                        summary: closedLidDisplayTitle, isExpanded: closedLidDisplayExpansion, groupsSection: false) {
-                        closedLidDisplayControls
-                    }.accessibilityIdentifier("settings-closed-lid-display-details")
-                }
-                if let status = model.closedLidDisplayStatusText {
-                    Note(status).accessibilityIdentifier("settings-closed-lid-display-status")
-                }
-                if model.closedLidDisplayRecoveryPending {
-                    CompactPushButton(L("Retry brightness restoration", "밝기 복구 다시 시도"),
-                        identifier: "settings-retry-brightness-restoration") { model.retryClosedLidDisplayRecovery() }
-                }
-            }
-            Note(L("Permissions only allow features requested by work; they do not start work.",
-                   "작업이 요청한 기능만 허용합니다. 허용을 켜도 작업이 시작되지는 않습니다."))
-                .accessibilityIdentifier("settings-global-permission-scope")
-            Note(L("Locking and password requirements follow macOS. Tether does not unlock the Mac.",
-                   "잠금·암호 요구는 macOS 설정을 따릅니다. Tether가 잠금을 해제하지는 않습니다."))
-                .accessibilityIdentifier("settings-lock-policy-note")
-            Button(L("Lock Screen settings…", "macOS 잠금 화면 설정…")) { model.open(.lockScreen) }
-                .buttonStyle(.link).disabled(model.userCommandsArePreview || model.developmentService)
-            if let error = model.userSessionStatus?.displayError { Note(error, color: .tetherWarning) }
-        }
-    }
-
-    private var closedLidDisplayControls: some View {
+    private var displayPermission: some View {
         VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
-            SettingRow(title: L("Built-in display when closed", "닫혔을 때 내장 화면")) {
-                CompactPopUp(title: L("Built-in display with the lid closed", "덮개를 닫으면 내장 화면을"), selection: Binding(
-                    get: { model.v3Settings.closedLidDisplayMode }, set: { model.setClosedLidDisplayMode($0) }), choices: [
-                    PopupChoice(ClosedLidDisplayMode.off, L("Turn display off", "화면 끄기")),
-                    PopupChoice(.zeroBrightness, L("Set brightness to zero", "밝기 0으로 낮추기"), enabled: model.canUseZeroBrightness),
-                    PopupChoice(.unchanged, L("Do not change", "변경하지 않기"))
-                ], identifier: "settings-closed-lid-display-mode").disabled(settingsControlsDisabled)
+            SettingsToggle(title: WorkPermissionText.displayTitle,
+                detail: model.displayUsageStatusText,
+                isOn: Binding(get: { model.v3Settings.keepDisplayAwake }, set: { model.setKeepDisplayAwake($0) }),
+                identifier: "keep-display-awake-toggle", detailIdentifier: "settings-display-current-status")
+                .disabled(settingsControlsDisabled)
+            if let error = model.userSessionStatus?.displayError { Note(error, color: .tetherWarning) }
+            if model.userSessionStatus?.ownReleasePending == true || model.userSessionStatus?.displayError != nil {
+                refreshPowerStatusButton(identifier: "settings-refresh-display-status")
             }
-            Note(closedLidDisplayExplanation)
-            if let reason = model.closedLidDisplayAvailabilityReason {
-                Note(reason).accessibilityIdentifier("settings-closed-lid-display-availability")
-            }
+        }
+    }
+
+    @ViewBuilder private var closedLidStatus: some View {
+        Note(model.lidUsageStatusText, color: lidStatusNeedsAttention ? .tetherWarning : .tetherSecondary)
+            .accessibilityIdentifier("settings-lid-current-status")
+        if model.showsLidOptions && !model.helperSetupConfirmed
+            && (model.v3Settings.allowClosedLid || closedLidDisplayExpansion.wrappedValue) {
+            Note(L("Set up the helper below to use the Mac with the lid closed.", "덮개를 닫고 사용하려면 아래에서 도우미를 준비하세요."),
+                 color: model.v3Settings.allowClosedLid ? .tetherWarning : .tetherSecondary)
+                .accessibilityIdentifier("settings-lid-preparation-required")
+        }
+        if let status = model.closedLidDisplayStatusText {
+            Note(status, color: model.closedLidDisplayRecoveryPending ? .tetherWarning : .tetherSecondary)
+                .accessibilityIdentifier("settings-closed-lid-display-status")
+        }
+        if model.v3Settings.closedLidDisplayMode == .zeroBrightness, !model.canUseZeroBrightness,
+           let reason = model.closedLidDisplayAvailabilityReason { Note(reason, color: .tetherWarning) }
+        if model.closedLidDisplayRecoveryPending {
+            CompactPushButton(L("Retry brightness restoration", "밝기 복구 다시 시도"),
+                identifier: "settings-retry-brightness-restoration") { model.retryClosedLidDisplayRecovery() }
+                .disabled(!model.hasCoordinatorAuthority || model.commandPending)
+        }
+        if model.lidReleasePending || (model.snapshot.observedLidClosed == nil
+            && (model.v3Settings.allowClosedLid || closedLidDisplayExpansion.wrappedValue)) {
+            refreshPowerStatusButton(identifier: "settings-refresh-lid-status")
+        }
+    }
+
+    private func refreshPowerStatusButton(identifier: String) -> some View {
+        Button(L("Check status again", "상태 다시 확인")) { model.refresh() }
+            .buttonStyle(.link).disabled(model.commandPending).accessibilityIdentifier(identifier)
+    }
+
+    private var lidStatusNeedsAttention: Bool {
+        model.lidReleasePending
+            || model.userSessionStatus?.ownReleasePending == true
+            || (model.v3Settings.allowClosedLid && (model.snapshot.observedLidClosed == nil || !model.helperSetupConfirmed))
+    }
+    var showsClosedLidStatus: Bool { model.showsLidOptions || model.closedLidDisplayRecoveryPending || model.lidReleasePending }
+    var automaticEventTitle: String {
+        model.v4Settings.usesAdvancedAutomaticConditions
+            ? model.v3Settings.effectiveAutomaticCondition.title : L("Power connected", "전원 연결")
+    }
+    var automaticConditionSummary: String {
+        model.v4Settings.usesAdvancedAutomaticConditions
+            ? L("Advanced · ", "고급 · ") + model.v4RuleSummary + " · " + automaticEventTitle : automaticEventTitle
+    }
+    private var automaticStatusSummary: String {
+        if model.userSessionStatus?.ownReleasePending == true || model.lidReleasePending {
+            return L("Confirming release", "해제 확인 중")
+        }
+        if model.workProtectionReason != nil { return L("Stopped for protection", "보호로 중지됨") }
+        if model.workPaused { return L("All work stopped", "모두 중지됨") }
+        if model.automaticPauseActive { return L("Automatic paused", "자동만 일시 중지됨") }
+        if model.automaticWorkReasonActive, model.workSessionHolding {
+            return L("Automatic keep-awake active", "자동 유지 중")
+        }
+        if !model.automaticEnabled {
+            return model.manualSessionActive && model.workSessionHolding
+                ? L("Automatic off · manual work continues", "자동 꺼짐 · 수동 유지 계속")
+                : L("Automatic start off", "자동 시작 꺼짐")
+        }
+        return L("Waiting for conditions", "조건 대기 중")
+    }
+    private var disconnectEventSummary: String {
+        switch model.v3Settings.disconnectPolicy {
+        case .endAll: L("End all current work", "현재 유지 모두 종료")
+        case .endAutomatic: L("End automatic · eligible manual work continues", "자동 종료 · 허용된 수동 유지 계속")
+        case .continueEligible: L("Continue battery-eligible work only", "배터리 허용 유지 계속")
+        }
+    }
+    private var closedLidEventSummary: String {
+        if model.v3Settings.allowClosedLid { return L("Closed-lid use allowed", "닫고 사용 허용") + " · " + closedLidDisplayTitle }
+        return L("Closed-lid use off · Saved: ", "닫고 사용 꺼짐 · 저장: ") + closedLidDisplayTitle
+    }
+    private var lockPolicyNote: some View {
+        Note(L("Display sleep and zero brightness do not unlock your Mac. Locking and password requirements follow macOS.",
+               "화면 꺼짐과 밝기 0은 잠금 해제가 아닙니다. 잠금·암호 요구는 macOS 설정을 따릅니다."))
+            .accessibilityIdentifier("settings-lock-policy-note")
+    }
+    private var lockScreenSettingsButton: some View {
+        Button(L("Lock Screen settings…", "macOS 잠금 화면 설정…")) { model.open(.lockScreen) }
+            .buttonStyle(.link).disabled(model.userCommandsArePreview || model.developmentService)
+    }
+    private var closedLidDisplayControls: some View {
+        SettingRow(title: L("Built-in display when closed", "덮개를 닫으면 내장 화면을")) {
+            CompactPopUp(title: L("Built-in display with the lid closed", "덮개를 닫으면 내장 화면을"), selection: Binding(
+                get: { model.v3Settings.closedLidDisplayMode }, set: { model.setClosedLidDisplayMode($0) }), choices: [
+                PopupChoice(ClosedLidDisplayMode.off, L("Turn display off", "화면 끄기")),
+                PopupChoice(.zeroBrightness, L("Set brightness to zero", "밝기 0으로 낮추기"), enabled: model.canUseZeroBrightness),
+                PopupChoice(.unchanged, L("Do not change", "변경하지 않기"))
+            ], identifier: "settings-closed-lid-display-mode").disabled(settingsControlsDisabled)
         }
     }
     private var closedLidDisplayTitle: String {
@@ -175,7 +234,15 @@ struct SafetyPage: View {
         }
     }
     private var closedLidDisplayExpansion: Binding<Bool> { disclosures?.closedLidDisplay ?? $closedLidDisplayExpanded }
-
+    var unplugExpansion: Binding<Bool> { disclosures?.powerDisconnect ?? $unplugExpanded }
+    private var scopeDetailsExpansion: Binding<Bool> { disclosures?.powerScope ?? $scopeDetailsExpanded }
+    private var disconnectSummary: String {
+        switch model.v3Settings.disconnectPolicy {
+        case .endAll: L("Start new manual work separately to use the battery.", "배터리에서 사용하려면 새 수동 유지를 시작하세요.")
+        case .endAutomatic: L("Only battery-eligible manual work continues within its original deadline and limit.", "배터리 사용이 허용된 수동 유지만 원래 기한·한도 안에서 계속합니다.")
+        case .continueEligible: L("Only already eligible work continues. Deadlines and battery limits are not reset.", "이미 배터리 사용이 허용된 유지에만 적용됩니다. 기한과 한도는 초기화하지 않습니다.")
+        }
+    }
     var disconnectExplanation: String {
         switch model.v3Settings.disconnectAction {
         case .sleepIfClosed:
@@ -186,7 +253,5 @@ struct SafetyPage: View {
               "마지막 유지가 끝나면 자체 지원을 해제하고 잠자기는 macOS에 맡깁니다. 다른 요청으로 Mac이 계속 깨어 있을 수 있습니다.")
         }
     }
-
     private var settingsControlsDisabled: Bool { !model.acceptingUserCommands || model.commandPending }
-    private var connectionsExpansion: Binding<Bool> { disclosures?.automaticConnections ?? $connectionsExpanded }
 }

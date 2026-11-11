@@ -1,12 +1,31 @@
 import SwiftUI
 import TetherCore
 import AppKit
+/// The editor owns a value draft. Neither opening it nor cancelling writes preferences.
+@MainActor
+struct AutomaticRulesDraft {
+    var settings: V4Settings
+    var powerCondition: PowerCondition
+    private let savedPowerCondition: PowerCondition
+
+    init(settings: V4Settings, powerCondition: PowerCondition) {
+        self.settings = settings
+        self.powerCondition = powerCondition
+        savedPowerCondition = powerCondition
+    }
+
+    func confirm(in model: AppModel) -> Bool {
+        model.saveV4AutomaticRules(settings,
+            powerCondition: powerCondition == savedPowerCondition ? nil : powerCondition,
+            expectedPowerCondition: savedPowerCondition)
+    }
+}
 
 /// Edits persistent choices as a local draft; only the model can validate and apply them.
 struct V4AutomaticRulesView: View {
     @ObservedObject var model: AppModel
     @Environment(\.dismiss) private var dismiss
-    @State private var draft: V4Settings
+    @State private var draft: AutomaticRulesDraft
     @State private var feedback: String?
 
     init(model: AppModel, initialTemplate: V4RuleStarter? = nil, startInAdvancedMode: Bool = false) {
@@ -15,34 +34,47 @@ struct V4AutomaticRulesView: View {
         // Opening an explicitly chosen advanced editor changes only this draft.
         // Providers and runtime settings wait for Confirm and apply.
         if startInAdvancedMode { settings.automaticMode = .advanced }
-        _draft = State(initialValue: initialTemplate?.adding(to: settings,
-            nextManualMinutes: model.selectedManualMinutes == 0 ? nil : model.selectedManualMinutes) ?? settings)
+        _draft = State(initialValue: AutomaticRulesDraft(settings: initialTemplate?.adding(to: settings,
+            nextManualMinutes: model.selectedManualMinutes == 0 ? nil : model.selectedManualMinutes) ?? settings,
+            powerCondition: model.v3Settings.condition))
     }
 
     var body: some View {
         V4FeatureSheet(title: L("Automatic conditions", "자동 조건")) {
-            VStack(alignment: .leading, spacing: 6) {
-                Picker(L("Automatic conditions", "자동 조건"), selection: $draft.automaticMode) {
-                    Text(L("Power condition only", "전원 조건만")).tag(V4AutomaticMode.acConnected)
-                    Text(L("Additional conditions", "추가 조건")).tag(V4AutomaticMode.advanced)
-                }.pickerStyle(.segmented).labelsHidden()
-                    .accessibilityIdentifier("automatic-mode-picker")
-                Text(draft.automaticMode == .acConnected
-                    ? L("Power: AC only", "전원: AC 전용")
-                    : L("Saved advanced power range: \(model.v3Settings.condition.title)", "저장된 고급 전원 범위: \(model.v3Settings.condition.title)"))
-                    .font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
+            SettingsContentGroup(L("Automatic mode", "자동 시작 방식"), summary: L("Confirm to save", "확인 후 저장")) {
+                SettingRow(title: L("Automatic conditions", "자동 조건")) {
+                    CompactPopUp(title: L("Automatic conditions", "자동 조건"), selection: $draft.settings.automaticMode,
+                        choices: [PopupChoice(V4AutomaticMode.acConnected, L("Power connection only", "전원 연결 조건만")),
+                                  PopupChoice(.advanced, L("Additional conditions", "추가 조건"))],
+                        identifier: "automatic-mode-picker")
+                }
+                if draft.settings.automaticMode == .advanced {
+                    SettingRow(title: L("Advanced automatic power scope", "고급 자동 전원 범위")) {
+                        PowerConditionPicker(selection: $draft.powerCondition,
+                            choices: model.hasInternalBattery ? PowerCondition.allCases : [.ac])
+                            .accessibilityIdentifier("settings-automatic-power-condition")
+                    }
+                    Note(L("Changing the range within advanced mode preserves an active request's captured range.",
+                           "같은 고급 방식에서 전원 범위를 바꾸어도 진행 중인 작업은 시작 당시 범위를 유지합니다."))
+                } else {
+                    SettingRow(title: L("Saved advanced power scope", "저장된 고급 전원 범위")) {
+                        Text(draft.powerCondition.title).foregroundStyle(Color.tetherSecondary)
+                    }
+                    Note(L("Power connection only stops advanced evaluation while retaining saved presets.",
+                           "전원 연결 조건만 사용하면 고급 조건 평가는 중단하며 저장된 프리셋은 보존합니다."))
+                }
             }
-            if draft.automaticMode != .advanced || selectedPresetIndex == nil {
+            if draft.settings.automaticMode != .advanced || selectedPresetIndex == nil {
                 starterPresets
             }
-            if draft.automaticMode == .advanced {
+            if draft.settings.automaticMode == .advanced {
                 presetSelection
                 if let index = selectedPresetIndex {
-                    V4PresetEditor(model: model, preset: $draft.presets[index])
+                    V4PresetEditor(model: model, preset: $draft.settings.presets[index])
                 } else {
                     Note(L("Add a preset and its conditions before applying advanced rules.", "고급 조건을 적용하려면 프리셋과 조건을 추가하세요."))
                 }
-                if V4RuleStarter.needsTargetSelection(draft) {
+                if V4RuleStarter.needsTargetSelection(draft.settings) {
                     Note(L("Choose the app or external display before applying this preset.", "이 프리셋을 적용하려면 앱 또는 외장 화면을 선택하세요."), color: .tetherWarning)
                         .accessibilityIdentifier("automatic-target-required")
                 }
@@ -52,13 +84,13 @@ struct V4AutomaticRulesView: View {
                 SettingsToggle(title: L("Allow experimental CPU and network conditions", "실험 CPU·네트워크 조건 허용"),
                     detail: L("Applies only to CPU load and network throughput. Unavailable observations remain unconfirmed.",
                               "CPU 사용량·네트워크 전송량에만 적용합니다. 확인할 수 없는 관측은 미확인으로 남습니다."),
-                    isOn: $draft.experimentalProvidersEnabled)
+                    isOn: $draft.settings.experimentalProvidersEnabled)
                     .accessibilityIdentifier("automatic-experimental-cpu-network-toggle")
             }
             DisclosureGroup(L("How conditions apply", "조건 적용 안내")) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Note(L("All conditions within a group must match (AND). One matching group is enough (OR).",
-                           "그룹 안은 모두 충족(AND), 그룹 사이는 하나만 충족(OR)하면 됩니다."))
+                    Note(L("Every condition within a group must match. Any one matching group is enough.",
+                           "묶음 안의 조건은 모두 충족해야 하며, 여러 묶음 중 하나가 맞으면 시작합니다."))
                     Note(L("Protection and global display/lid permissions always apply. Unavailable conditions never become a power-only rule.",
                            "보호와 화면·덮개의 전역 허용을 항상 따릅니다. 확인하지 못한 조건을 전원 조건만으로 대신 실행하지 않습니다."))
                 }.padding(.top, 4)
@@ -70,27 +102,27 @@ struct V4AutomaticRulesView: View {
             Button(L("Cancel", "취소")) { dismiss() }.actionButton().keyboardShortcut(.cancelAction)
             Spacer()
             Button(L("Confirm and apply", "확인 적용")) {
-                if model.saveV4AutomaticRules(draft) { dismiss() }
+                if draft.confirm(in: model) { dismiss() }
                 else { feedback = L("Could not apply. Review the conditions and current settings, then try again.", "적용하지 못했습니다. 조건과 현재 설정을 다시 확인하세요.") }
             }.actionButton(prominent: true).keyboardShortcut(.defaultAction)
-                .disabled(model.commandPending || !model.acceptingUserCommands || V4RuleStarter.needsTargetSelection(draft))
+                .disabled(model.commandPending || !model.acceptingUserCommands || V4RuleStarter.needsTargetSelection(draft.settings))
                 .accessibilityIdentifier("automatic-rules-apply")
         }
         .accessibilityIdentifier("settings-automatic-rules-sheet")
     }
 
-    private var selectedPresetIndex: Int? { draft.presets.firstIndex { $0.id == draft.activePresetID } }
+    private var selectedPresetIndex: Int? { draft.settings.presets.firstIndex { $0.id == draft.settings.activePresetID } }
     private var starterPresets: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(L("Start with a template", "쉽게 시작하기")).font(TetherTypography.section)
             HStack(spacing: 8) {
                 ForEach(V4RuleStarter.allCases) { starter in
                     Button(starter.title) {
-                        draft = starter.adding(to: draft,
+                        draft.settings = starter.adding(to: draft.settings,
                             nextManualMinutes: model.selectedManualMinutes == 0 ? nil : model.selectedManualMinutes)
                     }.actionButton()
                         .accessibilityIdentifier("automatic-template-\(starter.rawValue)")
-                        .disabled(!V4RuleStarter.canAdd(to: draft))
+                        .disabled(!V4RuleStarter.canAdd(to: draft.settings))
                 }
             }
             Note(L("Adds a new draft preset. Existing presets stay saved; nothing changes until Confirm and apply.",
@@ -100,10 +132,10 @@ struct V4AutomaticRulesView: View {
     private var presetSelection: some View {
         HStack(spacing: 8) {
             Text(L("Preset", "프리셋")).font(TetherTypography.secondary)
-            if !draft.presets.isEmpty {
-                Picker(L("Preset", "프리셋"), selection: $draft.activePresetID) {
+            if !draft.settings.presets.isEmpty {
+                Picker(L("Preset", "프리셋"), selection: $draft.settings.activePresetID) {
                     Text(L("Choose…", "선택…")).tag(Optional<UUID>.none)
-                    ForEach(draft.presets) { preset in
+                    ForEach(draft.settings.presets) { preset in
                         Text(preset.name + (preset.enabled ? "" : L(" · Off", " · 꺼짐"))).tag(Optional(preset.id))
                     }
                 }.labelsHidden().frame(maxWidth: .infinity, alignment: .leading)
@@ -115,11 +147,11 @@ struct V4AutomaticRulesView: View {
             Menu(L("Manage", "관리")) {
                 Button(L("Add preset", "프리셋 추가")) {
                     let preset = V4Preset(id: UUID(), name: L("New preset", "새 프리셋"), groups: [])
-                    draft.presets.append(preset); draft.activePresetID = preset.id
+                    draft.settings.presets.append(preset); draft.settings.activePresetID = preset.id
                 }
                 if let index = selectedPresetIndex {
                     Button(L("Delete preset", "프리셋 삭제")) {
-                        draft.presets.remove(at: index); draft.activePresetID = nil
+                        draft.settings.presets.remove(at: index); draft.settings.activePresetID = nil
                     }
                 }
             }.menuStyle(.borderlessButton).fixedSize()
@@ -139,7 +171,7 @@ private struct V4PresetEditor: View {
                 V4RuleGroupEditor(model: model, group: $group) { preset.groups.removeAll { $0.id == group.id } }
                 Divider()
             }
-            Button(L("Add OR group", "OR 그룹 추가")) {
+            Button(L("Add another group", "다른 조건 묶음 추가")) {
                 preset.groups.append(V4RuleGroup(id: UUID(), conditions: [V4Condition(id: UUID(), kind: .appRunning)]))
             }.actionButton()
             DisclosureGroup(L("Preset details", "프리셋 상세")) {
@@ -157,12 +189,12 @@ private struct V4PresetEditor: View {
                     ForEach([5, 10, 15, 30, 60, 120], id: \.self) { minutes in
                         Text(L("\(minutes) min", "\(minutes)분")).tag(Optional(minutes))
                     }
-                    Text(L("Unlimited · AC", "무제한 · AC")).tag(Optional<Int>.none)
+                    Text(L("Until ended · on power", "종료할 때까지 · 전원 연결")).tag(Optional<Int>.none)
                 }.labelsHidden().frame(width: 136)
             }
-            SettingsToggle(title: L("Request display keep-awake", "화면 유지 요청"), isOn: $preset.options.display)
-            SettingRow(title: L("Release display after idle", "유휴 후 화면 유지 해제")) {
-                Picker(L("Release display after idle", "유휴 후 화면 유지 해제"), selection: $preset.options.releaseDisplayAfterIdle) {
+            SettingsToggle(title: L("Keep the display on", "화면 켜두기"), isOn: $preset.options.display)
+            SettingRow(title: L("Release display after inactivity", "입력이 없으면 화면 켜두기 해제")) {
+                Picker(L("Release display after inactivity", "입력이 없으면 화면 켜두기 해제"), selection: $preset.options.releaseDisplayAfterIdle) {
                     Text(L("Off", "끔")).tag(Optional<Double>.none)
                     ForEach([5, 10, 15, 30], id: \.self) { minutes in
                         Text(L("\(minutes) min", "\(minutes)분")).tag(Optional(Double(minutes) * 60))
@@ -170,12 +202,12 @@ private struct V4PresetEditor: View {
                 }.labelsHidden().frame(width: 136)
             }
             Note(L("Releases only the display request. Unknown idle observations do not turn the display request off.",
-                   "화면 요청만 해제합니다. 유휴 상태를 확인할 수 없으면 임의로 화면 요청을 끄지 않습니다."))
+                   "화면 켜두기만 해제합니다. 입력이 없는 시간을 확인할 수 없으면 임의로 해제하지 않습니다."))
             if model.showsLidOptions {
-                SettingsToggle(title: L("Request closed-lid work", "덮개 유지 요청"), isOn: $preset.options.closedLid)
+                SettingsToggle(title: L("Use with the lid closed", "덮개 닫고 사용"), isOn: $preset.options.closedLid)
             }
             Note(L("Requests also require the corresponding global permission. This preset cannot bypass protection or preparation.",
-                   "요청에는 해당 전역 허용도 필요합니다. 프리셋으로 보호나 필수 준비를 우회할 수 없습니다."))
+                   "이 기능을 사용하려면 전원·덮개에서 해당 기능도 허용해야 합니다. 프리셋으로 보호나 필수 준비를 건너뛸 수 없습니다."))
         }
     }
 }
@@ -188,7 +220,7 @@ private struct V4RuleGroupEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text(L("Match all · AND", "모두 충족 · AND")).font(TetherTypography.secondary)
+                Text(L("When all conditions match", "아래 조건을 모두 만족하면")).font(TetherTypography.secondary)
                 Spacer()
                 Button(L("Remove group", "그룹 삭제"), action: remove).buttonStyle(.borderless)
             }
@@ -197,7 +229,7 @@ private struct V4RuleGroupEditor: View {
                     group.conditions.removeAll { $0.id == condition.id }
                 }
             }
-            Button(L("Add AND condition", "AND 조건 추가")) {
+            Button(L("Add condition", "조건 추가")) {
                 group.conditions.append(V4Condition(id: UUID(), kind: .appRunning))
             }.actionButton()
         }

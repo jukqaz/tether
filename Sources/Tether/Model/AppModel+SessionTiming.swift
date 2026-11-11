@@ -2,33 +2,42 @@ import Foundation
 import TetherCore
 
 extension AppModel {
-    // Compatibility entry points reject the retired end-time and retiming commands.
-    // No live view exposes these controls.
-    func manualSchedulingMaximum(forActive: Bool) -> TimeInterval { 0 }
-
-    @discardableResult
-    func scheduleManualSession(until: Date, replacing: Bool, now: Date = Date()) -> Bool { false }
-
-    @discardableResult
-    func finishManualSession(after minutes: Int) -> Bool { false }
-
     /// The continuous deadline is authoritative; the wall clock is only an end-time label.
     func manualRemaining(at now: Date, continuousNow: Double = ContinuousTime.now) -> TimeInterval? {
         guard manualSessionActive else { return nil }
         if let deadline = userSessionStatus?.manualContinuousDeadline {
             guard deadline.isFinite, continuousNow.isFinite else { return nil }
-            return max(0, deadline - continuousNow)
+            let remaining = max(0, deadline - continuousNow)
+            let wholeSecond = remaining.rounded()
+            // Adding a duration and subtracting two clock readings can land
+            // one representable step above an exact second. Keep real partial
+            // seconds for the countdown and leave the execution deadline intact.
+            if wholeSecond > 0, abs(remaining - wholeSecond) <= max(deadline.ulp, continuousNow.ulp) {
+                return wholeSecond
+            }
+            return remaining
         }
         return manualSessionUntil.map { max(0, $0.timeIntervalSince(now)) }
+    }
+
+    /// Display-only classification shared by the menu and status summary.
+    /// Missing timing observations must never be advertised as unlimited.
+    var hasConfirmedUntimedManualSession: Bool {
+        guard manualSessionActive, manualSessionUntil == nil else { return false }
+        if usesUserSession {
+            guard let request = userSession?.v4ManualSnapshot, request.confirmed, request.deadline == nil else { return false }
+            return snapshot.power == .ac || (snapshot.power == .battery && request.batteryTimeLimit == .unlimited)
+        }
+        return snapshot.power == .ac && manualSessionInfo?.holding == true
     }
 
     func manualCountdown(at now: Date, continuousNow: Double = ContinuousTime.now) -> String {
         if let remaining = manualRemaining(at: now, continuousNow: continuousNow) {
             return Texts.countdown(remaining)
         }
-        return snapshot.power == .ac
-            ? L("Unlimited on AC", "전원 연결 동안 무제한")
-            : L("Deadline not confirmed", "마감 확인 중")
+        return hasConfirmedUntimedManualSession
+            ? L("Until ended", "종료할 때까지")
+            : L("Checking end time", "종료 시간 확인 중")
     }
 
     /// Remote and display activity are diagnostics, never keep-awake reasons.
@@ -38,15 +47,15 @@ extension AppModel {
         if automaticWorkReasonActive {
             if v4Settings.usesAdvancedAutomaticConditions {
                 let captured = userSession?.runtimeMarkers.automaticActivation?.condition.title ?? v4RuleSummary
-                reasons.append(L("Automatic · \(captured)", "자동 · \(captured)"))
+                reasons.append(L("Automatic keep-awake · \(captured)", "자동 유지 · \(captured)"))
             } else {
-                reasons.append(L("Automatic · power adapter connected", "자동 · 전원 어댑터 연결"))
+                reasons.append(L("Automatic keep-awake · power connected", "자동 유지 · 전원 연결"))
             }
         }
         if manualSessionActive {
             reasons.append(includesManualCountdown
-                ? L("Manual · \(manualCountdown(at: now))", "수동 · \(manualCountdown(at: now))")
-                : L("Manual session", "수동 유지"))
+                ? L("Manual keep-awake · \(manualCountdown(at: now))", "수동 유지 · \(manualCountdown(at: now))")
+                : L("Manual keep-awake", "수동 유지"))
         }
         return reasons.isEmpty ? nil : reasons.joined(separator: "\n")
     }

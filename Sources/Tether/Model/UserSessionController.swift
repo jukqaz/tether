@@ -93,6 +93,9 @@ final class UserSessionController {
     private var endConsumptionID: UUID?
     private var lastExecutorEndAt: Double?
     private var rootProtectionLatchID: UUID?
+    private var importedProtectionLatch: WorkSessionProtectionLatch?
+    private var importedLegacyProtectionReasons: [String?] = [nil, nil]
+    private var importedProtectionStatusReason: String?
     private var protectionResumeID: UUID?
     private var ended = false
     private var endRequested = false
@@ -404,13 +407,19 @@ final class UserSessionController {
            !latch.reason.isEmpty, latch.reason.utf8.count <= 256 {
             // Protection is durable across boots. Its old monotonic timestamp
             // grants no work; only this observed ID can be explicitly resumed.
-            if rootProtectionLatchID != latch.id { changedExecutorState = true }
+            let isNewIncident = importedProtectionLatch != latch
+            if isNewIncident { changedExecutorState = true }
+            importedProtectionLatch = latch
             rootProtectionLatchID = latch.id
-            // Only an explicit safe Resume can acknowledge this exact latch.
+            // An explicit Resume or a completed automatic recovery may have
+            // acknowledged this exact latch. Neither can acknowledge a new one.
             if protectionResumeID != latch.id,
                let commonReason = WorkSessionBridge.generalWorkBlockReason(latch.reason) {
-                policy.acceptProtection(commonReason)
+                policy.acceptProtection(commonReason, isNewIncident: isNewIncident)
             }
+        } else {
+            rootProtectionLatchID = nil
+            protectionResumeID = nil
         }
         if let end = bridge.lidEndReceipt, end.bootID == boot, boot != "unknown",
            end.sessionID == sessionID, end.sequence <= workSequence,
@@ -458,8 +467,19 @@ final class UserSessionController {
             policy.adoptLegacyConfiguration(preparedControl, explicitActivation: explicitlyActivated)
         }
         if bridge.coordinated { policy.resolveLegacyConfiguration() }
-        policy.mergeLegacyBudgets(automatic: bridge.automaticBudget, manual: bridge.manualBudget)
-        if let reason = WorkSessionBridge.generalWorkBlockReason(protection?.blockReason) { policy.acceptProtection(reason) }
+        let legacyReasons = [WorkSessionBridge.generalWorkBlockReason(bridge.automaticBudget.blockReason),
+                             WorkSessionBridge.generalWorkBlockReason(bridge.manualBudget?.blockReason)]
+        // Clearing one ledger is not a new hazard from another unchanged ledger.
+        let newLegacyIncident = zip(legacyReasons, importedLegacyProtectionReasons)
+            .contains { $0.0 != nil && $0.0 != $0.1 }
+        policy.mergeLegacyBudgets(automatic: bridge.automaticBudget, manual: bridge.manualBudget,
+                                  isNewIncident: newLegacyIncident)
+        importedLegacyProtectionReasons = legacyReasons
+        let statusReason = WorkSessionBridge.generalWorkBlockReason(protection?.blockReason)
+        if let statusReason {
+            policy.acceptProtection(statusReason, isNewIncident: statusReason != importedProtectionStatusReason)
+        }
+        importedProtectionStatusReason = statusReason
         if bridge.stopRequested { invalidatePowerTransition(); explicitlyActivated = false; policy.setEnabled(false) }
         if changedExecutorState || consumedSleep || wasAwaitingSleep != awaitingRootSleepConsumption || policy.settings != before
             || rootHandoffPrepared != wasPrepared || pendingPowerTransition != nil { reevaluate(now: now) }
@@ -502,6 +522,9 @@ final class UserSessionController {
                 || previous.effectiveClosedLidDisplayMode != policy.settings.closedLidDisplayMode
             if !releaseUnobservedPermit { return nil }
         } else { releaseUnobservedPermit = false }
+        let confirmedProtectionResumeID: UUID? = if hasConfirmedSessionAuthority,
+            policy.settings.enabled, policy.markers.permitsAcquisition, policy.canResume(thermal: latestThermal),
+            protectionResumeID == rootProtectionLatchID { protectionResumeID } else { nil }
         if !releaseUnobservedPermit, driver.state == .unverified, let previous = lastConfirmedWorkLease,
            let previousExpiry = previous.expiry, previousExpiry > now,
            let confirmedExpiry = driver.confirmedExpiry, confirmedExpiry >= previousExpiry,
@@ -512,7 +535,7 @@ final class UserSessionController {
             previous.manualDeadline == policy.effectiveManualDeadline,
             previous.sleepConsumptionID == acknowledgedSleepConsumption?.id,
             previous.endConsumptionID == endConsumptionID,
-            previous.protectionResumeID == protectionResumeID,
+            previous.protectionResumeID == confirmedProtectionResumeID,
             (previous.lidPermit != nil) == (v4LidRequested && rootHandoffPrepared),
            previous.reasons.contains(.automatic) == policy.automaticActive,
            previous.reasons.contains(.manual) == policy.manualActive,
@@ -567,7 +590,7 @@ final class UserSessionController {
             manualDeadline: decision.manualDeadline, settings: projectedSettings, powerTransition: transition,
             continuationToken: policy.hasDirectBatteryIntent ? powerTransitionToken : nil,
             sleepConsumptionID: acknowledgedSleepConsumption?.id, manualStartedOnBattery: policy.manualStartedOnBattery,
-            lidPermit: lidPermit, endConsumptionID: endConsumptionID, protectionResumeID: protectionResumeID,
+            lidPermit: lidPermit, endConsumptionID: endConsumptionID, protectionResumeID: confirmedProtectionResumeID,
             disconnectEndRequested: disconnectEndRequested, closedLidDisplayMode: policy.settings.closedLidDisplayMode)
         lease.manualRequestID = policy.manualRequestID
         lease.automaticRequestID = policy.automaticRequestID
@@ -636,8 +659,11 @@ final class UserSessionController {
         policy.setDisplayIdleObservation(seconds: displayIdleObservation?.seconds, validUntil: displayIdleObservation?.validUntil)
         updateV4AutomaticGate(now: now)
         let hadDirectBatteryIntent = policy.hasDirectBatteryIntent
+        let hadProtection = policy.markers.protectionReason != nil
+        let permitsAutomaticProtectionRecovery = hasConfirmedSessionAuthority && !ownReleasePending
         policy.evaluate(power: power, thermal: thermal, fullWake: fullWake, controllingUser: controllingPolicy,
-                        now: now, batteryPercent: batteryPercent, lowPowerWarning: lowPowerWarning, lowPowerMode: latestLowPowerMode)
+                        now: now, batteryPercent: batteryPercent, lowPowerWarning: lowPowerWarning, lowPowerMode: latestLowPowerMode,
+                        permitsAutomaticProtectionRecovery: permitsAutomaticProtectionRecovery)
         v4WorkEvents.reconcile(context: v4Context(now: now), now: now)
         if hadDirectBatteryIntent, !policy.hasDirectBatteryIntent { invalidatePowerTransition() }
         if let receipt = pendingPowerTransition {
@@ -650,7 +676,8 @@ final class UserSessionController {
                 invalidatePowerTransition()
                 if changed {
                     policy.evaluate(power: power, thermal: thermal, fullWake: fullWake, controllingUser: controllingPolicy,
-                                    now: now, batteryPercent: batteryPercent, lowPowerWarning: lowPowerWarning)
+                                    now: now, batteryPercent: batteryPercent, lowPowerWarning: lowPowerWarning, lowPowerMode: latestLowPowerMode,
+                                    permitsAutomaticProtectionRecovery: permitsAutomaticProtectionRecovery)
                 }
             }
         }
@@ -689,6 +716,13 @@ final class UserSessionController {
         // General idle work is process-owned and independent of root readiness.
         // New acquisitions always follow successful durable intent persistence.
         let durable = persist()
+        if durable, hadProtection, policy.markers.permitsAcquisition,
+           let latch = importedProtectionLatch, latch.id == rootProtectionLatchID,
+           WorkSessionBridge.generalWorkBlockReason(latch.reason) != nil {
+            // The helper still checks its own current safety and clears its
+            // matching durable latch before accepting new lid work.
+            protectionResumeID = latch.id
+        }
         let desired = durable && readable && !endRequested && !awaitingRootSleepConsumption ? policy.expiry : nil
         let expiry = authority.map { $0.expiry(desired, existing: driver.assertionID != nil, now: now) } ?? desired
         if authority?.status == .unavailable || !policy.decision.renewalAllowed {
@@ -1025,7 +1059,8 @@ final class UserSessionController {
         timer?.invalidate(); timer = nil
         var boundaries = [policy.effectiveManualDeadline, policy.batteryDeadline, policy.automaticPauseDeadline].compactMap { $0 }
         if let pending = pendingExtension { boundaries.append(pending.preparation.expiresAt); boundaries.append(pending.preparation.currentDeadline) }
-        if policy.automaticActive || policy.manualActive || policy.settings.automaticEnabled { boundaries.append(now + 5) }
+        if policy.automaticActive || policy.manualActive || policy.settings.automaticEnabled
+            || policy.markers.protectionReason != nil { boundaries.append(now + 5) }
         for expiry in [driver.expiry, displayDriver.expiry].compactMap({ $0 }) {
             boundaries.append(min(now + IdleSessionPolicy.healthTTL / 2, expiry - 1))
         }
@@ -1052,11 +1087,18 @@ final class UserSessionController {
             }
             migrationOriginal = nil
         }
-        if let previous = defaults.data(forKey: Self.preferenceKey) {
+        let previous = defaults.data(forKey: Self.preferenceKey)
+        if let previous {
             defaults.set(previous, forKey: Self.preferenceKey + ".backup")
         }
         defaults.set(data, forKey: Self.preferenceKey)
         guard defaults.synchronize(), defaults.data(forKey: Self.preferenceKey) == data else {
+            // A failed acknowledgement must not leave a rejected settings edit
+            // in the defaults cache for the next launch. Storage may still be
+            // unavailable, so retain the fail-closed state even after rollback.
+            if let previous { defaults.set(previous, forKey: Self.preferenceKey) }
+            else { defaults.removeObject(forKey: Self.preferenceKey) }
+            _ = defaults.synchronize()
             persistenceFailed(); return false
         }
         savedSettings = policy.settings
@@ -1206,14 +1248,19 @@ extension UserSessionController {
         policy.setV4AutomaticGate(result.gate, now: now)
     }
     @discardableResult
-    func setV4Settings(_ next: V4Settings, presetDefaults: V4Preset? = nil) -> Bool {
+    func setV4Settings(_ next: V4Settings, presetDefaults: V4Preset? = nil,
+                       powerCondition: PowerCondition? = nil) -> Bool {
         guard verifyOwnership(), readable, !ended, !endRequested else { return false }
         let original = policy
         guard policy.setV4Settings(next) else { return false }
+        if let powerCondition { policy.setPowerCondition(powerCondition) }
         if let presetDefaults, !policy.selectManualDuration(presetDefaults.nextManualMinutes.map { Double($0) * 60 }) {
             policy = original; return false
         }
         guard persist() else { policy = original; reevaluate(); return false }
+        if let powerCondition, powerCondition != original.settings.condition {
+            invalidatePowerTransition(preservingDirectBatteryIntent: true)
+        }
         reevaluate(); return true
     }
     @discardableResult

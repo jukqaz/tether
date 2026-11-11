@@ -42,7 +42,7 @@ extension AppModel {
         }
         guard !Task.isCancelled, controller.manualExtensionPrepared, controller.commitManualExtension(requiresHelper: true) else {
             controller.cancelManualExtension(); controller.refresh()
-            errorText = L("The extension was not confirmed. Check the current deadline.", "연장을 확인하지 못했습니다. 현재 마감을 확인하세요.")
+            errorText = L("The extension was not confirmed. Check the current deadline.", "연장을 확인하지 못했습니다. 현재 종료 시각을 확인하세요.")
             return false
         }
         while ContinuousTime.now < until && !Task.isCancelled && acceptingUserCommands && controller.manualExtensionPending
@@ -54,7 +54,7 @@ extension AppModel {
             try? await Task.sleep(nanoseconds: 10_000_000)
         }
         controller.cancelManualExtension(); controller.refresh()
-        errorText = L("The extension could not be applied to every required executor. Check the current deadline.", "필요한 모든 실행기에 연장을 적용하지 못했습니다. 현재 마감을 확인하세요.")
+        errorText = L("The extension could not be applied to every required executor. Check the current deadline.", "필요한 모든 실행기에 연장을 적용하지 못했습니다. 현재 종료 시각을 확인하세요.")
         return false
     }
     @discardableResult

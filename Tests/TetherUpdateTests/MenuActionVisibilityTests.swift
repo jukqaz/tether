@@ -27,7 +27,7 @@ private final class MenuVisibilityFixture {
     let model: AppModel
 
     init(helperOutdated: Bool = false) throws {
-        defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defaults = TestMemoryDefaults(domain: suite)
         controller = UserSessionController(defaults: defaults, backend: backend,
             displayBackend: MenuVisibilityBackend(), guiProbe: nil, environmentProbe: nil,
             boot: "menu-visibility-fixture")

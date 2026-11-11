@@ -4,7 +4,8 @@ import SwiftUI
 struct WorkSessionVisualPreferences {
     let contrast: ColorSchemeContrast
     let reduceTransparency: Bool
-    var usesOpaqueControls: Bool { reduceTransparency || contrast == .increased }
+    // The product uses opaque controls in every accessibility configuration.
+    var usesOpaqueControls: Bool { true }
     var borderOpacity: Double { contrast == .increased ? 0.4 : 0.07 }
     var borderWidth: CGFloat { contrast == .increased ? 1 : 0.5 }
     var borderColor: Color {

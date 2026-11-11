@@ -10,19 +10,20 @@ struct PopupChoice<Value: Hashable>: Equatable {
     }
 }
 
-/// Standard AppKit popup: compact neutral bezel, with SwiftUI owning the value.
+/// Standard AppKit popup; SwiftUI owns the value and native AppKit owns the bezel.
 struct CompactPopUp<Value: Hashable>: NSViewRepresentable {
     let title: String
     @Binding var selection: Value
     let choices: [PopupChoice<Value>]
     var identifier = ""
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.tetherSettingsStyle) private var settingsStyle
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeNSView(context: Context) -> NSPopUpButton {
         let button = NSPopUpButton(frame: .zero, pullsDown: false)
-        button.controlSize = .small
-        button.font = .systemFont(ofSize: 12)
+        button.controlSize = .regular
+        button.font = .systemFont(ofSize: settingsStyle ? TetherTypography.settingsBodySize : TetherTypography.bodySize)
         button.bezelStyle = .rounded
         button.isBordered = true
         button.target = context.coordinator
@@ -31,6 +32,8 @@ struct CompactPopUp<Value: Hashable>: NSViewRepresentable {
     }
     func updateNSView(_ button: NSPopUpButton, context: Context) {
         context.coordinator.parent = self
+        let fontSize = settingsStyle ? TetherTypography.settingsBodySize : TetherTypography.bodySize
+        if button.font?.pointSize != fontSize { button.font = .systemFont(ofSize: fontSize) }
         if context.coordinator.renderedChoices != choices {
             button.removeAllItems()
             for (index, choice) in choices.enumerated() {
@@ -47,8 +50,12 @@ struct CompactPopUp<Value: Hashable>: NSViewRepresentable {
         if !identifier.isEmpty { button.setAccessibilityIdentifier(identifier) }
     }
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSPopUpButton, context: Context) -> CGSize? {
-        let width = proposal.width.flatMap { $0.isFinite && $0 > 0 ? $0 : nil } ?? nsView.intrinsicContentSize.width
-        return CGSize(width: width, height: 22)
+        let nativeWidth = nsView.intrinsicContentSize.width
+        let width = proposal.width.flatMap { $0.isFinite && $0 > 0 ? $0 : nil } ?? nativeWidth
+        // Preserve the same readable minimum in the menu and settings.
+        // ViewThatFits can then stack the row when its controls do not fit.
+        return CGSize(width: max(width, nativeWidth),
+                      height: max(30, nsView.intrinsicContentSize.height))
     }
     final class Coordinator: NSObject {
         var parent: CompactPopUp
@@ -69,6 +76,7 @@ struct CompactPushButton: NSViewRepresentable {
     var identifier = ""
     let action: () -> Void
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.tetherSettingsStyle) private var settingsStyle
 
     init(_ title: String, prominent: Bool = false, identifier: String = "", action: @escaping () -> Void) {
         self.title = title; self.prominent = prominent; self.identifier = identifier; self.action = action
@@ -76,13 +84,15 @@ struct CompactPushButton: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeNSView(context: Context) -> NSButton {
         let button = NSButton(title: title, target: context.coordinator, action: #selector(Coordinator.clicked(_:)))
-        button.controlSize = .small
-        button.font = .systemFont(ofSize: 12)
+        button.controlSize = .regular
+        button.font = .systemFont(ofSize: settingsStyle ? TetherTypography.settingsBodySize : TetherTypography.bodySize)
         button.bezelStyle = .rounded
         return button
     }
     func updateNSView(_ button: NSButton, context: Context) {
         context.coordinator.parent = self
+        let fontSize = settingsStyle ? TetherTypography.settingsBodySize : TetherTypography.bodySize
+        if button.font?.pointSize != fontSize { button.font = .systemFont(ofSize: fontSize) }
         if button.title != title { button.title = title }
         if button.isEnabled != isEnabled { button.isEnabled = isEnabled }
         let shortcut = prominent && isEnabled ? "\r" : ""
@@ -94,7 +104,8 @@ struct CompactPushButton: NSViewRepresentable {
         if !identifier.isEmpty { button.setAccessibilityIdentifier(identifier) }
     }
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSButton, context: Context) -> CGSize? {
-        return CGSize(width: nsView.intrinsicContentSize.width, height: 22)
+        return CGSize(width: nsView.intrinsicContentSize.width,
+                      height: max(30, nsView.intrinsicContentSize.height))
     }
     final class Coordinator: NSObject {
         var parent: CompactPushButton
@@ -116,14 +127,15 @@ struct CompactMenuAction {
 /// A compact standard action menu; SwiftUI owns every action and model value.
 struct CompactActionMenu: NSViewRepresentable {
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.tetherSettingsStyle) private var settingsStyle
     let title: String
     let actions: [CompactMenuAction]
     var identifier = ""
     func makeCoordinator() -> Coordinator { Coordinator() }
     func makeNSView(context: Context) -> NSPopUpButton {
         let button = NSPopUpButton(frame: .zero, pullsDown: true)
-        button.controlSize = .small
-        button.font = .systemFont(ofSize: 12)
+        button.controlSize = .regular
+        button.font = .systemFont(ofSize: settingsStyle ? TetherTypography.settingsBodySize : TetherTypography.bodySize)
         button.bezelStyle = .rounded
         button.isBordered = false
         button.imagePosition = .imageOnly
@@ -134,6 +146,8 @@ struct CompactActionMenu: NSViewRepresentable {
     func updateNSView(_ button: NSPopUpButton, context: Context) {
         context.coordinator.actions = actions
         context.coordinator.enabled = isEnabled
+        let fontSize = settingsStyle ? TetherTypography.settingsBodySize : TetherTypography.bodySize
+        if button.font?.pointSize != fontSize { button.font = .systemFont(ofSize: fontSize) }
         button.isEnabled = isEnabled
         let titles = actions.map(\.title)
         if context.coordinator.titles != titles {
@@ -158,7 +172,7 @@ struct CompactActionMenu: NSViewRepresentable {
         button.setAccessibilityIdentifier(identifier)
         button.toolTip = title
     }
-    func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSPopUpButton, context: Context) -> CGSize? { CGSize(width: 26, height: 22) }
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSPopUpButton, context: Context) -> CGSize? { CGSize(width: 32, height: 30) }
     final class Coordinator: NSObject {
         var actions: [CompactMenuAction] = []
         var enabled = true

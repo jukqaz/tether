@@ -6,60 +6,63 @@ struct GeneralPage: View {
     @ObservedObject var model: AppModel
     var disclosures: Binding<SettingsDisclosureState>? = nil
     @State private var manualBatteryExpanded = false
-    @State private var showLinkedWork = false
+    @State private var manualLimitsDetailsExpanded = false
 
     var body: some View {
         SettingsForm {
-            SettingsContentGroup(L("Defaults for the Next Manual Start", "다음 시작 기본값")) {
-                ManualDefaultsOptionsView(model: model, embedded: true)
+            SettingsContentGroup(model.showsLidOptions ? L("Display & Lid", "화면·덮개") : L("Display", "화면")) {
+                ManualDefaultsOptionsView(model: model, embedded: true, applicationDetails: disclosures?.manualApplication)
             }
             if model.hasInternalBattery {
-                SettingsDisclosure(title: L("Power Range & Time Limit", "전원 범위와 시간 한도"),
-                    summary: model.v3Settings.manualPowerCondition.title, isExpanded: manualBatteryExpansion) {
-                    SettingRow(title: L("Allowed power source", "사용할 전원")) {
+                SettingsDisclosure(title: L("Power & Time Limits", "전원·시간 한도"),
+                    summary: manualLimitsSummary, isExpanded: manualBatteryExpansion) {
+                    Note(L("Saves immediately. Applies to future work.",
+                           "즉시 저장되고 이후 유지부터 적용됩니다."))
+                        .accessibilityIdentifier("settings-manual-limits-save-summary")
+                    SettingRow(title: L("Manual power source", "수동 유지 전원"),
+                        detail: L("Applies to new manual work", "다음 수동 유지부터 적용")) {
                         CompactPopUp(title: L("Manual work power range", "수동 유지 전원 범위"),
                             selection: Binding(get: { model.v3Settings.manualPowerCondition }, set: { model.setManualPowerCondition($0) }),
                             choices: PowerCondition.allCases.map { PopupChoice($0, $0.title) },
                             identifier: "settings-manual-power-condition")
                             .disabled(settingsControlsDisabled)
                     }
-                    SettingRow(title: L("Maximum on battery", "배터리 최대 유지 시간")) {
+                    SettingRow(title: L("Battery time limit", "배터리 시간 한도"),
+                        detail: L("New manual work and the next advanced automatic run",
+                                  "새 수동 유지와 고급 자동의 다음 조건 구간에 적용")) {
                         CompactPopUp(title: L("Battery time limit", "배터리 시간 한도"),
                             selection: Binding(get: { model.v3Settings.batteryTimeLimit }, set: { model.setBatteryTimeLimit($0) }),
                             choices: WorkSessionBatteryLimit.allCases.map { PopupChoice($0, model.batteryLimitTitle($0)) },
                             identifier: "settings-battery-manual-limit")
                             .disabled(settingsControlsDisabled)
                     }
-                    Note(L("These two settings save immediately for the next start. Current work keeps its original limits. Reconnecting power does not refill battery time.",
-                           "전원·한도는 변경 즉시 저장되어 다음 시작부터 적용됩니다. 현재 작업의 한도는 그대로이며 전원 재연결로 배터리 시간이 늘지 않습니다."))
-                        .accessibilityIdentifier("settings-manual-limits-save-scope")
+                    SettingsDisclosure(title: L("Saving & Battery Time", "저장 범위와 배터리 시간"),
+                        isExpanded: manualLimitsDetailsExpansion, groupsSection: false) {
+                        Note(L("Apply and Discard above only affect manual defaults. Reconnecting power does not refill the current work's battery time.",
+                               "위의 적용·변경 취소는 수동 기본값에만 적용됩니다. 전원을 다시 연결해도 현재 유지의 배터리 시간은 늘지 않습니다."))
+                            .accessibilityIdentifier("settings-manual-limits-save-scope")
+                    }.accessibilityIdentifier("settings-manual-limits-application-details")
                 }.accessibilityIdentifier("settings-manual-battery-details")
             }
-            SettingsContentGroup(L("Start & Control", "시작과 조작")) {
-                Note(L("Choose a duration, start, extend or end current work from the menu.",
-                       "시간 선택·시작·연장·현재 작업 종료는 메뉴에서 합니다."))
-                SettingRow(title: L("Until connected work ends", "연결된 작업이 끝날 때까지")) {
-                    CompactPushButton(L("Connection Guide…", "연동 방법…"), identifier: "settings-linked-work-guide") {
-                        showLinkedWork = true
-                    }
-                }
-            }
         }
-        .alert(L("Connected Work", "작업 연결"), isPresented: $showLinkedWork) {
+        .alert(L("Current manual keep-awake", "현재 수동 유지"), isPresented: $model.reviewingManualDeadline) {
             Button(L("Close", "닫기"), role: .cancel) {}
         } message: {
-            Text(L("Start command- or PID-linked work with the CLI. When the connected work ends, only that request ends. This differs from an automatic running-app condition.",
-                   "명령이나 PID에 연결한 유지는 CLI로 시작합니다. 연결된 작업이 끝나면 해당 요청만 끝납니다. 앱 실행 여부를 보는 자동 조건과는 별개입니다."))
+            Text(currentManualDetail)
         }
-        .alert(L("Current manual session", "현재 수동 유지"), isPresented: $model.reviewingManualDeadline) {
-            Button(L("Close", "닫기"), role: .cancel) {}
-        } message: {
-            if model.manualSessionActive, let until = model.manualSessionUntil {
-                Text(L("Ends at \(Texts.time(until)). Extend or end it from the menu.", "\(Texts.time(until))에 끝납니다. 메뉴에서 연장하거나 끝낼 수 있습니다."))
-            } else if model.manualSessionActive {
-                Text(L("The original power, battery and protection limits still apply.", "시작할 때의 전원·배터리·보호 한도는 계속 적용됩니다."))
-            } else { Text(L("This manual session has ended.", "이 수동 유지는 끝났습니다.")) }
+    }
+
+    var currentManualDetail: String {
+        if model.manualSessionActive, let until = model.manualSessionUntil {
+            return L("Ends at \(Texts.time(until)). Extend or end it from the menu.", "\(Texts.time(until)) 종료됩니다. 메뉴에서 연장하거나 종료할 수 있습니다.")
         }
+        if model.hasConfirmedUntimedManualSession {
+            return L("Until ended. The original power, battery and protection limits still apply.", "종료할 때까지 유지합니다. 시작할 때의 전원·배터리·보호 한도는 계속 적용됩니다.")
+        }
+        if model.manualSessionActive {
+            return L("Checking end time. The original limits still apply; an unavailable end time does not mean unlimited keep-awake.", "종료 시간 확인 중입니다. 기존 한도는 계속 적용되며, 종료 시간이 미확인이라고 무기한 유지를 뜻하지는 않습니다.")
+        }
+        return L("Manual keep-awake has ended.", "수동 유지를 종료했습니다.")
     }
 
     var lidAvailability: LidOptionAvailability { LidOptionAvailability(model: model) }
@@ -72,6 +75,10 @@ struct GeneralPage: View {
     }
     private var settingsControlsDisabled: Bool { !model.acceptingUserCommands || model.commandPending }
     private var manualBatteryExpansion: Binding<Bool> { disclosures?.manualBattery ?? $manualBatteryExpanded }
+    private var manualLimitsDetailsExpansion: Binding<Bool> { disclosures?.manualLimitsApplication ?? $manualLimitsDetailsExpanded }
+    private var manualLimitsSummary: String {
+        "\(model.v3Settings.manualPowerCondition.title) · \(model.batteryLimitTitle(model.v3Settings.batteryTimeLimit))"
+    }
 }
 
 /// Content only: protection stays within the page's one scroll viewport.

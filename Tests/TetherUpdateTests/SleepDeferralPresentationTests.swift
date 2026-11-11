@@ -154,20 +154,21 @@ final class SleepDeferralPresentationTests: XCTestCase {
                       now: ContinuousTime.now, batteryPercent: 80)
         })
         defer { _ = protected?.end() }
-        XCTAssertEqual(safety.presentation.title, L("Safety stopped", "보호를 위해 중지됨"))
+        XCTAssertEqual(safety.presentation.title, L("Stopped for protection", "보호를 위해 중지됨"))
         XCTAssertEqual(safety.presentation.subtitle, protectionReason("thermal"))
 
         let (disabled, off) = fixture(mutateSession: { _ = $0.setEnabled(false) })
         defer { _ = disabled?.end() }
-        XCTAssertEqual(off.presentation.title, L("Paused", "유지 중지됨"))
+        XCTAssertEqual(off.presentation.title, L("All keep-awake stopped", "모두 중지됨"))
         XCTAssertEqual(off.presentation.subtitle,
-            L("Resume explicitly before automatic work can start again.", "다시 시작하기 전까지 자동 유지도 멈춥니다."))
+            L("Resume rechecks automatic conditions. Ended manual keep-awake does not restart.",
+              "중지를 해제하면 자동 조건을 다시 확인합니다. 종료된 수동 유지는 다시 시작하지 않습니다."))
         XCTAssertTrue(off.workPaused)
 
         let (active, work) = fixture(mutateSession: { XCTAssertTrue($0.start(duration: 600)) })
         defer { _ = active?.end() }
         XCTAssertTrue(work.workSessionHolding)
-        XCTAssertEqual(work.presentation.title, L("Manual session active", "수동 유지 중"))
+        XCTAssertEqual(work.presentation.title, L("Manual keep-awake active", "수동 유지 중"))
 
         let (uncontrolled, authority) = fixture(mutateSession: {
             $0.update(power: .battery, thermal: 0, fullWake: true, controllingUser: false,

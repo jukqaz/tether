@@ -78,6 +78,37 @@ final class V4G1RegressionTests: XCTestCase {
         XCTAssertEqual(policy.manualRequestID, newID)
     }
 
+    func testPreparedExtensionPreservesExactDeadlineAcrossContinuousClockPrecisionBoundary() throws {
+        for (start, duration) in [(30_070.0.nextUp, 900.0), (29_370.0.nextUp, 1_800.0)] {
+            var policy = ready()
+            observe(&policy, at: start)
+            XCTAssertTrue(policy.start(duration: 1_800, now: start))
+            let original = try XCTUnwrap(policy.manualDeadline)
+            let expected = original + duration
+            XCTAssertNotEqual(expected - original, duration,
+                              "Crossing the 32,768-second precision boundary makes subtraction inexact")
+
+            var proposed = policy
+            XCTAssertTrue(proposed.extend(duration: duration, now: start + 1))
+            let preparation = WorkSessionExtensionPreparation(id: try XCTUnwrap(proposed.manualExtensionID),
+                requestID: try XCTUnwrap(policy.manualRequestID), currentDeadline: original,
+                proposedDeadline: try XCTUnwrap(proposed.manualDeadline), expiresAt: start + 5)
+            XCTAssertEqual(preparation.proposedDeadline, expected)
+            XCTAssertTrue(preparation.isValid(now: start + 1))
+            XCTAssertEqual(policy.manualDeadline, original)
+
+            var unapproved = preparation
+            unapproved.proposedDeadline = expected.nextUp
+            XCTAssertFalse(unapproved.isValid(now: start + 1), "Even one representable step past the approved deadline must fail")
+            unapproved.proposedDeadline = original + 420
+            XCTAssertFalse(unapproved.isValid(now: start + 1))
+            XCTAssertFalse(policy.extend(duration: 420, now: start + 1))
+
+            XCTAssertTrue(policy.commitPreparedManualExtension(proposed, now: start + 2))
+            XCTAssertEqual(policy.manualDeadline, expected)
+        }
+    }
+
     func testLateBatteryAcknowledgementCannotShortenAnApprovedExtension() throws {
         var policy = ready(.battery)
         XCTAssertTrue(policy.start(duration: 1800, now: 100))

@@ -42,7 +42,7 @@ private final class CommandFixture {
          capabilityProbe: (() -> MacCapabilities)? = nil, settings: IdleSessionSettings? = nil,
          sleepExecutor: (() async -> Bool)? = nil, sleepSettled: (() -> Bool)? = nil,
          sleepAuthority: (() -> GUISessionObservation)? = nil) throws {
-        defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        defaults = TestMemoryDefaults(domain: name)
         if let settings { defaults.set(try JSONEncoder().encode(settings), forKey: UserSessionController.preferenceKey) }
         controller = UserSessionController(defaults: defaults, backend: backend, guiProbe: nil, environmentProbe: nil)
         controller.update(power: power, thermal: 0, fullWake: true, controllingUser: true,

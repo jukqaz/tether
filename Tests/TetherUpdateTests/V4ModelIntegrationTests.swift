@@ -8,6 +8,7 @@ private final class V4MemoryDefaults: UserDefaults {
     private var registered: [String: Any] = [:]
     private(set) var readKeys: [String] = []
     private(set) var writtenKeys: [String] = []
+    var failNextSynchronization = false
     override func object(forKey key: String) -> Any? { readKeys.append(key); return values[key] ?? registered[key] }
     override func set(_ value: Any?, forKey key: String) { writtenKeys.append(key); values[key] = value }
     override func removeObject(forKey key: String) { values[key] = nil }
@@ -17,7 +18,10 @@ private final class V4MemoryDefaults: UserDefaults {
     override func bool(forKey key: String) -> Bool { object(forKey: key) as? Bool ?? false }
     override func integer(forKey key: String) -> Int { object(forKey: key) as? Int ?? 0 }
     override func double(forKey key: String) -> Double { object(forKey: key) as? Double ?? 0 }
-    override func synchronize() -> Bool { true }
+    override func synchronize() -> Bool {
+        if failNextSynchronization { failNextSynchronization = false; return false }
+        return true
+    }
     override func persistentDomain(forName name: String) -> [String: Any]? { values }
 }
 private final class V4AssertionFixture: IdleAssertionBackend {
@@ -362,4 +366,99 @@ final class V4ModelIntegrationTests: XCTestCase {
             XCTAssertEqual(try XCTUnwrap(controller.v4WorkEvents.records[job]).state, .revoked)
         }
     }
+    func testRuleEditorSavesRulesAndPowerScopeTogetherWithoutRestartingManualWork() async throws {
+        try await MainActor.run {
+            let (defaults, controller, _, _) = fixture(); defer { _ = controller.end() }
+            controller.update(power: .ac, thermal: 0, fullWake: true, controllingUser: true,
+                now: ContinuousTime.now, batteryPercent: 90)
+            XCTAssertTrue(controller.start(duration: 1800, now: ContinuousTime.now))
+            let request = controller.manualRequestID
+            let deadline = controller.status.manualContinuousDeadline
+            var draft = controller.v4Settings
+            draft.automaticMode = .advanced
+            draft.notifyManualExpiry = true
+            XCTAssertTrue(controller.setV4Settings(draft, powerCondition: .battery))
+            XCTAssertEqual(controller.v4Settings.automaticMode, .advanced)
+            XCTAssertEqual(controller.settings.condition, .battery)
+            XCTAssertEqual(controller.manualRequestID, request)
+            XCTAssertEqual(controller.status.manualContinuousDeadline, deadline)
+            let saved = try XCTUnwrap(defaults.data(forKey: UserSessionController.preferenceKey))
+            let decoded = try JSONDecoder().decode(IdleSessionSettings.self, from: saved)
+            XCTAssertEqual(decoded.condition, .battery)
+            XCTAssertTrue(decoded.v4.notifyManualExpiry)
+        }
+    }
+
+    func testRuleEditorPersistenceFailureDoesNotSaveOnlyOneOfItsChoices() async {
+        await MainActor.run {
+            let (defaults, controller, _, _) = fixture(); defer { _ = controller.end() }
+            controller.update(power: .ac, thermal: 0, fullWake: true, controllingUser: true, now: ContinuousTime.now)
+            let original = controller.settings
+            let saved = defaults.data(forKey: UserSessionController.preferenceKey)
+            var draft = controller.v4Settings
+            draft.automaticMode = .advanced
+            controller.persistenceProbe = { false }
+            XCTAssertFalse(controller.setV4Settings(draft, powerCondition: .battery))
+            XCTAssertEqual(controller.settings, original)
+            XCTAssertEqual(defaults.data(forKey: UserSessionController.preferenceKey), saved)
+        }
+    }
+
+    func testStaleRuleEditorCannotOverwritePowerScope() async {
+        await MainActor.run {
+            let (defaults, controller, _, _) = fixture(); defer { _ = controller.end() }
+            controller.update(power: .ac, thermal: 0, fullWake: true, controllingUser: true, now: ContinuousTime.now)
+            let model = AppModel(preview: true,
+                capabilities: MacCapabilities(supportedPlatform: true, internalBattery: false, lid: false),
+                previewSession: controller, previewDefaults: defaults)
+            let stale = model.v4Settings
+            model.setNotifySessionEnd(!model.notifySessionEnd)
+            let original = controller.settings
+            XCTAssertFalse(model.saveV4AutomaticRules(stale, powerCondition: .ac))
+            XCTAssertEqual(controller.settings, original)
+            XCTAssertNotNil(model.errorText)
+        }
+    }
+
+    func testScopeOnlyRuleSaveAdvancesGenerationAndRejectsTheOldDraft() async throws {
+        try await MainActor.run {
+            let model = PreviewRenderer.sampleModel(arguments: ["--sample", "--prepared-lid"])
+            let controller = try XCTUnwrap(model.userSession); defer { _ = controller.end() }
+            let stale = model.v4Settings
+            XCTAssertTrue(model.saveV4AutomaticRules(stale, powerCondition: .any))
+            XCTAssertEqual(model.v4ConfigurationGeneration, stale.generation + 1)
+            XCTAssertEqual(controller.settings.condition, .any)
+            XCTAssertFalse(model.saveV4AutomaticRules(stale, powerCondition: .ac))
+            XCTAssertEqual(controller.settings.condition, .any)
+            let current = model.v4Settings
+            XCTAssertTrue(model.saveV4AutomaticRules(current, powerCondition: .any))
+            XCTAssertEqual(model.v4ConfigurationGeneration, current.generation,
+                "Confirming identical choices must not create another revision")
+        }
+    }
+
+    func testRejectedPostWriteRuleSaveRestoresPreviousPreferencesForRelaunch() async throws {
+        try await MainActor.run {
+            let (defaults, controller, _, _) = fixture()
+            controller.update(power: .ac, thermal: 0, fullWake: true, controllingUser: true, now: ContinuousTime.now)
+            let original = controller.settings
+            let saved = defaults.data(forKey: UserSessionController.preferenceKey)
+            var draft = controller.v4Settings
+            draft.notifyManualExpiry = !draft.notifyManualExpiry
+            defaults.failNextSynchronization = true
+            XCTAssertFalse(controller.setV4Settings(draft, powerCondition: .battery))
+            XCTAssertEqual(defaults.data(forKey: UserSessionController.preferenceKey), saved)
+            XCTAssertFalse(controller.status.holding)
+            XCTAssertNotNil(controller.status.error)
+            _ = controller.end()
+            let restarted = UserSessionController(defaults: defaults,
+                backend: V4AssertionFixture(), displayBackend: V4AssertionFixture(),
+                guiProbe: nil, environmentProbe: nil, boot: "v4-fixture")
+            defer { _ = restarted.end() }
+            XCTAssertEqual(restarted.settings.condition, original.condition)
+            XCTAssertEqual(restarted.v4Settings.notifyManualExpiry, original.v4.notifyManualExpiry)
+            XCTAssertFalse(restarted.status.manualActive)
+        }
+    }
+
 }

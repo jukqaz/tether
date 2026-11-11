@@ -171,7 +171,7 @@ struct ActivityReviewView: View {
         if !inspector.assertionsAvailable { return L("Check again; unavailable evidence is not evidence of no requests.", "다시 점검하세요. 확인하지 못한 상태를 요청이 없는 상태로 판단하지 않습니다.") }
         if inspector.appRequests.contains(where: { $0.kinds.contains(.display) }) {
             return L("Review each app's screen-awake option below. A request alone does not prove failed display sleep.",
-                     "아래 앱의 화면 유지 옵션을 확인하세요. 요청만으로 실제 화면 절전 실패를 확정하지 않습니다.")
+                     "아래 앱의 화면 켜두기 옵션을 확인하세요. 요청만으로 실제 화면 절전 실패를 확정하지 않습니다.")
         }
         if inspector.appRequests.contains(where: { $0.kinds == [.legacySystem] }) {
             return L("A legacy request is present. Its effect on this macOS is unconfirmed; review the app details.",
@@ -182,14 +182,14 @@ struct ActivityReviewView: View {
             : L("These requests do not require a lit display and can coexist with Tether.", "이 요청은 화면 켜짐을 요구하지 않으며 Tether의 화면 절전과 함께 사용할 수 있습니다.")
     }
     private var tetherPauseButton: some View {
-        Button(model.workPaused ? L("Resume Tether", "Tether 다시 시작") : L("Pause Tether only", "Tether만 일시 중지")) {
+        Button(model.workPaused ? L("Resume keep-awake", "중지 해제") : L("Stop Tether keep-awake", "Tether 유지 모두 중지")) {
             model.setEnabled(model.workPaused)
         }
         .actionButton()
         .accessibilityIdentifier("panel-pause-all")
         .help(model.workPaused
-            ? L("Allow Tether work again. Enabled automatic rules can resume; ended manual work does not restart.", "Tether 작업을 다시 허용합니다. 켜 둔 자동 조건은 다시 적용하며, 끝난 수동 유지는 다시 시작하지 않습니다.")
-            : L("End Tether's manual work and pause its automatic triggers. Other apps' requests remain.", "Tether 수동 유지와 자동 조건만 중지합니다. 다른 앱의 요청은 유지됩니다."))
+            ? L("Resume Tether keep-awake. Enabled automatic conditions may apply; ended manual keep-awake will not restart.", "Tether의 중지를 해제합니다. 켜 둔 자동 조건은 다시 확인하며 종료된 수동 유지는 다시 시작하지 않습니다.")
+            : L("End Tether manual keep-awake and pause automatic starts. Other apps' requests remain.", "Tether 수동 유지와 자동 조건만 중지합니다. 다른 앱의 요청은 유지됩니다."))
         .accessibilityHint(L("Changes Tether only. Other apps' requests remain.", "Tether만 변경하며 다른 앱의 요청은 유지됩니다."))
         .disabled(!model.sessionAvailable || model.commandPending || (model.workPaused && !model.canResumeWork))
     }
@@ -200,9 +200,9 @@ struct ActivityReviewView: View {
                 .fixedSize(horizontal: false, vertical: true)
             DisplaySleepNotice(model: model, showsReview: false)
             if model.showsLidOptions {
-                WorkSessionRow(title: L("Tether closed-lid support", "Tether 덮개 유지"), value: model.lidSupportSummary)
+                WorkSessionRow(title: L("Closed-lid support", "덮개 유지 기능"), value: model.lidSupportSummary)
                 Text(L("Tether follows its power, duration and protection settings independently of remote apps.",
-                       "Tether의 덮개 유지는 원격 앱과 무관하게 전원·시간·보호 설정에 따릅니다."))
+                       "Tether의 덮개 닫고 사용은 원격 앱과 무관하게 전원·시간·보호 설정에 따릅니다."))
                     .font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             WorkSessionRow(title: L("System sleep block", "잠자기 차단"), value: globalOverrideSummary)
@@ -289,8 +289,8 @@ struct ActivityReviewView: View {
                            "Tether는 다른 앱의 요청을 해제하거나 작업을 종료하지 않습니다."))
                     Note(L("Idle system sleep, display sleep and explicit Sleep have different effects. An observed request is not proof of active work or failed sleep.",
                            "일반 유휴 절전·화면 꺼짐·명시적인 잠자기는 서로 다릅니다. 요청 관측만으로 실제 작업 진행이나 잠자기 실패를 판단하지 않습니다."))
-                    Note(L("Unplugging ends existing work. If needed, start a new manual session from the menu while on battery. A closed Mac may sleep before you do this; continuous work is not guaranteed. Heat and battery limits still apply.",
-                           "전원을 빼면 기존 유지가 끝납니다. 필요하면 배터리 상태에서 메뉴를 열어 새 수동 유지를 시작하세요. 덮개가 닫혀 있으면 먼저 잠들 수 있으므로 연속 유지는 보장하지 않습니다. 발열·배터리 제한은 계속 적용됩니다."))
+                    Note(L("Unplugging applies the selected rule to end or continue work. If needed, start a new manual session from the menu while on battery. A closed Mac may sleep before you do this; continuous work is not guaranteed. Heat and battery limits still apply.",
+                           "전원을 빼면 선택한 종료·계속 규칙을 적용합니다. 필요하면 배터리 상태에서 메뉴를 열어 새 수동 유지를 시작하세요. 덮개가 닫혀 있으면 먼저 잠들 수 있으므로 연속 유지는 보장하지 않습니다. 발열·배터리 제한은 계속 적용됩니다."))
                 }.padding(.top, 8)
             }.font(.callout)
         }

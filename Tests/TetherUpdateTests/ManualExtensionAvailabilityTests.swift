@@ -115,10 +115,10 @@ final class ManualExtensionAvailabilityTests: XCTestCase {
             Localization.current = .korean
             let scenarios: [(PowerSource, Int?, Bool?, Bool, String)] = [
                 (.unknown, 0, true, true, "전원 상태"),
-                (.ac, nil, true, true, "전원·보호 관측"),
+                (.ac, nil, true, true, "전원·보호 상태"),
                 // Missing full-wake confirmation fails session authority. It
                 // does not enter the power/thermal carry-existing-permission path.
-                (.ac, 0, nil, false, "로그인 세션·깨움 상태")
+                (.ac, 0, nil, false, "로그인 사용자와 깨움 상태")
             ]
             for (power, thermal, fullWake, limited, expected) in scenarios {
                 let (model, controller, backend) = try fixture(power: .ac)
@@ -153,7 +153,7 @@ final class ManualExtensionAvailabilityTests: XCTestCase {
             model.v4ManualApprovalPending = true
             XCTAssertTrue(controller.canExtendManual(by: 30), "The app approval gate is independent of the core policy")
             let approvalReason = try assertReadOnlyBlockedReason(model, controller, backend)
-            XCTAssertTrue(approvalReason.contains("승인·연장"))
+            XCTAssertTrue(approvalReason.contains("수동 유지 시작이나 시간 추가"))
             model.v4ManualApprovalPending = false
             XCTAssertNil(model.manualExtensionUnavailableReason(by: 30))
 
@@ -205,7 +205,7 @@ final class ManualExtensionAvailabilityTests: XCTestCase {
             controller.ownershipProbe = { false }
             XCTAssertFalse(controller.hasConfirmedSessionAuthority)
             let reason = try assertReadOnlyBlockedReason(model, controller, backend)
-            XCTAssertTrue(reason.contains("로그인 세션·깨움 상태"))
+            XCTAssertTrue(reason.contains("로그인 사용자와 깨움 상태"))
             XCTAssertFalse(reason.contains("배터리 한도"))
         }
     }
@@ -221,7 +221,7 @@ final class ManualExtensionAvailabilityTests: XCTestCase {
             XCTAssertTrue(model.manualFeaturesNeedHelper)
             XCTAssertTrue(controller.canExtendManual(by: 30))
             XCTAssertFalse(model.canAcquireManualFeatures)
-            XCTAssertTrue(try assertReadOnlyBlockedReason(model, controller, backend).contains("덮개 도우미"))
+            XCTAssertTrue(try assertReadOnlyBlockedReason(model, controller, backend).contains("도우미 연결과 덮개 상태"))
         }
     }
 
@@ -252,7 +252,7 @@ final class ManualExtensionAvailabilityTests: XCTestCase {
             XCTAssertEqual(controller.status.observationLimited, false,
                 "This snapshot predates the current freshness failure")
             XCTAssertTrue(controller.hasConfirmedSessionAuthority)
-            XCTAssertTrue(try assertReadOnlyBlockedReason(model, controller, backend).contains("기한·전원·보호 상태"))
+            XCTAssertTrue(try assertReadOnlyBlockedReason(model, controller, backend).contains("종료 시간·전원·보호 상태"))
         }
     }
 

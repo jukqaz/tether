@@ -9,16 +9,13 @@ struct OptionCatalogView: View {
     private var entries: [OptionCatalogEntry] {
         OptionCatalog.entries.filter { $0.readiness != .notImplemented && $0.matches(query) }
     }
-    private var plannedEntries: [OptionCatalogEntry] {
-        OptionCatalog.entries.filter { $0.readiness == .notImplemented && $0.matches(query) }
-    }
 
     var body: some View {
         V4FeatureSheet(title: L("Additional options", "추가 옵션")) {
             TextField(L("Find a feature or setting", "기능·설정 찾기"), text: $query)
                 .textFieldStyle(.roundedBorder)
                 .accessibilityIdentifier("option-catalog-search")
-            if entries.isEmpty && plannedEntries.isEmpty { Text(L("No matching options", "일치하는 옵션이 없어요")) }
+            if entries.isEmpty { Text(L("No matching options", "일치하는 옵션이 없어요")) }
             ForEach(entries) { entry in
                 VStack(alignment: .leading, spacing: 6) {
                     Text(entry.title).font(TetherTypography.section)
@@ -32,7 +29,7 @@ struct OptionCatalogView: View {
                             .accessibilityIdentifier("option-catalog-open-\(entry.id)")
                     }
                     if entry.id == "O25", model.showsLidOptions {
-                        Button(L("Closed-lid helper…", "덮개 유지 도우미…")) {
+                        Button(L("Closed-lid helper…", "덮개 닫고 사용 도우미…")) {
                             model.settingsPage = .safety
                             dismiss()
                         }
@@ -56,19 +53,6 @@ struct OptionCatalogView: View {
                         }
                     }.padding(.top, 8)
                 }.accessibilityIdentifier("option-catalog-support-details")
-            }
-            if !plannedEntries.isEmpty {
-                DisclosureGroup(L("Unavailable or under review", "미지원·검토 중")) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        ForEach(plannedEntries) { entry in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(entry.title).font(TetherTypography.section)
-                                Text(entry.summary).font(TetherTypography.body).foregroundStyle(.secondary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                        }
-                    }.padding(.top, 8)
-                }
             }
         } actions: {
             Spacer()

@@ -8,7 +8,7 @@ struct LifecycleOptionsView: View {
         if let runtime = model.lifecycleOptions {
             LifecycleWebhookEditor(runtime: runtime, mayEdit: model.acceptingUserCommands && !model.commandPending)
         } else {
-            V4FeatureSheet(title: L("Event actions", "이 일이 생기면 실행")) {
+            V4FeatureSheet(title: L("Work event actions", "작업 이벤트 연동")) {
                 Note(L("Connect to the current Tether session before editing event actions.", "현재 Tether 실행에 연결된 뒤 사건별 실행을 편집할 수 있습니다."))
             } actions: {
                 Spacer()
@@ -37,7 +37,7 @@ private struct LifecycleWebhookEditor: View {
         return action.isValid ? action : nil
     }
     var body: some View {
-        V4FeatureSheet(title: L("Event actions", "이 일이 생기면 실행")) {
+        V4FeatureSheet(title: L("Work event actions", "작업 이벤트 연동")) {
             Text(L("Applies to future confirmed events", "앞으로 확인한 사건에 적용")).font(TetherTypography.secondary).foregroundStyle(.secondary)
             SettingsToggle(title: L("Allow configured webhooks", "설정한 Webhook 실행 허용"), isOn: $draft.enabled)
             Note(L("Send a configured HTTPS request when the selected event is confirmed. Off by default.",

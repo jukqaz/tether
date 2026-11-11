@@ -66,17 +66,23 @@ extension AppModel {
             return (item.enabled ? "" : L("Off: ", "끔: ")) + item.kind.rawValue + (detail.isEmpty ? "" : " = " + detail)
         }
         let groups = preset.groups.map { "(" + $0.conditions.map(condition).joined(separator: " AND ") + ")" }.joined(separator: " OR ")
-        let minutes = preset.nextManualMinutes.map { L("\($0) min", "\($0)분") } ?? L("Unlimited on AC", "AC 무제한")
+        let minutes = preset.nextManualMinutes.map { L("\($0) min", "\($0)분") } ?? L("Until ended on power", "전원 연결 시 종료할 때까지")
         let options = L("display ", "화면 ") + (preset.options.display ? L("On", "켬") : L("Off", "끔")) + " · "
             + L("lid ", "덮개 ") + (preset.options.closedLid ? L("On", "켬") : L("Off", "끔"))
         return preset.name + (preset.enabled ? "" : L(" [disabled]", " [비활성]")) + " · " + minutes + " · " + options
             + (groups.isEmpty ? L(" · No conditions", " · 조건 없음") : "\n" + groups)
     }
     @discardableResult
-    func saveV4AutomaticRules(_ draft: V4Settings) -> Bool {
+    func saveV4AutomaticRules(_ draft: V4Settings, powerCondition: PowerCondition? = nil,
+                              expectedPowerCondition: PowerCondition? = nil) -> Bool {
         guard acceptingUserCommands, let controller = userSession else { return false }
+        if let powerCondition, powerCondition != .ac, let error = validateBatteryAction() {
+            errorText = UserSessionFailure(error).localizedDescription
+            return false
+        }
         let errors = V4RuleEngine.validate(draft)
         guard errors.isEmpty, draft.generation == v4Settings.generation,
+              expectedPowerCondition.map({ $0 == controller.settings.condition }) ?? true,
               v4ConfigurationGeneration < UInt64.max else {
             errorText = errors.isEmpty ? L("Settings changed. Review the current choices again.", "설정이 바뀌었습니다. 현재 선택을 다시 확인하세요.")
                 : L("These rules could not be saved: ", "규칙을 저장하지 못했습니다: ") + errors.joined(separator: ", ")
@@ -89,7 +95,20 @@ extension AppModel {
             && (next.automaticMode != controller.v4Settings.automaticMode || selected?.id != old?.id
                 || selected?.options != old?.options || selected?.nextManualMinutes != old?.nextManualMinutes)
         if appliesDefaults, let selected { next.nextManualOptions = selected.options }
-        return controller.setV4Settings(next, presetDefaults: appliesDefaults ? selected : nil)
+        var comparison = next
+        comparison.generation = controller.v4Settings.generation
+        guard comparison != controller.v4Settings
+                || powerCondition.map({ $0 != controller.settings.condition }) == true else { return true }
+        // The transfer document intentionally omits runtime power scope. Commit
+        // its CAS generation explicitly, including a scope-only editor change.
+        v4ConfigurationTransaction = true
+        defer { v4ConfigurationTransaction = false }
+        guard controller.setV4Settings(next, presetDefaults: appliesDefaults ? selected : nil,
+                                       powerCondition: powerCondition) else { return false }
+        v4ConfigurationGeneration = next.generation
+        defaults.set(Int(clamping: next.generation), forKey: "v4ConfigurationGeneration")
+        v4PreviousDocument = v4Document
+        return true
     }
     @discardableResult
     func finishOnboarding(automaticEnabled: Bool, allowClosedLid: Bool) -> Bool {
@@ -133,7 +152,9 @@ extension AppModel {
     /// Keep only the generation used to reject stale rule/import drafts.
     /// The retired settings history is neither loaded, collected nor replayed.
     func loadV4ConfigurationGeneration() {
-        v4ConfigurationGeneration = UInt64(max(0, defaults.integer(forKey: "v4ConfigurationGeneration")))
+        v4ConfigurationGeneration = max(
+            UInt64(max(0, defaults.integer(forKey: "v4ConfigurationGeneration"))),
+            userSession?.v4Settings.generation ?? 0)
         v4PreviousDocument = v4Document
     }
     func refreshV4ConfigurationGeneration() {

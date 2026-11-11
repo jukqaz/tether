@@ -528,7 +528,7 @@ final class DisplaySessionControllerTests: XCTestCase {
     @MainActor
     private func withFixture(_ body: (UserDefaults, DisplaySessionAssertionFixture, DisplaySessionAssertionFixture) throws -> Void) rethrows {
         let name = "tether-display-session-test-" + UUID().uuidString
-        let defaults = UserDefaults(suiteName: name)!
+        let defaults = TestMemoryDefaults(domain: name)
         defer { defaults.removePersistentDomain(forName: name) }
         try body(defaults, DisplaySessionAssertionFixture(id: 9), DisplaySessionAssertionFixture(id: 19))
     }

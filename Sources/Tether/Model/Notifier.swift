@@ -53,7 +53,7 @@ final class Notifier {
                 : L("Stopped for battery protection", "배터리 보호로 유지를 중단했습니다")
             post(title: title,
                  body: protectionReason(reason) + " " + L("Review Protection in Tether settings. Recovery does not restart ended manual sessions.",
-                     "Tether 설정의 기기 보호를 확인하세요. 회복되어도 끝난 수동 세션은 다시 켜지지 않습니다."))
+                     "Tether 설정의 보호·진단을 확인하세요. 안전해져도 종료한 수동 유지는 다시 시작하지 않습니다."))
         }
     }
 

@@ -64,7 +64,7 @@ final class LiveUIBindingTests: XCTestCase {
                 XCTAssertEqual(model.workSessionHolding, !ready)
                 XCTAssertNil(model.errorText)
                 XCTAssertEqual(model.presentation.title, ready ? "Keep-awake is off"
-                    : manual ? "Manual session active" : "Keeping work running")
+                    : manual ? "Manual keep-awake active" : "Automatic keep-awake active")
                 if manual && arguments.contains("--timed") {
                     XCTAssertEqual(try XCTUnwrap(work.status.until).timeIntervalSinceNow, 1800, accuracy: 2)
                 }
@@ -204,8 +204,8 @@ final class LiveUIBindingTests: XCTestCase {
             XCTAssertEqual(SettingsPage.allCases.map(\.shortTitle), ["Power & Lid", "Manual", "Protection", "General"],
                 "A compact visible label must retain a distinct complete accessible title")
             Localization.current = .korean
-            XCTAssertEqual(SettingsPage.allCases.map(\.title), ["전원·덮개", "직접 유지", "보호·진단", "일반"])
-            XCTAssertEqual(SettingsPage.allCases.map(\.shortTitle), ["전원·덮개", "직접 유지", "보호·진단", "일반"])
+            XCTAssertEqual(SettingsPage.allCases.map(\.title), ["전원·덮개", "수동 유지", "보호·진단", "일반"])
+            XCTAssertEqual(SettingsPage.allCases.map(\.shortTitle), ["전원·덮개", "수동 유지", "보호·진단", "일반"])
             XCTAssertEqual(Set(SettingsPage.allCases.map(\.title)).count, 4)
         }
     }
@@ -331,14 +331,14 @@ final class LiveUIBindingTests: XCTestCase {
                 XCTAssertEqual(model.automaticBatteryEnded, advanced,
                     "A legacy battery marker is relevant to explicit advanced scope, not the AC-only basic mode")
                 XCTAssertEqual(panel.statusTitle, advanced
-                    ? L("Automatic battery session ended", "자동 배터리 유지 종료")
+                    ? L("Automatic battery keep-awake ended", "배터리 자동 유지 종료")
                     : L("Waiting to start automatically", "자동 시작 대기 중"))
                 XCTAssertEqual(panel.statusDetail, advanced ? model.presentation.subtitle : nil)
                 XCTAssertFalse(model.workSessionHolding)
                 XCTAssertEqual(defaults.data(forKey: UserSessionController.preferenceKey), saved)
                 XCTAssertTrue(controller.start(duration: 1800))
                 XCTAssertFalse(model.automaticBatteryEnded)
-                XCTAssertEqual(panel.statusTitle, L("Timer active", "타이머 실행 중"),
+                XCTAssertEqual(panel.statusTitle, L("Manual keep-awake active", "수동 유지 중"),
                     "A new manual timer must take precedence over the spent automatic marker")
             }
         }
@@ -610,6 +610,34 @@ final class LiveUIBindingTests: XCTestCase {
         }
     }
 
+    func testMenuPermissionStatusDoesNotCallAnUnverifiedActiveRequestAbsent() async throws {
+        try await MainActor.run {
+            let previous = Localization.current; defer { Localization.current = previous }
+            for language in [Language.english, .korean] {
+                Localization.current = language
+                let (model, controller, backend) = fixture()
+                defer { _ = controller.end() }
+                model.setKeepDisplayAwake(true)
+                var next = controller.v4Settings
+                next.nextManualOptions.display = false
+                XCTAssertTrue(controller.setV4Settings(next))
+                model.startManualSession(minutes: 30)
+                let request = try XCTUnwrap(controller.manualRequestID)
+                let deadline = controller.status.manualContinuousDeadline
+                backend.observedLevel = nil
+                controller.update(power: .ac, thermal: 0, fullWake: true, controllingUser: true,
+                    now: ContinuousTime.now, batteryPercent: 80)
+                XCTAssertTrue(model.manualSessionActive)
+                XCTAssertFalse(model.workSessionHolding)
+                XCTAssertNil(controller.status.displayError)
+                XCTAssertEqual(MenuKeepAwakeControls(model: model).displayStatusDetail,
+                    L("Allowed · keep-awake not confirmed", "허용 저장됨 · 유지 적용 확인 필요"))
+                XCTAssertEqual(controller.manualRequestID, request)
+                XCTAssertEqual(controller.status.manualContinuousDeadline, deadline)
+            }
+        }
+    }
+
     func testMenuDisplayStatusSeparatesSavedChoiceActiveRequestPauseAndUnconfirmedExecution() async throws {
         try await MainActor.run {
             let previous = Localization.current; defer { Localization.current = previous }
@@ -621,7 +649,7 @@ final class LiveUIBindingTests: XCTestCase {
                 let controls = MenuKeepAwakeControls(model: model, openHelperSetup: {})
                 XCTAssertEqual(controls.displayStatusDetail, L("Display sleep follows macOS", "화면 절전은 macOS에 맡김"))
                 controls.displayBinding.wrappedValue = true
-                XCTAssertEqual(controls.displayStatusDetail, L("Applies when work starts", "작업이 시작되면 적용"))
+                XCTAssertEqual(controls.displayStatusDetail, L("Allowed · no keep-awake session active", "허용 저장됨 · 현재 유지 없음"))
 
                 var next = controller.v4Settings
                 next.nextManualOptions.display = false
@@ -630,19 +658,19 @@ final class LiveUIBindingTests: XCTestCase {
                 XCTAssertTrue(model.workSessionHolding)
                 XCTAssertEqual(controller.status.displayHolding, false)
                 XCTAssertEqual(controls.displayStatusDetail,
-                    L("Enabled · not currently applied", "선택 켬 · 현재 화면 유지는 미적용"),
+                    L("Allowed · not applied to this session", "허용됨 · 이번 유지에는 화면 켜두기 미적용"),
                     "A saved global choice is not proof that this request's options include display keeping")
 
                 model.setEnabled(false)
                 XCTAssertEqual(controls.displayStatusDetail,
-                    L("Choice saved · work is stopped", "선택 저장됨 · 작업은 중지 중"))
+                    L("All keep-awake stopped · permission stays enabled", "모두 중지됨 · 허용 설정 유지"))
                 model.setEnabled(true)
                 next = controller.v4Settings; next.nextManualOptions.display = true
                 XCTAssertTrue(controller.setV4Settings(next))
                 model.startManualSession(minutes: 30)
                 XCTAssertEqual(controller.status.displayHolding, true)
                 XCTAssertEqual(controls.displayStatusDetail,
-                    L("Display kept awake · macOS lock policy applies", "화면 유지 중 · 잠금은 macOS 설정"))
+                    L("Display keep-awake requested · locking follows macOS", "화면 켜두기 요청 중 · 잠금은 macOS 설정을 따름"))
 
                 display.observedLevel = nil
                 controller.update(power: .ac, thermal: 0, fullWake: true, controllingUser: true,
@@ -656,12 +684,93 @@ final class LiveUIBindingTests: XCTestCase {
                 let displayCreates = display.creates, displayReleases = display.releases
                 for _ in 0..<3 {
                     XCTAssertEqual(controls.displayStatusDetail,
-                        L("Display keep-awake needs review", "화면 유지 확인 필요"))
+                        L("Display keep-awake needs review", "화면 켜두기 확인 필요"))
                 }
                 XCTAssertEqual(controller.status, before)
                 XCTAssertEqual(model.defaults.data(forKey: UserSessionController.preferenceKey), saved)
                 XCTAssertEqual(backend.creates, creates); XCTAssertEqual(backend.releases, releases)
                 XCTAssertEqual(display.creates, displayCreates); XCTAssertEqual(display.releases, displayReleases)
+            }
+        }
+    }
+
+    func testLidCopySeparatesPermissionSessionSelectionAndStopWithoutChangingWork() async throws {
+        try await MainActor.run {
+            let previous = Localization.current; defer { Localization.current = previous }
+            for language in [Language.english, .korean] {
+                Localization.current = language
+                let (model, controller, backend) = fixture()
+                defer { _ = controller.end() }
+                controller.setAllowClosedLid(true)
+                var next = controller.v4Settings
+                next.nextManualOptions.closedLid = false
+                XCTAssertTrue(controller.setV4Settings(next))
+                model.startManualSession(minutes: 30)
+                XCTAssertTrue(model.workSessionHolding)
+                XCTAssertFalse(controller.v4LidRequested)
+                XCTAssertEqual(model.lidUsageStatusText,
+                    L("Checking lid state · closed-lid use not selected for this session",
+                      "덮개 상태 확인 중 · 이번 유지에는 덮개 기능 미선택"))
+                XCTAssertTrue(model.generalSessionDetail.contains(
+                    L("closed-lid use not selected for this session", "이번 유지에는 덮개 기능 미선택")))
+
+                let request = controller.manualRequestID
+                let deadline = controller.status.manualContinuousDeadline
+                let before = controller.status
+                let saved = model.defaults.data(forKey: UserSessionController.preferenceKey)
+                let creates = backend.creates, releases = backend.releases
+                for _ in 0..<3 {
+                    XCTAssertEqual(MenuKeepAwakeControls(model: model).lidStatusDetail, model.lidUsageStatusText)
+                    XCTAssertFalse(model.lidUsageStatusText.contains(L("Lid closed", "덮개 닫힘")))
+                    XCTAssertFalse(model.lidUsageStatusText.contains(L("Lid open", "덮개 열림")))
+                }
+                XCTAssertEqual(controller.manualRequestID, request)
+                XCTAssertEqual(controller.status.manualContinuousDeadline, deadline)
+                XCTAssertEqual(controller.status, before)
+                XCTAssertEqual(model.defaults.data(forKey: UserSessionController.preferenceKey), saved)
+                XCTAssertEqual(backend.creates, creates); XCTAssertEqual(backend.releases, releases)
+
+                controller.setAllowClosedLid(false)
+                XCTAssertTrue(model.workSessionHolding)
+                XCTAssertTrue(model.generalSessionDetail.contains(
+                    L("closed-lid permission off", "덮개 유지 허용 꺼짐")))
+                controller.setAllowClosedLid(true)
+                model.setEnabled(false)
+                XCTAssertEqual(model.lidUsageStatusText,
+                    L("Checking lid state · All keep-awake stopped", "덮개 상태 확인 중 · 모두 중지됨"))
+                controller.setAllowClosedLid(false)
+                XCTAssertEqual(model.lidUsageStatusText,
+                    L("Checking lid state · closed-lid permission off", "덮개 상태 확인 중 · 덮개 유지 허용 꺼짐"))
+            }
+        }
+    }
+
+    func testLegacyLidDetailDoesNotTreatMissingObservationAsOpen() async {
+        await MainActor.run {
+            let previous = Localization.current; defer { Localization.current = previous }
+            for language in [Language.english, .korean] {
+                Localization.current = language
+                for closed in [Optional(false), Optional(true), nil] {
+                    let isolatedReply = ServiceReply(id: UUID(), ok: true, epoch: "lid-copy-legacy",
+                        revision: 1, control: Control(),
+                        protection: .init(reason: nil, error: nil, dryRun: true))
+                    let model = AppModel(preview: true,
+                        capabilities: .init(supportedPlatform: true, internalBattery: true, lid: true),
+                        previewLegacyObservation: { .init(power: .ac, lidClosed: closed, sleepDisabled: false) },
+                        previewWorkService: { _ in throw ServiceFailure("lid-copy-legacy-isolated") },
+                        previewHelperReply: isolatedReply, previewDefaults: LiveUIDefaults(),
+                        previewHelperFiles: { [] })
+                    XCTAssertFalse(model.usesUserSession)
+                    XCTAssertEqual(model.snapshot.observedLidClosed, closed)
+                    if closed == nil {
+                        XCTAssertEqual(model.lidDetail, L("Checking lid state", "덮개 상태 확인 중"))
+                    } else if closed == false {
+                        XCTAssertEqual(model.lidDetail,
+                            L("Lid open · macOS controls display sleep", "덮개 열림 · 화면 끄기는 macOS 설정에 따름"))
+                    } else {
+                        XCTAssertFalse(model.lidDetail.contains(L("Lid open", "덮개 열림")))
+                    }
+                }
             }
         }
     }
@@ -747,7 +856,7 @@ final class LiveUIBindingTests: XCTestCase {
             XCTAssertEqual(controller.runtimeMarkers.pauseReason, .userSleep)
             XCTAssertTrue(model.workPaused)
             XCTAssertEqual(model.presentation.title, "Waiting after Sleep request")
-            XCTAssertEqual(model.manualStartBlockedDetail, "Choose Resume before starting a manual session.")
+            XCTAssertEqual(model.manualStartBlockedDetail, "Choose Resume before starting manual keep-awake.")
             XCTAssertFalse(model.canStartManualSession)
             XCTAssertFalse(model.workSessionHolding)
             XCTAssertEqual(backend.creates, creates, "Displaying Resume cannot restart work")
@@ -949,9 +1058,9 @@ final class LiveUIBindingTests: XCTestCase {
                 let requestID = try XCTUnwrap(controller.manualRequestID)
                 let deadline = try XCTUnwrap(controller.status.manualContinuousDeadline)
                 let summaries: [(WorkSessionDisconnectPolicy, String)] = [
-                    (.endAll, L("Unplug: end all sessions", "전원 분리 시 모두 종료")),
-                    (.endAutomatic, L("Unplug: end automatic sessions", "전원 분리 시 자동 유지 종료")),
-                    (.continueEligible, L("Unplug: continue eligible sessions", "전원 분리 시 허용된 유지 계속"))
+                    (.endAll, L("End all current work", "현재 유지 모두 종료")),
+                    (.endAutomatic, L("End automatic · eligible manual work continues", "자동 종료 · 허용된 수동 유지 계속")),
+                    (.continueEligible, L("Continue battery-eligible work only", "배터리 허용 유지 계속"))
                 ]
                 let panel = TetherPanel(model: model)
                 for (policy, expected) in summaries {
@@ -988,7 +1097,10 @@ final class LiveUIBindingTests: XCTestCase {
                 XCTAssertTrue(try XCTUnwrap(controller.v4ManualSnapshot).confirmed)
                 XCTAssertEqual(controller.v4ManualSnapshot?.batteryTimeLimit, .unlimited)
                 XCTAssertTrue(controls.hasConfirmedUnlimitedDuration)
-                XCTAssertEqual(controls.remainingDescription, L("Until turned off", "끄기 전까지"))
+                XCTAssertEqual(controls.remainingDescription, L("Until ended", "종료할 때까지"))
+                XCTAssertEqual(model.manualCountdown(at: Date()), controls.remainingDescription,
+                    "The status summary and menu must use the captured unlimited permission")
+                XCTAssertEqual(TetherPanel(model: model).statusTitle, L("Manual keep-awake active", "수동 유지 중"))
 
                 model.setBatteryTimeLimit(.thirtyMinutes)
                 XCTAssertEqual(model.v3Settings.batteryTimeLimit, .thirtyMinutes)
@@ -1001,7 +1113,9 @@ final class LiveUIBindingTests: XCTestCase {
                 let creates = backend.creates, releases = backend.releases
                 for _ in 0..<3 {
                     XCTAssertTrue(controls.hasConfirmedUnlimitedDuration)
-                    XCTAssertEqual(controls.remainingDescription, L("Until turned off", "끄기 전까지"))
+                    XCTAssertEqual(controls.remainingDescription, L("Until ended", "종료할 때까지"))
+                    XCTAssertEqual(model.manualCountdown(at: Date()), controls.remainingDescription)
+                    XCTAssertTrue(GeneralPage(model: model).currentManualDetail.contains(model.hasConfirmedUntimedManualSession ? L("Until ended", "종료할 때까지") : L("Checking end time", "종료 시간 확인 중")))
                 }
                 XCTAssertEqual(controller.status, before)
                 XCTAssertEqual(model.defaults.data(forKey: UserSessionController.preferenceKey), saved)
@@ -1014,12 +1128,43 @@ final class LiveUIBindingTests: XCTestCase {
                 let unknownSaved = model.defaults.data(forKey: UserSessionController.preferenceKey)
                 for _ in 0..<3 {
                     XCTAssertFalse(controls.hasConfirmedUnlimitedDuration)
-                    XCTAssertEqual(controls.remainingDescription, L("Checking deadline", "마감 확인 중"))
+                    XCTAssertEqual(controls.remainingDescription, L("Checking end time", "종료 시간 확인 중"))
+                    XCTAssertEqual(model.manualCountdown(at: Date()), controls.remainingDescription)
+                    XCTAssertTrue(GeneralPage(model: model).currentManualDetail.contains(model.hasConfirmedUntimedManualSession ? L("Until ended", "종료할 때까지") : L("Checking end time", "종료 시간 확인 중")))
                 }
                 XCTAssertEqual(controller.status, unknown)
                 XCTAssertEqual(model.defaults.data(forKey: UserSessionController.preferenceKey), unknownSaved)
                 XCTAssertEqual(controller.manualRequestID, requestID)
                 XCTAssertEqual(backend.creates, creates); XCTAssertEqual(backend.releases, releases)
+            }
+        }
+    }
+
+    func testUnconfirmedAcRequestCannotAdvertiseUntimedWork() async throws {
+        try await MainActor.run {
+            let previous = Localization.current; defer { Localization.current = previous }
+            for language in [Language.english, .korean] {
+                Localization.current = language
+                let (model, controller, backend) = fixture(power: .ac)
+                defer { _ = controller.end() }
+                XCTAssertTrue(controller.start(duration: nil))
+                let requestID = try XCTUnwrap(controller.manualRequestID)
+                XCTAssertTrue(model.hasConfirmedUntimedManualSession)
+                backend.observedLevel = nil
+                controller.update(power: .ac, thermal: 0, fullWake: true, controllingUser: true,
+                    now: ContinuousTime.now, batteryPercent: 80)
+                XCTAssertTrue(model.manualSessionActive)
+                XCTAssertNil(model.manualSessionUntil)
+                XCTAssertFalse(model.hasConfirmedUntimedManualSession)
+                let before = controller.status
+                let saved = model.defaults.data(forKey: UserSessionController.preferenceKey)
+                for _ in 0..<3 {
+                    XCTAssertEqual(model.manualCountdown(at: Date()), L("Checking end time", "종료 시간 확인 중"))
+                    XCTAssertTrue(GeneralPage(model: model).currentManualDetail.contains(L("Checking end time", "종료 시간 확인 중")))
+                }
+                XCTAssertEqual(controller.status, before)
+                XCTAssertEqual(controller.manualRequestID, requestID)
+                XCTAssertEqual(model.defaults.data(forKey: UserSessionController.preferenceKey), saved)
             }
         }
     }
@@ -1050,7 +1195,9 @@ final class LiveUIBindingTests: XCTestCase {
                 let creates = backend.creates, releases = backend.releases
                 for _ in 0..<3 {
                     XCTAssertFalse(controls.hasConfirmedUnlimitedDuration)
-                    XCTAssertEqual(controls.remainingDescription, L("Checking deadline", "마감 확인 중"))
+                    XCTAssertEqual(controls.remainingDescription, L("Checking end time", "종료 시간 확인 중"))
+                    XCTAssertEqual(model.manualCountdown(at: Date()), controls.remainingDescription)
+                    XCTAssertTrue(GeneralPage(model: model).currentManualDetail.contains(model.hasConfirmedUntimedManualSession ? L("Until ended", "종료할 때까지") : L("Checking end time", "종료 시간 확인 중")))
                 }
                 XCTAssertEqual(controller.status, before)
                 XCTAssertEqual(model.defaults.data(forKey: UserSessionController.preferenceKey), saved)
@@ -1152,7 +1299,7 @@ final class LiveUIBindingTests: XCTestCase {
             XCTAssertTrue(model.manualSessionActive); XCTAssertTrue(model.workSessionHolding)
             XCTAssertEqual(controller.status.manualContinuousDeadline, deadline)
             XCTAssertFalse(model.automaticWorkReasonActive)
-            XCTAssertEqual(model.manualEndingDetail, "Ending this session turns keep-awake off.")
+            XCTAssertEqual(model.manualEndingDetail, "Ending manual keep-awake turns keep-awake off.")
             model.endManualSession()
             XCTAssertFalse(model.workSessionHolding); XCTAssertEqual(backend.releases, 1)
         }
@@ -1168,7 +1315,7 @@ final class LiveUIBindingTests: XCTestCase {
             model.startManualSession(minutes: 15)
             model.setEnabled(false)
             XCTAssertTrue(model.workPaused)
-            XCTAssertEqual(model.manualStartBlockedDetail, "Choose Resume before starting a manual session.")
+            XCTAssertEqual(model.manualStartBlockedDetail, "Choose Resume before starting manual keep-awake.")
             model.setAutomaticEnabled(false); model.setAutomaticEnabled(true)
             XCTAssertFalse(model.workSessionHolding); XCTAssertFalse(model.manualSessionActive)
             XCTAssertTrue(model.workPaused)
@@ -1405,15 +1552,13 @@ final class LiveUIBindingTests: XCTestCase {
                         .environment(\.colorScheme, .dark)
                         .environment(\.tetherReduceTransparencyOverride, true)
                         .environment(\.tetherContrastOverride, .increased))
-                    XCTAssertEqual(panel.fittingSize.width, 304, accuracy: 0.5)
+                    XCTAssertEqual(panel.fittingSize.width, 380, accuracy: 0.5)
                     XCTAssertGreaterThan(panel.fittingSize.height, 140,
-                        "Compact status, controls and persistent actions still need a readable surface")
+                        "Status, controls and persistent actions need a readable surface")
                     XCTAssertLessThanOrEqual(panel.fittingSize.height, WorkSessionMetrics.panelMaximumHeight)
-                    if !active {
-                        // Includes the two newly approved lid/display quick controls
-                        // and the inline helper setup link, without scrolling.
-                        XCTAssertLessThanOrEqual(panel.fittingSize.height, 320)
-                    }
+                    // The larger reading scale may scroll; the measured body
+                    // viewport must preserve the persistent footer instead of
+                    // compressing controls to an arbitrary compact budget.
                     try assertSnapshot(panel, size: panel.fittingSize)
                 }
                 for page in SettingsPage.allCases {
@@ -1422,11 +1567,11 @@ final class LiveUIBindingTests: XCTestCase {
                         .environment(\.colorScheme, .dark)
                         .environment(\.tetherReduceTransparencyOverride, true)
                         .environment(\.tetherContrastOverride, .increased)
-                        .frame(width: 640, height: 480))
-                    XCTAssertEqual(WorkSessionMetrics.settingsMinimum, CGSize(width: 600, height: 440))
-                    XCTAssertEqual(settings.fittingSize.width, 640, accuracy: 0.5)
-                    XCTAssertEqual(settings.fittingSize.height, 480, accuracy: 0.5)
-                    try assertSnapshot(settings, size: CGSize(width: 640, height: 480))
+                        .frame(width: 720, height: 560))
+                    XCTAssertEqual(WorkSessionMetrics.settingsMinimum, CGSize(width: 720, height: 560))
+                    XCTAssertEqual(settings.fittingSize.width, 720, accuracy: 0.5)
+                    XCTAssertEqual(settings.fittingSize.height, 560, accuracy: 0.5)
+                    try assertSnapshot(settings, size: CGSize(width: 720, height: 560))
                 }
             }
         }
@@ -1467,7 +1612,7 @@ final class LiveUIBindingTests: XCTestCase {
                             let panel = NSHostingView(rootView: TetherPanel(model: model, maximumHeight: viewport)
                                 .environment(\.colorScheme, .dark)
                                 .environment(\.tetherReduceTransparencyOverride, true))
-                            XCTAssertEqual(panel.fittingSize.width, 304, accuracy: 0.5)
+                            XCTAssertEqual(panel.fittingSize.width, 380, accuracy: 0.5)
                             XCTAssertLessThanOrEqual(panel.fittingSize.height, viewport,
                                 "Overflow: language=\(language), portable=\(portable), state=\(state)")
                             try assertSnapshot(panel, size: panel.fittingSize)

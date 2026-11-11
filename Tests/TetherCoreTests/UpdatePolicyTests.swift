@@ -3,9 +3,7 @@ import XCTest
 
 final class UpdatePolicyTests: XCTestCase {
     @MainActor func testLegacyBuildOnlyAttemptDoesNotBlockCurrentContractAndOffIsPreserved() throws {
-        let domain = "io.github.jukqaz.tether.upgrade-attempt-test.\(UUID())"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: domain))
-        defer { defaults.removePersistentDomain(forName: domain) }
+        let defaults = CoreMemoryDefaults()
         defaults.set(String(TetherPaths.build), forKey: "helperUpgradeAttemptedBuild")
         defaults.set(false, forKey: "enabled")
         XCTAssertTrue(HelperUpgradeAttempt.claim(in: defaults))
@@ -16,9 +14,7 @@ final class UpdatePolicyTests: XCTestCase {
     }
 
     @MainActor func testCoordinatorContractChangeAllowsOneNewAutomaticAttempt() throws {
-        let domain = "io.github.jukqaz.tether.upgrade-attempt-test.\(UUID())"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: domain))
-        defer { defaults.removePersistentDomain(forName: domain) }
+        let defaults = CoreMemoryDefaults()
         let oldContract = "\(TetherPaths.version):\(TetherPaths.build):protocol2:schema\(Control.currentSchema):coordinator3"
         defaults.set(oldContract, forKey: HelperUpgradeAttempt.preferenceKey)
         XCTAssertNotEqual(oldContract, HelperUpgradeAttempt.currentContractID)

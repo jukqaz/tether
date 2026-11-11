@@ -24,7 +24,7 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2026.10.1</string>
+	<string>2026.11.1</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -37,7 +37,7 @@
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>58</string>
+	<string>59</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>26.0</string>
 	<key>LSUIElement</key>
@@ -69,7 +69,7 @@
 	<key>TetherBetaIteration</key>
 	<integer>1</integer>
 	<key>TetherDesignRevision</key>
-	<string>2026-10-15-v4-compact-approved</string>
+	<string>2026-11-11-native-sidebar</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Tether needs full Calendar access to read only the time and availability of the calendars you select. It does not create or edit events.</string>
 </dict>

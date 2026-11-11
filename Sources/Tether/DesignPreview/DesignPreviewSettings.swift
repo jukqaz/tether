@@ -11,7 +11,7 @@ struct DesignPreviewSettings: View {
     @ObservedObject var state: DesignPreviewState
     var snapshot = false
 
-    init(state: DesignPreviewState, page: Page = .sessions, showPreviewControls: Bool = false, snapshot: Bool = false) {
+    init(state: DesignPreviewState, page: Page = .sessions, snapshot: Bool = false) {
         self.state = state
         self.snapshot = snapshot
         state.model.settingsPage = page.settingsPage
