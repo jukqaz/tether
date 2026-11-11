@@ -53,7 +53,8 @@ struct ManualDefaultsOptionsView: View {
                     .accessibilityIdentifier("manual-defaults-lid-global-note")
             }
             SettingsDisclosure(title: L("Application Details", "적용 범위 자세히"),
-                isExpanded: applicationDetailsExpansion, groupsSection: false) {
+                isExpanded: applicationDetailsExpansion, groupsSection: false,
+                identifier: "manual-defaults-application-details") {
                 Note(manualOptionsSaveScope)
                     .accessibilityIdentifier("manual-defaults-scope")
                 Note(L("App-wide permission is set separately in Power & Lid. Features are checked again when work starts.",
@@ -72,7 +73,7 @@ struct ManualDefaultsOptionsView: View {
             SettingsToggle(title: L("Keep the display on", "화면 켜두기"),
                 isOn: $draft.nextManualOptions.display, identifier: "manual-defaults-display")
                 .disabled(controlsDisabled)
-            SettingRow(title: L("Release display after inactivity", "입력이 없으면 화면 켜두기 해제")) {
+            SettingRow(title: L("Release when inactive", "입력 없을 때 켜두기 해제")) {
                 CompactPopUp(title: L("Display inactivity timeout", "입력 없이 대기할 시간"),
                     selection: $draft.nextManualOptions.releaseDisplayAfterIdle,
                     choices: idleChoices, identifier: "manual-defaults-display-idle")
@@ -90,16 +91,20 @@ struct ManualDefaultsOptionsView: View {
     @ViewBuilder
     private var editorActions: some View {
         if embedded {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: SettingsMetrics.rowSpacing) {
-                    draftStatus.fixedSize(horizontal: true, vertical: true)
-                    Spacer(minLength: 0)
-                    editorButtons
+            if hasChanges {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: SettingsMetrics.rowSpacing) {
+                        draftStatus.fixedSize(horizontal: true, vertical: true)
+                        Spacer(minLength: 0)
+                        editorButtons
+                    }
+                    VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
+                        draftStatus
+                        editorButtons.frame(maxWidth: .infinity, alignment: .trailing)
+                    }
                 }
-                VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
-                    draftStatus
-                    editorButtons.frame(maxWidth: .infinity, alignment: .trailing)
-                }
+            } else {
+                draftStatus
             }
         } else {
             editorButtons.frame(maxWidth: .infinity, alignment: .trailing)
@@ -107,7 +112,8 @@ struct ManualDefaultsOptionsView: View {
     }
 
     private var draftStatus: some View {
-        Note(hasChanges ? L("Unsaved changes", "저장할 변경 있음") : L("Saved defaults", "저장된 설정"))
+        Note(hasChanges ? L("Unsaved changes", "저장하지 않은 변경")
+            : L("Saved · applies at the next manual start", "저장됨 · 다음 수동 시작에 적용"))
             .accessibilityIdentifier("manual-defaults-save-summary")
     }
 

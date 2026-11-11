@@ -18,25 +18,33 @@ struct SafetyPage: View {
             }
             SettingsContentGroup(L("Automatic keep-awake", "자동 유지"),
                 summary: L("Saves immediately", "즉시 저장"), summaryIdentifier: "settings-power-save-scope") {
-                SettingsToggle(title: L("Allow automatic start", "자동 시작 허용"),
-                    detail: automaticStatusSummary,
-                    isOn: Binding(get: { model.automaticEnabled }, set: { model.setAutomaticEnabled($0) }),
-                    identifier: "automatic-ac-toggle", detailIdentifier: "settings-automatic-start-state")
-                    .disabled(settingsControlsDisabled)
-                    .help(model.automaticStartStateDetail)
-                SettingRow(title: automaticConditionSummary) {
-                    CompactPushButton(L("Conditions…", "조건 설정…"),
-                        identifier: "settings-automatic-rules") { showAutomaticConditions = true }
+                VStack(alignment: .leading, spacing: 4) {
+                    SettingsToggle(title: L("Allow automatic start", "자동 시작 허용"),
+                        detail: automaticStatusSummary,
+                        isOn: Binding(get: { model.automaticEnabled }, set: { model.setAutomaticEnabled($0) }),
+                        identifier: "automatic-ac-toggle", detailIdentifier: "settings-automatic-start-state")
                         .disabled(settingsControlsDisabled)
-                }.accessibilityIdentifier("settings-automatic-mode-summary")
+                        .help(model.automaticStartStateDetail)
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            automaticConditionsSummary
+                            automaticConditionsButton
+                        }
+                        VStack(alignment: .leading, spacing: 4) {
+                            automaticConditionsSummary
+                            automaticConditionsButton
+                        }
+                    }
+                    .padding(.leading, SettingsMetrics.checkboxTextInset)
+                }
             }
 
-            SettingsContentGroup(L("Power & lid behavior", "전원·덮개 동작")) {
+            VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
                 if model.hasInternalBattery {
                     PowerEventSettingsSection(title: L("When power disconnects", "전원을 분리하면"),
                         outcome: disconnectEventSummary, outcomeIdentifier: "settings-unplug-policy-summary",
                         isExpanded: unplugExpansion) {
-                        SettingRow(title: L("Existing work", "진행 중인 유지")) {
+                        SettingRow(title: L("Active work", "진행 중인 유지")) {
                             CompactPopUp(title: L("Unplug policy", "전원 분리 규칙"), selection: Binding(
                                 get: { model.v3Settings.disconnectPolicy }, set: { model.setDisconnectPolicy($0) }), choices: [
                                 PopupChoice(WorkSessionDisconnectPolicy.endAll, L("End all · Recommended", "모두 끝내기 · 권장")),
@@ -46,7 +54,9 @@ struct SafetyPage: View {
                         }.accessibilityIdentifier("settings-unplug-policy")
                         Note(disconnectSummary)
                         if model.showsLidOptions && model.v3Settings.allowClosedLid {
-                            SettingRow(title: L("When the last hold ends with the lid closed", "덮개가 닫힌 채 마지막 유지가 끝나면"), showsAccessibleTitle: false) {
+                            SettingRow(title: L("After the last work ends", "마지막 유지 종료 후"),
+                                detail: L("With the lid closed after power disconnects", "전원 분리 후 덮개가 닫혀 있을 때"),
+                                showsAccessibleTitle: false) {
                                 CompactPopUp(title: L("Unplugged with lid closed", "닫힌 채 전원 분리"), selection: Binding(
                                     get: { model.v3Settings.disconnectAction }, set: { model.setDisconnectAction($0) }), choices: [
                                     PopupChoice(WorkSessionEndAction.sleepIfClosed, L("Request sleep · Recommended", "잠자기 요청 · 권장")),
@@ -84,7 +94,8 @@ struct SafetyPage: View {
                 }
                 displayPermission
                 SettingsDisclosure(title: L("Display sleep & behavior", "화면 꺼짐과 동작 안내"),
-                    isExpanded: scopeDetailsExpansion, groupsSection: false) {
+                    isExpanded: scopeDetailsExpansion, groupsSection: false,
+                    identifier: "settings-power-scope-details") {
                     lockPolicyNote
                     lockScreenSettingsButton
                     Note(WorkPermissionText.scopeDetail)
@@ -107,6 +118,21 @@ struct SafetyPage: View {
         .sheet(isPresented: $showAutomaticConditions) {
             V4AutomaticRulesView(model: model)
         }
+    }
+
+    private var automaticConditionsSummary: some View {
+        Text(automaticConditionSummary)
+            .font(TetherTypography.settingsSecondary)
+            .foregroundStyle(Color.tetherSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("settings-automatic-mode-summary")
+    }
+
+    private var automaticConditionsButton: some View {
+        Button(L("Conditions…", "조건 설정…")) { showAutomaticConditions = true }
+            .buttonStyle(.link)
+            .disabled(settingsControlsDisabled)
+            .accessibilityIdentifier("settings-automatic-rules")
     }
 
     private var displayPermission: some View {

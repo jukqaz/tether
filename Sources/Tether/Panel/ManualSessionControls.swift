@@ -17,26 +17,18 @@ struct ManualSessionControls: View {
     @State private var extensionReasonExpanded = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: compact ? 6 : 12) {
             if model.manualSessionActive, presentation != .start {
                 if compact {
-                    VStack(alignment: .leading, spacing: 6) {
-                        if showsTimedExtension {
-                            Text(model.automaticWorkReasonActive
-                                ? L("Manual time remaining", "수동 유지 남은 시간")
-                                : L("Time remaining", "남은 시간"))
-                                .font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .center, spacing: 8) {
+                            countdown.fixedSize(horizontal: true, vertical: false)
+                            Spacer(minLength: 0)
+                            currentActions.fixedSize(horizontal: true, vertical: false)
                         }
-                        ViewThatFits(in: .horizontal) {
-                            HStack(alignment: .center, spacing: 12) {
-                                countdown.fixedSize(horizontal: true, vertical: false)
-                                Spacer(minLength: 0)
-                                currentActions.fixedSize(horizontal: true, vertical: false)
-                            }
-                            VStack(alignment: .leading, spacing: 12) {
-                                countdown
-                                currentActions
-                            }
+                        VStack(alignment: .leading, spacing: 8) {
+                            countdown
+                            currentActions
                         }
                     }
                 } else {
@@ -65,7 +57,7 @@ struct ManualSessionControls: View {
                         .help(model.manualEndingDetail)
                 }
             } else if !model.manualSessionActive, presentation != .current {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: compact ? 6 : 10) {
                     ViewThatFits(in: .horizontal) {
                         HStack(spacing: 12) {
                             ManualDurationPicker(model: model).frame(minWidth: 128)
@@ -95,7 +87,10 @@ struct ManualSessionControls: View {
 
     private var countdown: some View {
         VStack(alignment: .leading, spacing: 5) {
-            if showsSessionLabel && !compact {
+            // A single clock needs no second heading. Coexisting automatic
+            // and manual deadlines still keep their names next to each value.
+            if showsSessionLabel && (!compact
+                || (model.automaticWorkReasonActive && model.batteryHoldUntil != nil)) {
                 Text(L("Manual keep-awake", "수동 유지"))
                     .font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
             }
@@ -165,7 +160,7 @@ struct ManualSessionControls: View {
         let reason = model.manualExtensionUnavailableReason(by: minutes)
         let hint = reason ?? L("Adds \(minutes) minutes to the current end time without restarting manual keep-awake.",
                                "수동 유지를 다시 시작하지 않고 현재 종료 시각에 \(minutes)분을 더합니다.")
-        return CompactPushButton(extensionButtonTitle(minutes), prominent: compact,
+        return CompactPushButton(extensionButtonTitle(minutes),
                                  identifier: "panel-extend-manual-\(minutes)") {
             model.extendManualSession(by: minutes)
         }

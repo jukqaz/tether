@@ -12,14 +12,14 @@ struct Page<Content: View>: View {
 
 /// One content column for headings and scroll content, including wide windows.
 enum SettingsMetrics {
-    static let contentWidth: CGFloat = 560
-    static let gutter: CGFloat = 24
-    static let contentTopInset: CGFloat = 12
-    static let sectionSpacing: CGFloat = 18
+    static let contentWidth: CGFloat = 520
+    static let gutter: CGFloat = 22
+    static let contentTopInset: CGFloat = 8
+    static let sectionSpacing: CGFloat = 22
     static let cardInset: CGFloat = 12
-    static let rowHeight: CGFloat = 36
+    static let rowHeight: CGFloat = 28
     static let rowSpacing: CGFloat = 8
-    static let controlWidth: CGFloat = 200
+    static let controlWidth: CGFloat = 160
     static let conditionWidth: CGFloat = 190
     static let checkboxTextInset: CGFloat = 20
 
@@ -129,7 +129,7 @@ struct SettingsSection<Content: View>: View {
     }
 }
 
-/// Flat section headings and dividers keep dense utility settings legible.
+/// A quiet heading groups related controls without turning each group into a card.
 struct SettingsContentGroup<Content: View>: View {
     let title: String
     var summary: String? = nil
@@ -149,6 +149,7 @@ struct SettingsContentGroup<Content: View>: View {
         VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
             HStack(alignment: .firstTextBaseline, spacing: 16) {
                 Text(title).font(settingsStyle ? TetherTypography.settingsSection : TetherTypography.section)
+                    .foregroundStyle(Color.tetherSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
                 if let summary {
@@ -161,9 +162,9 @@ struct SettingsContentGroup<Content: View>: View {
                 }
             }
             content
-            Divider().padding(.top, 4)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
     }
 
     private func summaryText(_ text: String) -> some View {
@@ -179,18 +180,12 @@ struct SettingsDisclosure<Content: View>: View {
     var summary: String? = nil
     @Binding var isExpanded: Bool
     var groupsSection = true
+    var identifier: String? = nil
     @ViewBuilder var content: Content
     @Environment(\.tetherSettingsStyle) private var settingsStyle
 
-    @ViewBuilder var body: some View {
-        if groupsSection {
-            VStack(alignment: .leading, spacing: 4) {
-                disclosure
-                Divider()
-            }
-        } else {
-            disclosure
-        }
+    var body: some View {
+        disclosure.padding(.vertical, groupsSection ? 2 : 0)
     }
 
     private var disclosure: some View {
@@ -220,8 +215,13 @@ struct SettingsDisclosure<Content: View>: View {
         .accessibilityElement(children: .contain)
     }
 
-    private var titleText: some View {
-        Text(title).font(settingsStyle ? TetherTypography.settingsBody : TetherTypography.body)
+    @ViewBuilder private var titleText: some View {
+        if let identifier {
+            Text(title).font(settingsStyle ? TetherTypography.settingsBody : TetherTypography.body)
+                .accessibilityIdentifier(identifier)
+        } else {
+            Text(title).font(settingsStyle ? TetherTypography.settingsBody : TetherTypography.body)
+        }
     }
 
     private func summaryText(_ text: String) -> some View {

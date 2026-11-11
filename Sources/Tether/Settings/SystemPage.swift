@@ -50,15 +50,17 @@ struct SystemPage: View {
             }.accessibilityIdentifier("settings-notifications-details")
 
             SettingsContentGroup(L("Updates", "업데이트")) {
-                SettingRow(title: L("Update status", "업데이트 상태"), detail: updateSummary) { updateCheckButton }
+                SettingRow(title: updateSummary) { updateCheckButton }
                 SettingsToggle(title: L("Check for updates automatically", "업데이트 자동 확인"), isOn: $model.checkUpdates)
                     .disabled(model.userCommandsArePreview || model.developmentService)
                 SettingsDisclosure(title: L("Installation Details", "설치 안내"),
-                    isExpanded: updateExpansion, groupsSection: false) { updateDetails }
+                    isExpanded: updateExpansion, groupsSection: false,
+                    identifier: "settings-updates-details") { updateDetails }
                     .accessibilityIdentifier("settings-updates-details")
             }
 
-            SettingsDisclosure(title: L("Advanced Integrations", "고급 연동"), isExpanded: advancedExpansion) {
+            SettingsDisclosure(title: L("Advanced Integrations", "고급 연동"), isExpanded: advancedExpansion,
+                identifier: "settings-app-advanced-details") {
                 SettingRow(title: L("Command-line control", "명령으로 제어"),
                     detail: L("Start, extend or end manual keep-awake with the supported CLI and URLs", "지원되는 CLI·URL로 수동 유지를 시작·연장·종료합니다")) {
                     Button(L("Usage…", "사용 방법…")) { showCommandLineGuide = true }
@@ -77,7 +79,7 @@ struct SystemPage: View {
                 }
             }.accessibilityIdentifier("settings-app-advanced-details")
 
-            SettingsDisclosure(title: L("About & Quit Behavior", "앱 정보와 종료 동작"),
+            SettingsDisclosure(title: L("About Tether", "앱 정보"),
                 summary: AppModel.appDisplayVersion, isExpanded: appDetailsExpansion) {
                 Note(L("Quitting ends Tether keep-awake and restores its power and display changes. Saved preferences are retained. Ended manual keep-awake will not restart.",
                        "앱을 종료하면 Tether 유지를 끝내고 변경한 전원·화면 상태를 복원합니다. 저장한 환경설정은 유지하며, 종료된 수동 유지는 다시 시작하지 않습니다."))

@@ -5,13 +5,12 @@ import TetherCore
 struct GeneralPage: View {
     @ObservedObject var model: AppModel
     var disclosures: Binding<SettingsDisclosureState>? = nil
-    @State private var manualBatteryExpanded = false
+    @State private var manualBatteryExpanded = true
     @State private var manualLimitsDetailsExpanded = false
 
     var body: some View {
         SettingsForm {
-            SettingsContentGroup(model.showsLidOptions ? L("Display & Lid", "화면·덮개") : L("Display", "화면"),
-                summary: L("Apply to next start", "다음 시작에 적용")) {
+            SettingsContentGroup(model.showsLidOptions ? L("Display & Lid", "화면·덮개") : L("Display", "화면")) {
                 ManualDefaultsOptionsView(model: model, embedded: true, applicationDetails: disclosures?.manualApplication)
             }
             if model.hasInternalBattery {
@@ -20,8 +19,7 @@ struct GeneralPage: View {
                     Note(L("Saves immediately. Applies to future work.",
                            "즉시 저장되고 이후 유지부터 적용됩니다."))
                         .accessibilityIdentifier("settings-manual-limits-save-summary")
-                    SettingRow(title: L("Manual power source", "수동 유지 전원"),
-                        detail: L("Applies to new manual work", "다음 수동 유지부터 적용")) {
+                    SettingRow(title: L("Manual power source", "수동 유지 전원")) {
                         CompactPopUp(title: L("Manual work power range", "수동 유지 전원 범위"),
                             selection: Binding(get: { model.v3Settings.manualPowerCondition }, set: { model.setManualPowerCondition($0) }),
                             choices: PowerCondition.allCases.map { PopupChoice($0, $0.title) },
@@ -96,7 +94,7 @@ struct ProtectionSettingsContent: View {
                 isOn: Binding(get: { model.v3Settings.stopOnSeriousThermal }, set: { model.setStopOnSeriousThermal($0) }))
                 .disabled(model.commandPending || !model.acceptingUserCommands)
             if model.hasInternalBattery {
-                SettingRow(title: L("Stop below battery level", "배터리가 이보다 낮으면 끝내기"), showsAccessibleTitle: false) {
+                SettingRow(title: L("Battery cutoff", "배터리 잔량 하한"), showsAccessibleTitle: false) {
                     CompactPopUp(title: L("Stop below", "잔량 하한"), selection: Binding(
                         get: { model.batteryFloor }, set: { value in
                             var limits = model.limits; limits.batteryFloor = value; model.setLimits(limits)

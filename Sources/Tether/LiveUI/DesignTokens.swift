@@ -5,12 +5,12 @@ enum TetherTypography {
     static let bodySize: CGFloat = 14
     static let secondarySize: CGFloat = 12
     static let sectionSize: CGFloat = 14
-    static let statusSize: CGFloat = 17
-    static let pageSize: CGFloat = 19
-    static let countdownSize: CGFloat = 28
+    static let statusSize: CGFloat = 16
+    static let pageSize: CGFloat = 17
+    static let countdownSize: CGFloat = 24
     static let settingsBodySize: CGFloat = 14
     static let settingsSecondarySize: CGFloat = 12
-    static let settingsSectionSize: CGFloat = 15
+    static let settingsSectionSize: CGFloat = 13
 
     static let body = Font.system(size: bodySize)
     static let secondary = Font.system(size: secondarySize)

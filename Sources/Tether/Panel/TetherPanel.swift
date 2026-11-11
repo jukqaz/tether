@@ -36,12 +36,12 @@ struct TetherPanel: View {
     var body: some View {
         VStack(spacing: 0) {
             header.padding(.horizontal, WorkSessionMetrics.panelInset)
-                .padding(.vertical, 6)
+                .padding(.vertical, 10)
                 .background { chromeMeasurement }
             Divider()
             // Reserve the measured chrome, including wrapped footer text.
             MenuPanelBody(maximumHeight: max(1, (maximumHeight ?? screenHeightLimit) - chromeHeight)) {
-                panelContent.padding(.horizontal, WorkSessionMetrics.panelInset).padding(.vertical, 14)
+                panelContent.padding(.horizontal, WorkSessionMetrics.panelInset).padding(.vertical, 12)
             }
             .background(Color(nsColor: .windowBackgroundColor))
             Divider()
@@ -75,16 +75,28 @@ struct TetherPanel: View {
     }
 
     private var header: some View {
-        HStack(spacing: 8) {
-            Text("Tether").font(TetherTypography.body.weight(.semibold))
-            Spacer(minLength: 8)
-            moreActions
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 8) {
+                statusSummary
+                moreActions.fixedSize()
+            }
+            if model.workProtectionReason != nil {
+                Text(protectionResumeExplanation)
+                    .font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("panel-protection-resume-detail")
+            }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(actionVisibility.showsCurrentWork
+            ? "panel-current-work-section" : "panel-state-section")
     }
 
     private var statusSummary: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(statusTitle).font(TetherTypography.status)
+                .foregroundStyle(model.workProtectionReason != nil
+                    ? Color.tetherWarning : Color.tetherPrimary)
                 .fixedSize(horizontal: false, vertical: true)
             Text(statusExplanation)
                 .font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
@@ -99,21 +111,9 @@ struct TetherPanel: View {
     }
 
     private var panelContent: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 16) {
-                statusSummary
-                if actionVisibility.showsCurrentWork,
-                   model.manualSessionActive || model.batteryHoldUntil != nil { currentWork }
-            }
-            .accessibilityElement(children: .contain)
-            .accessibilityIdentifier(actionVisibility.showsCurrentWork
-                ? "panel-current-work-section" : "panel-state-section")
-            if model.workProtectionReason != nil {
-                Text(protectionResumeExplanation)
-                    .font(TetherTypography.secondary).foregroundStyle(Color.tetherSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("panel-protection-resume-detail")
-            }
+        VStack(alignment: .leading, spacing: 12) {
+            if actionVisibility.showsCurrentWork,
+               model.manualSessionActive || model.batteryHoldUntil != nil { currentWork }
             if model.v4ACDrainWarning {
                 Text(L("Battery charge continues to decrease while connected to power.",
                        "전원 연결 중 배터리 잔량이 계속 줄고 있습니다."))
@@ -145,40 +145,33 @@ struct TetherPanel: View {
             }
             if showsDisplayRecoveryWarning { displayRecoveryAttention }
             if actionVisibility.showsNewManual {
-                VStack(alignment: .leading, spacing: 8) {
-                    sectionTitle(model.automaticWorkReasonActive
-                        ? L("Add manual keep-awake", "추가 수동 유지")
-                        : L("Manual keep-awake", "수동 유지"))
-                    ManualSessionControls(model: model, clock: model.clock, compact: true,
-                        showBatteryScopeHint: false, presentation: .start,
-                        prominentStart: true)
-                }
+                ManualSessionControls(model: model, clock: model.clock, compact: true,
+                    showBatteryScopeHint: false, presentation: .start,
+                    prominentStart: true)
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("panel-new-manual-section")
             }
             if actionVisibility.showsStartBlockedReason {
                 Note(model.manualStartBlockedDetail)
             }
-            if actionVisibility.showsQuickOptions || model.workPaused || model.workProtectionReason != nil
-                || actionVisibility.showsAutomaticRest {
-                VStack(alignment: .leading, spacing: 12) {
-                    if actionVisibility.showsQuickOptions || model.workPaused || model.workProtectionReason != nil {
-                        MenuKeepAwakeControls(model: model, canEdit: actionVisibility.showsQuickOptions,
-                            openHelperSetup: { showSettings(page: .safety) })
-                    }
+            if actionVisibility.showsQuickOptions || model.workPaused || model.workProtectionReason != nil {
+                MenuKeepAwakeControls(model: model, canEdit: actionVisibility.showsQuickOptions,
+                    openHelperSetup: { showSettings(page: .safety) }, stopSummaryIsInHeader: true)
+            }
+            if actionVisibility.showsAutomaticRest || model.capabilities.internalBattery == true
+                || actionVisibility.showsWorkDetails || actionVisibility.showsAutomaticToggle {
+                VStack(alignment: .leading, spacing: 4) {
+                    Divider().padding(.bottom, 4)
                     if actionVisibility.showsAutomaticRest {
                         AutomaticPauseControls(model: model, compact: true)
                     }
-                }
-            }
-            if model.capabilities.internalBattery == true || actionVisibility.showsWorkDetails
-                || actionVisibility.showsAutomaticToggle {
-                VStack(alignment: .leading, spacing: 10) {
                     if model.capabilities.internalBattery == true {
-                        Divider()
                         PowerBatteryDetails(monitor: powerBattery, isExpanded: $powerDetailsExpanded)
+                            .padding(.vertical, 4)
                     }
-                    if actionVisibility.showsWorkDetails || actionVisibility.showsAutomaticToggle { workDetails }
+                    if actionVisibility.showsWorkDetails || actionVisibility.showsAutomaticToggle {
+                        workDetails.padding(.vertical, 4)
+                    }
                 }
             }
             if let summary = model.otherAppKeepAwakeSummary {
@@ -261,7 +254,7 @@ struct TetherPanel: View {
     }
 
     private var currentWork: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             if model.automaticWorkReasonActive {
                 AutomaticSessionCountdown(model: model, clock: model.clock)
             }
@@ -271,11 +264,6 @@ struct TetherPanel: View {
                     showsSessionLabel: model.automaticWorkReasonActive)
             }
         }
-    }
-
-    private func sectionTitle(_ title: String) -> some View {
-        Text(title).font(TetherTypography.section)
-            .foregroundStyle(Color.tetherSecondary).accessibilityAddTraits(.isHeader)
     }
 
     private var automaticControls: some View {

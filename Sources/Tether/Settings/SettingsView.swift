@@ -61,9 +61,9 @@ struct SettingsNavigation: View {
             }
             .listStyle(.sidebar)
             .scrollContentBackground(.hidden)
-            .environment(\.defaultMinListRowHeight, 36)
+            .environment(\.defaultMinListRowHeight, 32)
             .toolbar(removing: .sidebarToggle)
-            .navigationSplitViewColumnWidth(min: 168, ideal: 176, max: 208)
+            .navigationSplitViewColumnWidth(min: 168, ideal: 168, max: 192)
             .background(Color(nsColor: .windowBackgroundColor))
             .accessibilityIdentifier("settings-sidebar")
         } detail: {
@@ -71,18 +71,17 @@ struct SettingsNavigation: View {
             // document. Long pages must not enlarge the whole split view.
             GeometryReader { _ in
                 VStack(spacing: 0) {
-                    VStack(alignment: .leading, spacing: 5) {
+                    VStack(alignment: .leading, spacing: 0) {
                         Text(model.settingsPage.title).font(TetherTypography.page)
                             .foregroundStyle(Color.tetherPrimary)
                             .accessibilityAddTraits(.isHeader)
+                            .accessibilityValue(model.settingsPage.subtitle)
+                            .help(model.settingsPage.subtitle)
                             .accessibilityIdentifier("settings-page-heading")
-                        Text(model.settingsPage.subtitle).font(TetherTypography.settingsSecondary)
-                            .foregroundStyle(Color.tetherSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
                     }
                     .frame(maxWidth: SettingsMetrics.contentWidth, alignment: .leading)
                     .padding(.horizontal, SettingsMetrics.gutter)
-                    .padding(.top, 18).padding(.bottom, 12)
+                    .padding(.top, 16).padding(.bottom, 14)
                     .frame(maxWidth: .infinity)
                     .background(Color(nsColor: .windowBackgroundColor))
                     model.settingsPage.page(model: model, disclosures: $disclosures)
@@ -135,7 +134,7 @@ struct SettingsNavigation: View {
 /// Standalone page renderers can continue using their local State fallback.
 struct SettingsDisclosureState {
     var powerDisconnect = true
-    var manualBattery = false
+    var manualBattery = true
     var manualApplication = false
     var manualLimitsApplication = false
     var powerScope = false
@@ -154,7 +153,7 @@ struct SettingsDisclosureState {
     var usageStatistics = false
     var otherAppRequests = false
     init(expanded: Bool = false) {
-        manualBattery = expanded; workRules = expanded; protectionAlerts = expanded; protectionRules = expanded
+        workRules = expanded; protectionAlerts = expanded; protectionRules = expanded
         manualApplication = expanded; manualLimitsApplication = expanded; powerScope = expanded
         protectionBasis = expanded; appBehavior = expanded
         notifications = expanded; appAdvanced = expanded

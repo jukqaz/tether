@@ -32,7 +32,7 @@ final class DesignPreviewStateTests: XCTestCase {
             let state = DesignPreviewState(scenario: .automatic)
             defer { state.close() }
             await waitForPreparedPreview(state)
-            for size in [WorkSessionMetrics.settingsDefault, WorkSessionMetrics.settingsMinimum] {
+            for size in [WorkSessionMetrics.settingsMinimum, CGSize(width: 900, height: 640)] {
                 let window = DesignPreview.makeWindow(title: "Settings layout regression",
                     size: size, dark: false,
                     view: DesignPreviewSettings(state: state, page: .app, snapshot: true))

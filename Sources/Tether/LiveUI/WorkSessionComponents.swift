@@ -9,7 +9,7 @@ enum WorkSessionMetrics {
     static let iconWidth: CGFloat = 16
     static let iconSpacing: CGFloat = 8
     static let settingsMinimum = CGSize(width: 720, height: 560)
-    static let settingsDefault = CGSize(width: 780, height: 620)
+    static let settingsDefault = CGSize(width: 720, height: 560)
     static let pageInset: CGFloat = 24
     static func panelHeightLimit(visibleHeight: CGFloat) -> CGFloat {
         min(panelMaximumHeight, max(202, visibleHeight - 32))

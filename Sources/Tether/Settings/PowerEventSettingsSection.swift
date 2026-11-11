@@ -33,7 +33,6 @@ struct PowerEventSettingsSection<Content: View, Status: View>: View {
             }
             .accessibilityElement(children: .contain)
             status
-            Divider().padding(.top, 4)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

@@ -54,6 +54,8 @@ struct MenuKeepAwakeControls: View {
     @ObservedObject var model: AppModel
     var canEdit = true
     var openHelperSetup: () -> Void = {}
+    /// Only a parent that already names the stop may shorten redundant details.
+    var stopSummaryIsInHeader = false
 
     var controlsDisabled: Bool { !canEdit || !model.acceptingUserCommands || model.commandPending }
     var lidAvailability: LidOptionAvailability { LidOptionAvailability(model: model) }
@@ -74,14 +76,16 @@ struct MenuKeepAwakeControls: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             if model.showsLidOptions {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 2) {
                     option(WorkPermissionText.lidTitle, selection: lidBinding,
                            identifier: "panel-allow-closed-lid")
                         .disabled(lidControlDisabled)
-                        .help(WorkPermissionText.lidHelp)
-                    permissionDetail(lidStatusDetail)
+                        .help(WorkPermissionText.lidHelp + "\n" + lidStatusDetail)
+                        .accessibilityHint(lidStatusDetail)
+                    permissionDetail(usesCompactStopSummary && model.v3Settings.allowClosedLid
+                        ? observedLidPosition : lidStatusDetail, original: lidStatusDetail)
                         .accessibilityIdentifier("panel-lid-status")
                     if canEdit && !model.helperSetupConfirmed {
                         Button(L("Set up…", "도우미 설정…"), action: openHelperSetup)
@@ -92,12 +96,15 @@ struct MenuKeepAwakeControls: View {
                     }
                 }
             }
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 option(WorkPermissionText.displayTitle, selection: displayBinding,
                        identifier: "panel-keep-display-awake")
                     .disabled(controlsDisabled)
-                    .help(WorkPermissionText.displayHelp)
-                permissionDetail(displayStatusDetail)
+                    .help(WorkPermissionText.displayHelp + "\n" + displayStatusDetail)
+                    .accessibilityHint(displayStatusDetail)
+                permissionDetail(usesCompactStopSummary && model.v3Settings.keepDisplayAwake
+                    ? L("Saved permission choices are kept.", "저장된 허용 선택은 유지됩니다.")
+                    : displayStatusDetail, original: displayStatusDetail)
                     .accessibilityIdentifier("panel-display-status")
             }
         }
@@ -105,13 +112,35 @@ struct MenuKeepAwakeControls: View {
         .toggleStyle(.checkbox).tint(.tetherAction).controlSize(.regular)
     }
 
-    private func permissionDetail(_ text: String) -> some View {
+    /// A stop's reason is already in the header. Never shorten an unresolved
+    /// release, an unknown device state, or a helper/display warning.
+    private var usesCompactStopSummary: Bool {
+        stopSummaryIsInHeader && model.featureStopSummary != nil
+            && model.userSessionStatus?.ownReleasePending != true
+            && model.userSessionStatus?.displayError == nil
+            && !model.lidReleasePending && !model.closedLidDisplayRecoveryPending
+            && (!model.showsLidOptions || (model.snapshot.observedLidClosed != nil
+                && model.helperSetupConfirmed && model.coordinatedLidError == nil
+                && model.coordinatedLidBlockReason == nil))
+    }
+
+    private var observedLidPosition: String {
+        switch model.snapshot.observedLidClosed {
+        case true?: L("Lid closed", "덮개 닫힘")
+        case false?: L("Lid open", "덮개 열림")
+        case nil: lidStatusDetail
+        }
+    }
+
+    private func permissionDetail(_ text: String, original: String) -> some View {
         Text(text)
             .font(TetherTypography.secondary)
             .foregroundStyle(Color.tetherSecondary)
             .lineSpacing(2)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.leading, 22)
+            .accessibilityLabel(original)
+            .help(original)
     }
 
     private func option(_ title: String, selection: Binding<Bool>, identifier: String) -> some View {
