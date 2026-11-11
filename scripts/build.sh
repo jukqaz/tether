@@ -5,8 +5,8 @@ set -eu
 cd "$(dirname "$0")/.."
 
 # App Intents extraction needs the compiler constants emitted by Swift Build.
-# Xcode 26's SwiftPM can still default to the native backend.
-set -- --build-system swiftbuild "$@"
+# Xcode 26's SwiftPM can default to the native backend or build a universal binary.
+set -- --build-system swiftbuild --arch arm64 "$@"
 swift build "$@" -c release --product Tether
 swift build "$@" -c release --product TetherHelper
 swift build "$@" -c release --product TetherCLI
