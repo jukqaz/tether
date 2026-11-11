@@ -1,6 +1,6 @@
 #!/bin/sh
 # Extract compiler-produced App Intents metadata into an uninstalled local build bundle.
-# Usage: scripts/extract-app-intents.sh build/Tether.app [Release|Debug]
+# Usage: scripts/extract-app-intents.sh build/Tether.app [Release|Debug] [compiler-bin-directory]
 # This does not launch the app, register Shortcuts, authenticate or install anything.
 set -eu
 cd "$(dirname "$0")/.."
@@ -8,6 +8,10 @@ cd "$(dirname "$0")/.."
 APP_INTENTS_BUNDLE=${1:?Usage: extract-app-intents.sh build/Tether.app [Release|Debug]}
 APP_INTENTS_CONFIGURATION=${2:-Release}
 case "$APP_INTENTS_CONFIGURATION" in Release|Debug) ;; *) echo 'Expected Release or Debug.' >&2; exit 2 ;; esac
+APP_INTENTS_BIN=${3:-}
+if [ -z "$APP_INTENTS_BIN" ]; then
+    APP_INTENTS_BIN=$(swift build --build-system swiftbuild --arch arm64 -c "$(printf '%s' "$APP_INTENTS_CONFIGURATION" | tr '[:upper:]' '[:lower:]')" --show-bin-path)
+fi
 
 # The helper may only write inside this checkout's local build directory.
 python3 - "$APP_INTENTS_BUNDLE" <<'PY'
@@ -34,21 +38,25 @@ APP_INTENTS_STAGE=$(mktemp -d "$PWD/build/app-intents.XXXXXX")
 trap 'rm -rf "$APP_INTENTS_STAGE"' 0
 trap 'exit 1' 1 2 15
 
-python3 - "$APP_INTENTS_CONFIGURATION" "$APP_INTENTS_ARCHS" "$APP_INTENTS_STAGE" <<'PY'
+python3 - "$APP_INTENTS_CONFIGURATION" "$APP_INTENTS_ARCHS" "$APP_INTENTS_STAGE" "$APP_INTENTS_BIN" <<'PY'
 from pathlib import Path
 import json, sys
-configuration, architecture, stage = sys.argv[1:]
+configuration, architecture, stage, binary_directory = sys.argv[1:]
 root = Path.cwd()
 # Xcode-backed SwiftPM writes one const-values file per source in Debug and a
 # whole-module file in Release. Read the output map instead of guessing filenames.
-output_map = (root / '.build/out/Intermediates.noindex/Tether.build' / configuration /
-              'Tether-p.build/Objects-normal' / architecture / 'Tether-OutputFileMap.json')
-if not output_map.is_file():
-    # Also accept classic SwiftPM's compiler output map when it provides constants.
-    candidates = sorted((root / '.build').glob(f'*-apple-macosx/{configuration.lower()}/Tether.build/output-file-map.json'))
-    if len(candidates) != 1:
-        raise SystemExit(f'Missing unambiguous Tether compiler output map for {configuration}; build that product first.')
-    output_map = candidates[0]
+# Swift Build's root and target directory names differ across Xcode versions.
+# Follow the selected compiler product, so another build cannot supply stale maps.
+binary_directory = Path(binary_directory).resolve()
+if binary_directory.parent.name == 'Products':
+    intermediates = binary_directory.parent.parent / 'Intermediates.noindex'
+    candidates = sorted(intermediates.glob(
+        f'*/{configuration}/*/Objects-normal/{architecture}/Tether-OutputFileMap.json'))
+else:
+    candidates = [binary_directory / 'Tether.build/output-file-map.json']
+if len(candidates) != 1 or not candidates[0].is_file():
+    raise SystemExit(f'Missing unambiguous Tether compiler output map for {configuration} at {binary_directory}; build that product first.')
+output_map = candidates[0]
 output = json.loads(output_map.read_text())
 sources = sorted(Path(name) for name in output if name.endswith('.swift'))
 constants = sorted({Path(values['const-values']) for values in output.values() if values.get('const-values')})

@@ -52,7 +52,7 @@ fi
 # Strings live in code (English and Korean); these tell macOS which languages the app speaks.
 for lang in en ko; do mkdir -p "$APP/Contents/Resources/$lang.lproj"; done
 # Required system-action metadata is extracted before signing; failure aborts packaging.
-./scripts/extract-app-intents.sh "$APP" Release
+./scripts/extract-app-intents.sh "$APP" Release "$BIN"
 # The compiler's debug map includes local build paths. Keep it in the build
 # products and omit it from the binaries that will be signed and distributed.
 for executable in MacOS/Tether Helpers/tether Resources/tether-helper Resources/tether-power-recovery; do
