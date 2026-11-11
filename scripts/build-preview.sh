@@ -30,11 +30,24 @@ else
     cp build/Tether.app/Contents/MacOS/Tether "$APP/Contents/MacOS/Tether"
     cp build/Tether.app/Contents/Resources/tether-helper "$APP/Contents/Resources/tether-helper"
 fi
-for icon in Assets.car AppIcon.icns; do
-    if [ -f "build/Tether.app/Contents/Resources/$icon" ]; then
-        cp "build/Tether.app/Contents/Resources/$icon" "$APP/Contents/Resources/"
+if [ "$DESIGN_PREVIEW" = true ]; then
+    # A clean worktree must preview the actual source icon, not a generic icon
+    # or resources left behind by an unrelated production build.
+    MIN_MACOS=$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' Resources/Info.plist)
+    xcrun actool "$PWD/Resources/AppIcon.icon" --compile "$PWD/$APP/Contents/Resources" --platform macosx \
+        --minimum-deployment-target "$MIN_MACOS" --app-icon AppIcon \
+        --output-partial-info-plist "$PWD/build/design-icon-info.plist" --output-format human-readable-text
+    if [ ! -s "$APP/Contents/Resources/AppIcon.icns" ] || [ ! -s "$APP/Contents/Resources/Assets.car" ]; then
+        echo 'Icon Composer did not produce both app icon files.' >&2
+        exit 1
     fi
-done
+else
+    for icon in Assets.car AppIcon.icns; do
+        if [ -f "build/Tether.app/Contents/Resources/$icon" ]; then
+            cp "build/Tether.app/Contents/Resources/$icon" "$APP/Contents/Resources/"
+        fi
+    done
+fi
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 if [ "$DESIGN_PREVIEW" = true ]; then
     /usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier io.github.jukqaz.tether.design' "$APP/Contents/Info.plist"
