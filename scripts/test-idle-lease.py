@@ -23,6 +23,8 @@ def run(fixture, output):
     output.mkdir(parents=True, exist_ok=False)
     samples = []
     child = foreign = None
+    lease = None
+    last_active = None
 
     def snapshot():
         result = subprocess.run([str(fixture), "--idle-snapshot"], text=True,
@@ -94,9 +96,9 @@ def run(fixture, output):
             else:
                 absent = sample["continuous"]
                 break
-            # Coarse before the deadline, then bound the final observation interval.
+            # Poll at least once a second, tightening the last three seconds.
             remaining = lease["expiry"] - sample["continuous"]
-            time.sleep(min(10, max(0.1, remaining - 1)))
+            time.sleep(min(1, max(0.1, remaining - 3)))
         if absent is None:
             raise RuntimeError("The native request stayed active beyond the observation deadline")
         if last_active < lease["expiry"] - 2:
@@ -113,7 +115,28 @@ def run(fixture, output):
         (output / "result.json").write_text(json.dumps(report, indent=2) + "\n")
         print(json.dumps(report, sort_keys=True), flush=True)
     except Exception as error:
-        (output / "failure.json").write_text(json.dumps({"error": str(error), "samples": len(samples)}, indent=2) + "\n")
+        def observed_active(sample, process):
+            if process is None:
+                return None
+            try:
+                return active(sample, process.pid)
+            except (KeyError, TypeError):
+                return None
+
+        failure = {
+            "error": str(error),
+            "samples": len(samples),
+            "lease_expiry": lease.get("expiry") if isinstance(lease, dict) else None,
+            "last_active": last_active,
+            "recent_samples": [
+                {"continuous": sample.get("continuous"),
+                 "own_active": observed_active(sample, child),
+                 "foreign_active": observed_active(sample, foreign)}
+                for sample in samples[-5:]
+            ],
+        }
+        (output / "failure.json").write_text(json.dumps(failure, indent=2) + "\n")
+        print(json.dumps({"failure": failure}, sort_keys=True), flush=True)
         raise
     finally:
         cleanup(child)

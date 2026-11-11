@@ -10,14 +10,18 @@ on:
         description: Recheck packaging after a packaging-only change
         type: boolean
         default: false
+      idle_only:
+        description: Recheck the native finite idle lease
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
   build:
-    if: ${{ !inputs.package_only }}
-    needs: package
+    if: ${{ !inputs.package_only && !inputs.idle_only }}
+    needs: [package, idle-lease]
     runs-on: macos-26
     timeout-minutes: 30
     steps:
@@ -75,6 +79,7 @@ jobs:
       - name: Uninstall and ownership recovery integration
         run: python3 scripts/test-uninstall.py
   package:
+    if: ${{ !inputs.idle_only }}
     runs-on: macos-26
     timeout-minutes: 20
     steps:
@@ -90,6 +95,11 @@ jobs:
         env:
           TETHER_TEST_HELPER: ${{ github.workspace }}/build/Tether.app/Contents/Resources/tether-helper
         run: python3 scripts/test-redesign-helper.py
+  idle-lease:
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - name: Native finite idle lease after a stopped test driver
         run: |
           swift build --product TetherWriterFixture
