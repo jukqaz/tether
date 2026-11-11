@@ -7,7 +7,15 @@ extension AppModel {
         guard manualSessionActive else { return nil }
         if let deadline = userSessionStatus?.manualContinuousDeadline {
             guard deadline.isFinite, continuousNow.isFinite else { return nil }
-            return max(0, deadline - continuousNow)
+            let remaining = max(0, deadline - continuousNow)
+            let wholeSecond = remaining.rounded()
+            // Adding a duration and subtracting two clock readings can land
+            // one representable step above an exact second. Keep real partial
+            // seconds for the countdown and leave the execution deadline intact.
+            if wholeSecond > 0, abs(remaining - wholeSecond) <= max(deadline.ulp, continuousNow.ulp) {
+                return wholeSecond
+            }
+            return remaining
         }
         return manualSessionUntil.map { max(0, $0.timeIntervalSince(now)) }
     }
